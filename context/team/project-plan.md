@@ -130,3 +130,11 @@ Brugere:
 	- Som Hotel CFO ønsker jeg altid at have et overblik over cocktailbaren. Både hvor meget Helene Christine har solgt totalt for året, omsætning/indtjening per drink/cocktail og vise procentfordelingen af cocktails/drinks og kaffe solgt, så jeg kan etablere de mest populære drinks/cocktails, forstå hvor høj indtjening vi har I cocktailbaren samt procentfordelingen af de forskellige læske kategorier.
 - User story 4 (Hotel CFO) (Tableau)
 	- Som Hotel CFO ønsker jeg altid at have et overblik over cocktailbaren, så jeg kan etablere om folk køber dyre eller billige produkter i baren og hvilke produkter der bliver købt flest af i baren.
+
+### Team-beslutninger (TD – 2026-10-27)
+Beslutninger truffet under udarbejdelsen af projektets Constitution (`constitution.md`):
+- **Konfliktregel (Precedence):** Underviserkrav (`context/teacher/`) vægter højest, dernæst `constitution.md`, denne teamplan (`project-plan.md`), specifikationer/planer/tasks og til sidst kode. Konflikter med underviserkrav afgøres altid til fordel for underviserkravet og dokumenteres åbent under *Open Questions*.
+- **Commit- og review-flow:** Gruppemedlemmer committer direkte til `main` (pull requests er ikke påkrævet). Kodeagenten implementerer én task ad gangen, og medlemmet gennemgår hele diff'en og kører tests (samt `docker-compose up` ved ændringer i Docker, compose eller databaseskema) før commit. Commit-beskeder bør referere til task-ID (f.eks. `T012`). Teamet gennemgår nye commits sammen ved check-ins.
+- **Test-politik:** Alle KPI-formler og forretningsregler i forretningslaget skal have automatiserede unit tests, og alle REST API-endpoints skal have automatiserede kontrakttests mod OpenAPI-kontrakten. TDD er ikke påkrævet, men en task er først færdig, når dens tests er skrevet og består.
+- **Ændringer til Constitution (Amendments):** Ændringer foretages via `/speckit-constitution`, committes direkte til `main` med versionsbump (SemVer) og begrundelse i commit-beskeden, og gennemgås ved næste team check-in.
+- **Sprog:** Spec-artefakter skrives på engelsk, mens citater fra kilder og selve user story-sætningerne (`"Som <rolle> ønsker jeg <mål>, så <fordel>"`) skrives på dansk. Praktisk udviklervejledning samles i `CONTRIBUTE.md`.
