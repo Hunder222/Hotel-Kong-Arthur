@@ -8,6 +8,17 @@
 
 **Input**: User description: "Full system spec: cover all mandatory requirements (F1 Booking CRUD, A1-A7 Hotel KPIs, B1-B3 Cocktail Bar, K1-K3 calculations, and Tableau REST API integration) derived from constitution.md and context/"
 
+## Clarifications
+
+### Session 2026-10-27
+
+- Q: How should the system deliver "live" data to the analytics dashboard, and which records must be editable at runtime? (FR-005) → A: On-demand REST API pull on dashboard load/refresh (<5s delay); bookings support full runtime CRUD via UI and API (`F1`), while bar sales are seeded in MySQL and queried live via the API.
+- Q: How should the three seasons (`low`, `mid`, `high`) be mapped to calendar months and day counts for seasonal pricing and occupancy calculations? (FR-010) → A: `low` = Jan, Feb, Nov (89 days); `mid` = Mar, Apr, May, Sep, Oct (153 days); `high` = Jun, Jul, Aug, Dec (123 days), totaling 365 days.
+- Q: Should occupancy rate (`belægningsgrad`) be calculated from room-nights (`214` rooms) or guest capacity (`428` guests), and how are the `214` rooms distributed across the 8 room types? (FR-010) → A: Measured in room-nights across `214` rooms (`78,110` annual room-nights), with a balanced inventory of `27` rooms each for 6 room types and `26` rooms each for `Suite` and `LOFT Suite` (`6×27 + 2×26 = 214`).
+- Q: Since the sample CSV files have no customer satisfaction column, how should satisfaction scores (`kundetilfredshed`) be populated and updated? (FR-011) → A: Store satisfaction in dedicated guest review records (`1`–`5` scale) in a separate `reviews` table/endpoint seeded with synthetic reviews, separate from the booking form.
+- Q: Since the sample CSV files contain no calendar dates, how should the system represent "the year" when calculating annual hotel revenue (`A6`) and annual bar sales (`B1`)? (FR-007) → A: Require a calendar `check_in_date` (`YYYY-MM-DD`) on every booking (generating deterministic `2026` dates matching each CSV row's season during seeding) and derive both `Season` and the reporting year from `check_in_date`.
+- Q: Should `docker compose up` automatically seed historical bookings and sales data on startup? (FR-004, SC-005) → A: No; `docker compose up` MUST start the system with the database schema and 8 static room types (`214` rooms) ready, but with zero booking history, bar sales, or reviews. A separate idempotent command MUST be used to seed (reset/replace) the database with the sample inspiration data.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Manage Room Bookings (Priority: P1)
@@ -16,7 +27,7 @@
 
 **Mandatory Scope Covered**: `F1` (and live data foundation for `A1`–`A7`, `K1`–`K3`)
 
-The Receptionist uses a browser-based booking interface to view existing room reservations, register new guest bookings, update details on existing bookings (such as guest name, country of origin, room type, stay duration, season, price, or guest satisfaction score), and cancel/remove bookings. Any booking change is immediately persisted in the central system so that operational reports and executive analytics reflect current reservations rather than static historical snapshots. External booking systems used by the hotel can also submit the same create, update, and delete operations through the system's central service interface.
+The Receptionist uses a browser-based booking interface to view existing room reservations, register new guest bookings, update details on existing bookings (such as guest name, country of origin, room type, check-in date, stay duration, or price), and cancel/remove bookings. Any booking change is immediately persisted in the central system so that operational reports and executive analytics reflect current reservations rather than static historical snapshots. External booking systems used by the hotel can also submit the same create, update, and delete operations through the system's central service interface.
 
 **Why this priority**: Without the ability to create, edit, and delete bookings and persist them centrally, the platform cannot satisfy the core requirement of moving from static historical data to live operational data (`F1`). It is also the foundational data source for all hotel KPIs.
 
@@ -24,10 +35,10 @@ The Receptionist uses a browser-based booking interface to view existing room re
 
 **Acceptance Scenarios**:
 
-1. **Given** the Receptionist has the booking interface open, **When** they submit a valid new booking with guest first name, family name, country, room type (one of the 8 valid room types), days rented (positive integer), season (`low`, `mid`, or `high`), and price in DKK, **Then** the system stores the booking, assigns it a unique identifier, displays it in the active booking list, and includes it in subsequent KPI calculations.
+1. **Given** the Receptionist has the booking interface open, **When** they submit a valid new booking with guest first name, family name, country, room type (one of the 8 valid room types), check-in date (`YYYY-MM-DD`), days rented (positive integer), and price in DKK, **Then** the system derives the season (`low`, `mid`, or `high`) and reporting year from the check-in date, stores the booking, assigns it a unique identifier, displays it in the active booking list, and includes it in subsequent KPI calculations.
 2. **Given** an existing booking in the system, **When** the Receptionist modifies one or more booking fields (e.g., changing `Days Rented` from `3` to `5` or updating the `Room Type`) and saves, **Then** the system validates and persists the changes and updates all dependent revenue and occupancy figures.
 3. **Given** an existing booking in the system, **When** the Receptionist selects to delete that booking, **Then** the booking is removed from the system and excluded from subsequent KPI calculations.
-4. **Given** the Receptionist attempts to create or update a booking with invalid or missing mandatory data (such as an unknown room type, zero or negative days rented, an invalid season, or a negative price), **When** they submit the form, **Then** the system rejects the change, preserves existing data unchanged, and displays a clear validation message explaining which field is invalid.
+4. **Given** the Receptionist attempts to create or update a booking with invalid or missing mandatory data (such as an unknown room type, an invalid check-in date, zero or negative days rented, or a negative price), **When** they submit the form, **Then** the system rejects the change, preserves existing data unchanged, and displays a clear validation message explaining which field is invalid.
 
 ---
 
@@ -68,7 +79,7 @@ The Hotel CFO uses the analytics dashboard to inspect the geographic distributio
 
 1. **Given** bookings with guest countries of origin recorded in the system, **When** the Hotel CFO views the guest origin distribution (`A1`), **Then** the dashboard shows the number and proportion of bookings/guests from each country.
 2. **Given** Hotel Kong Arthur's fixed capacity of 214 rooms and the recorded room-nights (`Days Rented`) across bookings, **When** the Hotel CFO views the occupancy KPI (`K1`), **Then** the system presents the calculated occupancy rate (`belægningsgrad`) as a percentage overall and per season/room type.
-3. **Given** bookings with recorded guest satisfaction ratings (`1` to `5` scale), **When** the Hotel CFO views customer satisfaction (`K3`), **Then** the system presents the average satisfaction score overall, by room type, and by season.
+3. **Given** guest review records with satisfaction ratings (`1` to `5` scale) in the system, **When** the Hotel CFO views customer satisfaction (`K3`), **Then** the system presents the average satisfaction score overall, by room type, and by season.
 
 ---
 
@@ -115,7 +126,7 @@ To fulfill the requirement for a team-selected KPI (`A7`) and address the team's
 
 ### Edge Cases
 
-- **Invalid or out-of-bounds booking inputs**: What happens when a user or external client submits a booking with `0` or negative `Days Rented`, a negative `Price`, an unrecognized `Room Type` (outside the 8 hotel room types), an unrecognized `Season` (outside `low`, `mid`, `high`), or empty guest name/country fields? The system MUST reject the request with a descriptive validation error and leave stored data untouched.
+- **Invalid or out-of-bounds booking inputs**: What happens when a user or external client submits a booking with `0` or negative `Days Rented`, a negative `Price`, an unrecognized `Room Type` (outside the 8 hotel room types), an invalid or missing `Check-In Date` (not in `YYYY-MM-DD` format), or empty guest name/country fields? The system MUST reject the request with a descriptive validation error and leave stored data untouched.
 - **Non-existent booking on edit or delete**: What happens when a user or external client attempts to edit or delete a booking ID that does not exist (or was already deleted)? The system MUST return a clear "not found" error without affecting other records.
 - **Division by zero on empty datasets or filtered slices**: How does the system handle KPI calculations (`belægningsgrad`, average satisfaction, percentage split between cocktails and coffee, or average length of stay) if a filtered category has zero bookings or zero sales? The system MUST return `0` (or `0.0%`) safely rather than failing or producing invalid numbers.
 - **Character encoding in international guest names**: The baseline guest dataset includes international characters (e.g., `Müller`, `Johansson`, `Dubois`). The system MUST preserve and display international characters and diacritics accurately across booking creation, storage, retrieval, and dashboard display.
@@ -154,11 +165,11 @@ Per Constitution Phase Gate 1 (*Specify*), the table below maps every mandatory 
   - Non-empty `First Name`, `Family Name`, and `Country`.
   - A `Room Type` belonging to Hotel Kong Arthur's 8 room types (`Standard Single`, `Grand Lit`, `Standard Double`, `Superior Double`, `Junior Suite`, `Spa Executive`, `Suite`, `LOFT Suite`).
   - `Days Rented` as a whole number greater than or equal to `1`.
-  - `Season` as one of `low`, `mid`, or `high`.
+  - A valid `Check-In Date` (`YYYY-MM-DD`), from which the business layer derives the booking's `Season` (`low` = Jan, Feb, Nov; `mid` = Mar, Apr, May, Sep, Oct; `high` = Jun, Jul, Aug, Dec) and reporting year.
   - `Price` (total booking price in DKK) as a positive number consistent with the room type's seasonal pricing rules (or automatically calculated from the room type's seasonal nightly rate multiplied by `Days Rented` when not manually overridden).
-  - An optional or default `Satisfaction Score` on a `1` to `5` integer scale.
-- **FR-004**: The system MUST automatically initialize and seed its central data store on startup with the baseline hotel room catalogue (8 room types totaling 214 rooms), the baseline guest booking records (`1,000` bookings), and Helene Christine's lobby bar menu and sales records (`30` drinks: `20` cocktails and `10` coffee types).
-- **FR-005**: All changes to bookings (create, edit, delete) MUST be persisted immediately in the central data store so that subsequent queries from the browser interface or the analytics dashboard return the updated live state.
+  - Booking records and the booking form exclude satisfaction ratings (which are stored separately in `reviews` per `FR-011`).
+- **FR-004**: Starting the system via `docker compose up` MUST initialize the database schema and the 8 static hotel room types (`214` rooms) with **no booking history, bar sales, or guest review data** (`0` bookings, `0` bar sales, `0` reviews) so new bookings can be created immediately. The system MUST provide a separate explicit, idempotent command (which resets/replaces sample records without duplicates) to seed the database with the sample inspiration data: the baseline guest booking records (`1,000` bookings seeded with deterministic `2026` `Check-In Date` values within each row's corresponding season months), synthetic guest review records (`1`–`5` scale in the `reviews` table), and Helene Christine's lobby bar sales records (`30` drinks: `20` cocktails and `10` coffee types for reporting year `2026`).
+- **FR-005**: All changes to bookings (create, edit, delete) MUST be persisted immediately in the central MySQL data store so that subsequent on-demand REST API queries from the browser interface or the analytics dashboard return the updated live state within 5 seconds on load/refresh. Runtime CRUD is required for bookings (`F1`), whereas lobby bar sales are seeded into MySQL and queried dynamically through the REST API.
 
 #### Hotel Revenue & Geographic KPIs (`A1`–`A6`, `K2`)
 
@@ -174,8 +185,8 @@ Per Constitution Phase Gate 1 (*Specify*), the table below maps every mandatory 
 
 - **FR-010**: The system MUST calculate the hotel's occupancy rate (`belægningsgrad`, `K1`) in the central business logic using Hotel Kong Arthur's binding capacity of **214 rooms** (`78,110` available room-nights per 365-day year):
   - $\text{Occupancy Rate (\%)} = \left(\frac{\sum \text{Days Rented}}{\text{Available Room-Nights}}\right) \times 100$
-  - The system MUST provide overall annual occupancy rate as well as occupancy rate segmented by `Season` and by `Room Type`.
-- **FR-011**: The system MUST calculate customer satisfaction (`kundetilfredshed`, `K3`) in the central business logic as the arithmetic mean of recorded booking satisfaction scores (`1` to `5` scale) overall, per `Room Type`, and per `Season`, along with the percentage of satisfied guests (score $\ge 4$).
+  - The system MUST provide overall annual occupancy rate as well as occupancy rate segmented by `Season` (`low` = 89 days / `19,046` room-nights; `mid` = 153 days / `32,742` room-nights; `high` = 123 days / `26,322` room-nights) and by `Room Type` (using the balanced 214-room inventory: `27` rooms each for `Standard Single`, `Grand Lit`, `Standard Double`, `Superior Double`, `Junior Suite`, and `Spa Executive`; `26` rooms each for `Suite` and `LOFT Suite`).
+- **FR-011**: The system MUST store guest satisfaction ratings (`1` to `5` integer scale) in a dedicated `reviews` table exposed via its own REST API endpoint (separate from the booking form) and calculate customer satisfaction (`kundetilfredshed`, `K3`) in the central business logic as the arithmetic mean of review scores overall, per `Room Type`, and per `Season`, along with the percentage of satisfied guests (score $\ge 4$).
 
 #### Cocktail Bar Operations & KPIs (`B1`–`B3`)
 
@@ -195,7 +206,8 @@ Per Constitution Phase Gate 1 (*Specify*), the table below maps every mandatory 
 ### Key Entities *(include if feature involves data)*
 
 - **RoomType**: Represents one of Hotel Kong Arthur's 8 room categories (`Standard Single`, `Grand Lit`, `Standard Double`, `Superior Double`, `Junior Suite`, `Spa Executive`, `Suite`, `LOFT Suite`). Key attributes: room type name, standard seasonal nightly price ranges (`low`, `mid`, `high` in DKK), guest capacity per room (`1–4` persons), and allocated room count out of the hotel's `214` total rooms.
-- **Booking**: Represents a guest reservation at Hotel Kong Arthur. Key attributes: unique booking ID, guest first name, guest family name, guest country of origin, room type (referencing `RoomType`), days rented (nights), season (`low`, `mid`, `high`), total booking price in DKK, and customer satisfaction rating (`1`–`5`).
+- **Booking**: Represents a guest reservation at Hotel Kong Arthur. Key attributes: unique booking ID, guest first name, guest family name, guest country of origin, room type (referencing `RoomType`), check-in date (`YYYY-MM-DD`), days rented (nights), derived season (`low`, `mid`, `high`) and reporting year, and total booking price in DKK.
+- **GuestReview**: Represents a guest satisfaction review stored in a dedicated `reviews` table and exposed via a reviews endpoint. Key attributes: unique review ID, optional booking reference, room type, season (`low`, `mid`, `high`), and satisfaction rating (`1`–`5` integer scale).
 - **BarDrinkSale**: Represents a product on Helene Christine's lobby bar menu and its annual sales performance. Key attributes: unique drink ID, drink name, category (`Cocktail` or `Coffee`), unit price in DKK, units sold, and calculated total drink revenue in DKK.
 - **KPIReport**: Represents the authoritative business metrics computed by the system's business logic, including total annual hotel revenue, revenue by room type/season/country, top-earning room types and countries, guest country distribution, occupancy rate (`belægningsgrad`), customer satisfaction (`kundetilfredshed`), ALOS/ADR, total annual bar sales, per-drink revenue, and cocktail-vs-coffee percentage split.
 
@@ -207,19 +219,19 @@ Per Constitution Phase Gate 1 (*Specify*), the table below maps every mandatory 
 - **SC-002**: 100% of mandatory analytics views (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) are displayed in the interactive dashboard using live data retrieved from the central service interface, with zero direct connections to raw data files or underlying storage.
 - **SC-003**: KPI figures displayed on the dashboard (total annual hotel revenue, room-type/season/country revenue, occupancy rate, customer satisfaction, total bar sales, per-drink revenue, and cocktail/coffee percentage split) match the system's authoritative business calculations with 100% numerical accuracy (within `0.01` DKK / `0.01%` rounding tolerance).
 - **SC-004**: After a booking is created, updated, or deleted, refreshing the analytics dashboard reflects the updated hotel KPIs within 5 seconds.
-- **SC-005**: The complete platform (central data store with seeded data, backend service, contract documentation interface, and booking web interface) starts from a fresh checkout using a single startup command and becomes ready to serve requests within 60 seconds without manual setup steps.
+- **SC-005**: The complete platform (central data store with empty booking/sales tables, backend service, contract documentation interface, and booking web interface) starts from a fresh checkout using a single `docker compose up` command and becomes ready to serve requests within 60 seconds without manual setup steps, while a separate command seeds the sample inspiration data on demand.
 
 ## Assumptions
 
-The following working assumptions provide concrete, testable defaults for areas where the assignment brief (`T1`) leaves room for interpretation. Per Constitution Principle I, the items marked **(Clarify Candidate)** are scheduled for formal confirmation with the team during `/speckit-clarify`:
+The following working assumptions and clarified decisions provide concrete, testable rules for areas where the assignment brief (`T1`) left room for interpretation:
 
-- **Live Data Mechanism & Scope (Clarify Candidate)**: "Live data" means all runtime data is stored in the central data store, bookings can be created/updated/deleted continuously via the service interface, and the analytics dashboard fetches current data from the service interface on load/refresh (near-real-time pull within 5 seconds) rather than reading static historical files. Bookings require full create/edit/delete in the browser UI (`F1`); bar sales are seeded from the baseline dataset and read dynamically through the service interface.
-- **Season Definition (Clarify Candidate)**: Bookings record one of three seasons (`low`, `mid`, `high`) matching the baseline dataset:
+- **Live Data Mechanism & Scope**: "Live data" means all runtime data is stored in the central MySQL data store, `docker compose up` starts with an empty operational state (only the 8 room types configured, `0` bookings/sales/reviews), bookings can be created/updated/deleted continuously via the browser UI and REST API (`F1`), and the analytics dashboard fetches current data from the REST API on load/refresh (within 5 seconds) rather than reading static historical files. A separate idempotent seed command loads the sample inspiration dataset (`1,000` bookings, `30` bar drink sales, and synthetic guest reviews) on demand.
+- **Season Definition**: Bookings derive their season (`low`, `mid`, `high`) from the month of their `Check-In Date`, matching the baseline dataset and totaling 365 days (`low` = 89 days, `mid` = 153 days, `high` = 123 days):
   - `low` (Lavsæson — winter: January, February, November)
   - `mid` (Mellemsæson — spring and autumn: March, April, May, September, October)
   - `high` (Højsæson — summer and Christmas: June, July, August, December)
-- **Occupancy Rate (`belægningsgrad`) Formula (Clarify Candidate)**: Because the baseline booking dataset records `Days Rented` per room booking (and does not record guest headcount per booking), occupancy rate (`K1`) is measured in **room-nights**: $\text{Occupancy Rate} = \frac{\sum \text{Days Rented}}{214 \times 365} \times 100$ for the full year (and scaled proportionally by season days or room-type inventory when segmented).
-- **Customer Satisfaction (`kundetilfredshed`) Data Source (Clarify Candidate)**: Since the historical booking sample dataset does not include a satisfaction column, initial data seeding assigns a deterministic baseline satisfaction score (`1`–`5` scale) to historical bookings, and new/edited bookings can record or update a `1`–`5` satisfaction score (`K3`).
-- **Reporting Year (`A6`, `B1`) (Clarify Candidate)**: Because the baseline historical records do not contain calendar dates, all seeded records represent the active reporting year (`2026`), and new bookings created at runtime belong to the same reporting year unless filtered otherwise.
+- **Occupancy Rate (`belægningsgrad`) Formula**: Because the baseline booking dataset records `Days Rented` per room booking (and does not record guest headcount per booking), occupancy rate (`K1`) is measured in **room-nights**: $\text{Occupancy Rate} = \frac{\sum \text{Days Rented}}{214 \times 365} \times 100$ for the full year, and scaled by season days (`89` / `153` / `123`) and room-type inventory (`27` rooms each for 6 types and `26` rooms each for `Suite` and `LOFT Suite` = `214` rooms) when segmented.
+- **Customer Satisfaction (`kundetilfredshed`) Data Source**: Since the historical booking sample dataset does not include a satisfaction column, guest satisfaction ratings (`1`–`5` scale) are stored in a dedicated `reviews` table and exposed via a separate REST endpoint seeded with synthetic guest reviews, keeping the booking form strictly aligned with the CSV booking fields (`K3`).
+- **Reporting Year (`A6`, `B1`)**: Every booking requires a `Check-In Date` (`YYYY-MM-DD`). Because the baseline historical CSV records do not contain calendar dates, initial seeding generates deterministic `2026` `Check-In Date` values within each row's season months, and both `Season` and reporting year (`2026`) are derived from `Check-In Date` (with bar sales representing reporting year `2026`).
 - **Room Type Naming Alignment**: The 8 English room type names in the baseline dataset (`Standard Single`, `Grand Lit`, `Standard Double`, `Superior Double`, `Junior Suite`, `Spa Executive`, `Suite`, `LOFT Suite`) map 1-to-1 to the 8 Danish room type descriptions in the assignment brief (`Standard enkeltværelse`, `Grand lit værelse`, `Standard dobbeltværelse`, `Superior dobbeltværelse`, `Junior suite`, `Spa executive`, `Suite`, `LOFT suite`).
 - **Authentication**: User authentication and role-based access control are out of scope for this prototype; both the Receptionist browser interface and the CFO dashboard access the service interface directly within the local environment.
