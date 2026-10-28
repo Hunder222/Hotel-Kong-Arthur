@@ -24,6 +24,13 @@
 
 - `FR-003` now lists the value limits the plan introduced (research R17): at most `365` nights, dates between `2000` and `2100`, text up to `100` characters, prices with at most `2` decimals.
 - `FR-010` now derives the available room-nights and the season day counts from the calendar of the reporting year instead of a fixed 365-day year. The figures for `2026` are unchanged (`78,110`; `89` / `153` / `123`); a leap year has `366` days.
+- **Revision Amendments (TODOS.md alignment)**:
+  - **Receptionist Frontend UX Enhancements**:
+    - `FR-018`: The booking interface MUST display a dynamic price breakdown preview (standard nightly rate, selected days rented, and calculated total standard price in DKK) before the user creates or saves a booking.
+    - `FR-019`: The booking interface form MUST allow setting a custom fixed price per night (`price_per_night_dkk`) alongside the total price field (`price_dkk`), enforcing mutual exclusivity (only one manual price field may be active at a time, automatically computing the corresponding other field for convenience).
+    - `FR-020`: The booking interface MUST provide a distinct, visually separated "Edit Mode" when modifying existing bookings (prominent styling, dedicated banner/status, clear cancel-edit action) to clearly distinguish editing from new booking creation.
+  - **All-Time vs. Reporting Year KPI Aggregation**:
+    - `FR-021`: KPI endpoints (`/kpis/hotel/summary`, `/kpis/hotel/by-room-type`, `/kpis/hotel/by-season`, `/kpis/hotel/by-room-type-and-season`, `/kpis/hotel/by-country`, `/kpis/bar/summary`, `/kpis/bar/by-category`, `/kpis/bar/by-price-tier`) MUST support querying all-time aggregates when the `year` parameter is explicitly omitted or passed as `all` (`year=all` or omitting `year`), in addition to filtering by a specific calendar year (e.g. `?year=2026`). In summary and breakdown responses for all-time queries, `year` is represented as `'all'` or `null`, and available room-nights for occupancy are scaled across all years spanned by bookings.
 
 ## User Scenarios & Testing *(mandatory)*
 

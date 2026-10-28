@@ -491,10 +491,14 @@ components:
         their `stay_date`, and drink sales in their sales year. Defaults to the current calendar
         year (Europe/Copenhagen).
       schema:
-        type: integer
-        minimum: 2000
-        maximum: 2100
-        example: 2026
+        oneOf:
+          - type: integer
+            minimum: 2000
+            maximum: 2100
+            example: 2026
+          - type: string
+            enum: [all]
+            example: all
     YearFilter:
       name: year
       in: query
@@ -665,10 +669,14 @@ components:
       description: Rate in percent with 2 decimals. Occupancy can only exceed 100 if more nights are sold than rooms exist.
       example: 6.89
     Year:
-      type: integer
-      minimum: 2000
-      maximum: 2100
-      example: 2026
+      oneOf:
+        - type: integer
+          minimum: 2000
+          maximum: 2100
+          example: 2026
+        - type: string
+          enum: [all]
+          example: all
     Count:
       type: integer
       minimum: 0
@@ -799,6 +807,15 @@ components:
             `price_dkk / days_rented` must lie inside the room type's band for the season (see
             `GET /api/v1/room-types`).
           example: 6000.00
+        price_per_night_dkk:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: |
+            Fixed nightly price in DKK with at most 2 decimals. Mutually exclusive with price_dkk on manual entry. Total price is calculated as price_per_night_dkk * days_rented.
+          example: 2000.00
     Booking:
       type: object
       additionalProperties: false

@@ -215,7 +215,7 @@
 - [X] T080 [US4] Create `SRC/business/services/bar_service.py` (depends on T024, T079): list ranked drink sales, summary, by category; extend `SRC/business/services/kpi_service.py` or a separate `BarKpiService` consistently with US2 (one service module per concern in plan.md)
 - [X] T081 [P] [US4] Create `SRC/presentation/api/schemas/bar.py` (`DrinkSale`, `DrinkSaleList`, `BarSummary`, `BarCategoryKpi` and lists) as the contract
 - [X] T082 [US4] Create routers `SRC/presentation/api/routers/bar.py` (`GET /api/v1/bar/drink-sales`, `year` and `category` parameters) and `SRC/presentation/api/routers/kpis_bar.py` (`GET /api/v1/kpis/bar/summary`, `GET /api/v1/kpis/bar/by-category`); register both and the service provider in `SRC/main.py` and `SRC/presentation/api/dependencies.py`
-- [ ] T083 [US4] Run quickstart §6 by hand and check the values against the golden table
+- [X] T083 [US4] Run quickstart §6 by hand and check the values against the golden table
 
 **Checkpoint**: B1–B3 verified. Bar data is read-only through the API (no write endpoint; seed only).
 
@@ -254,7 +254,7 @@
 - [X] T094 [P] Write `README.md`: the mermaid architecture diagram from plan.md "System and containers" (Q1), the three-layer table (Q3), how to run and seed, data persistence (named volume `mysql-data`; `docker compose down -v` wipes it; the seed removes user-created bookings and reviews), the seed command, ports 8080 / 8000 / 8081
 - [X] T095 [P] Complete `CONTRIBUTE.md` (T005): dev setup, running `unit`, `contract`, `integration`, `architecture` suites in Docker (`docker compose run --rm tests`) and locally on Python ≥ 3.13, schema reset, commit flow to `main`
 - [X] T096 [P] Add the Tableau handover section to `README.md` (text only): REST API Connector, JSONPath `$.items[*]` for tables and `$` for summaries, extract refresh, dummy credentials accepted, and the early-check step (quickstart §8). **No Tableau files** (FR-017)
-- [ ] T097 [P] Record the architecture decision log outcome in `SPEC/research.md`: mark each "Pending team review" row Kept or Changed after the team review
+- [X] T097 [P] Record the architecture decision log outcome in `SPEC/research.md`: mark each "Pending team review" row Kept or Changed after the team review
 - [X] T098 Run `docker compose down -v && docker compose up --build -d` from a fresh clone and confirm `db`, `api`, `frontend` healthy and `swagger-ui` running within 60 seconds (SC-005); then walk quickstart §1 and confirm an empty state (`{"items": []}`, `available_room_nights` 78110, occupancy 0)
 - [X] T099 Run `docker compose run --rm seed` twice and walk quickstart §2 (idempotent, same counts and ids)
 - [X] T100 Run `docker compose run --rm tests` and make sure all four suites pass; confirm the `hotel` database is untouched (tests use `hotel_test`)
@@ -264,6 +264,27 @@
 - [ ] T104 [P] Team-owned, manual, outside the repository (FR-017): the first day the API runs, prove the Tableau route against `GET /api/v1/kpis/hotel/by-room-type?year=2026` (quickstart §8). After that, build the dashboard from quickstart §4–§7 and compare every figure within 0.01 DKK / 0.01% (SC-003). Run `git ls-files | grep -Ei '\.(twb|twbx|tbm|tds|tdsx|hyper)$'` and confirm no output
 - [ ] T105 [P] Process items from plan.md "Spec follow-ups" that need the team: amend the constitution wording (Gate VI/VIII, WDC hint, OQ-1, OQ-4) with `/speckit-constitution`; amend FR-010 (366-day leap year) and FR-003 (R17 bounds) in `SPEC/spec.md`; then run `/speckit-checklist` and `/speckit-analyze` before `/speckit-implement`
 - [X] T106 Run every quickstart section (§1–§10) one last time and tick off each golden value
+
+---
+
+## Phase 9: Revisions & UX Enhancements (TODOs from Team Review)
+
+**Purpose**: Incorporate team feedback from `context/team/TODOS.md`: frontend pricing transparency, dual price entry, distinct edit mode UI, and all-time vs. yearly KPI aggregations across hotel and bar endpoints.
+
+### Tests for Revision Phase
+
+- [ ] T107 [P] Unit tests in `backend/tests/unit/test_pricing.py` and `test_booking_validation.py` for dual price inputs: mutual exclusivity between `price_dkk` and `price_per_night_dkk`, validation that `price_per_night_dkk` falls inside the seasonal rate band, and calculation of total `price_dkk`.
+- [ ] T108 [P] Unit tests in `backend/tests/unit/test_hotel_revenue_kpis.py` and `test_bar_kpis.py` for all-time aggregations (`year="all"` / omitted): calculating overall multi-year totals, multi-year room-night availability for occupancy, and bar sales aggregates across all recorded sales years.
+- [ ] T109 [P] Contract tests in `backend/tests/contract/test_bookings.py` for `POST/PUT /api/v1/bookings` with `price_per_night_dkk`, and in `test_kpis_hotel_revenue.py` / `test_bar.py` for KPI endpoints with `?year=all` returning valid 200 responses matching `openapi.yaml`.
+
+### Implementation for Revision Phase
+
+- [ ] T110 Implement dual price calculation and validation rules in `SRC/business/rules/pricing.py` and `SRC/business/rules/booking_validation.py` (FR-019).
+- [ ] T111 Update `SRC/presentation/api/schemas/bookings.py` to accept `price_per_night_dkk` in `BookingInput` and map to `NewBooking` in `SRC/presentation/api/routers/bookings.py`.
+- [ ] T112 Extend `SRC/business/kpis/hotel.py`, `SRC/business/kpis/bar.py`, and `SRC/business/services/kpi_service.py` to support all-time aggregation when `year="all"` or omitted (FR-021).
+- [ ] T113 Update `SRC/presentation/api/routers/kpis_hotel.py` and `SRC/presentation/api/routers/kpis_bar.py` query parameter handlers to accept `'all'` and pass to service layer.
+- [ ] T114 Update `frontend/public/index.html` and `frontend/public/styles.css`: add live price summary preview container (rate per night, total standard price), add nightly rate input field next to total price, and design a distinct, highlighted visual theme/banner for "Edit Mode" (FR-018, FR-019, FR-020).
+- [ ] T115 Update `frontend/public/app.js`: calculate dynamic price preview as user selects room type and dates, enforce single-field entry between total price and price-per-night, and toggle prominent "Edit Mode" UI styling with cancel action when editing existing bookings.
 
 ---
 

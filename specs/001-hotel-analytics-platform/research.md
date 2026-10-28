@@ -440,14 +440,14 @@ v5.4 are available.
 
 | # | Decision | Proposed by | Team status |
 |---|----------|-------------|-------------|
-| 1 | Python + FastAPI, synchronous endpoints (R1) | Team plan (TM), framework picked by AI | Pending team review |
+| 1 | Python + FastAPI, synchronous endpoints (R1) | Team plan (TM), framework picked by AI | Kept |
 | 2 | KPIs as pure functions in the business layer (R6) | Team plan (TM: service layer) | Kept |
-| 3 | Design-first OpenAPI 3.0.3, FastAPI docs off, three-part sync check (R4) | AI (this plan) | Pending team review |
-| 4 | Named volume `mysql-data`; `down -v` resets (R12) | AI (this plan) | Pending team review |
+| 3 | Design-first OpenAPI 3.0.3, FastAPI docs off, three-part sync check (R4) | AI (this plan) | Kept |
+| 4 | Named volume `mysql-data`; `down -v` resets (R12) | AI (this plan) | Kept |
 | 5 | Tableau via the REST API only; no Tableau files or connector code in the repository (R14, FR-017) | **AI proposed a Web Data Connector** (constitution, Clarify list) | **Changed by the team** on 2026-10-27: REST API only, dashboard built manually |
 | 6 | Sample data by explicit `seed` command, not on `up` (R13) | AI asked in Clarify | Decided by the team (Clarify Q5) |
-| 7 | Pricing bands plus standard rate (R9) | AI (this plan) | Pending team review |
-| 8 | Repair `M�ller` → `Müller` while seeding (R13) | AI (this plan) | Pending team review |
+| 7 | Pricing bands plus standard rate (R9) | AI (this plan) | Kept |
+| 8 | Repair M�ller → Müller while seeding (R13) | AI (this plan) | Kept |
 
 Row 5 is the decision Principle X asks for: one the AI proposed and the team changed. The team
 should fill in "Kept" or "Changed" for the pending rows during the plan review.
