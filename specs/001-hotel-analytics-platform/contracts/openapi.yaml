@@ -1,0 +1,1372 @@
+openapi: 3.0.3
+info:
+  title: Hotel Kong Arthur Operations & Analytics API
+  version: 1.0.0
+  description: |
+    REST/JSON API for Hotel Kong Arthur (feature `001-hotel-analytics-platform`).
+
+    This file is the **authoritative contract** (OpenAPI 3.0.3, design-first). Swagger UI serves it,
+    and the contract tests validate every response of the running code against it. FastAPI's own
+    generated documentation is switched off.
+
+    **Consumers**
+    - Browser frontend (Receptionist): bookings through the frontend container's `/api/` proxy.
+    - Tableau dashboard (Hotel CFO): built manually by the team outside this repository (FR-017).
+      It reads the `GET` endpoints. JSONPath to records is `$.items[*]` for tables and `$` for
+      summaries.
+    - The hotel's existing booking system: `POST`, `PUT` and `DELETE` on `/api/v1/bookings`.
+
+    **Conventions**
+    - JSON field names use `snake_case`. Collections and KPI tables are objects with an `items`
+      array. Summaries are single objects. Every KPI row repeats its `year`.
+    - Amounts are in DKK, sent as JSON numbers rounded to 2 decimals. Percentages run from 0 to 100
+      with 2 decimals. Shares within one breakdown add up to exactly 100.00. When a total is 0,
+      every share, average and rate is 0.
+    - `season` (`low` = Jan, Feb, Nov; `mid` = Mar, Apr, May, Sep, Oct; `high` = Jun, Jul, Aug, Dec)
+      and `year` are derived by the API from `check_in_date` or `stay_date`. A stay belongs
+      entirely to the season and year of its check-in date.
+    - KPI endpoints take `year` (default: the current calendar year, Europe/Copenhagen) and are
+      computed on every request. Every response carries `Cache-Control: no-store`.
+    - Errors use RFC 9457 Problem Details (`application/problem+json`):
+      - `400`: malformed JSON, or an invalid query or path parameter.
+      - `404`: unknown id in the path.
+      - `422`: a well-formed body that breaks a field or business rule.
+      - `503`: database unavailable.
+    - No authentication: this is a local prototype (see spec Assumptions). `Authorization`
+      headers are ignored.
+servers:
+  - url: http://localhost:8000
+    description: API container of the local docker compose stack
+tags:
+  - name: Health
+    description: Liveness of the API and its database connection.
+  - name: Reference data
+    description: Static hotel facts (room types, room counts, seasonal rate bands).
+  - name: Bookings
+    description: Room bookings with full CRUD (F1). Used by the frontend and the hotel's booking system.
+  - name: Reviews
+    description: Guest satisfaction reviews (K3 data, FR-011).
+  - name: Bar
+    description: Helene Christine's lobby bar sales per drink (B2, FR-012, FR-016).
+  - name: Hotel KPIs
+    description: Authoritative hotel KPIs, one table per grain (A1–A7, K1–K3).
+  - name: Bar KPIs
+    description: Authoritative bar KPIs (B1, B3, FR-016).
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Check that the API can reach its database
+      responses:
+        '200':
+          description: API and database are up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/room-types:
+    get:
+      tags: [Reference data]
+      operationId: listRoomTypes
+      summary: List the 8 room types with room counts and seasonal rate bands
+      description: |
+        Static reference data. The 8 room types have 214 rooms in total. Each room type has one rate
+        band per season, and its `standard_nightly_dkk` is used when a booking is saved without a
+        price. Ordered by the canonical T1 order.
+      responses:
+        '200':
+          description: All room types.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomTypeList'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/bookings:
+    get:
+      tags: [Bookings]
+      operationId: listBookings
+      summary: List bookings, newest first
+      description: |
+        Returns every booking that matches the optional filters, ordered by `id` descending. Each
+        booking includes its derived `season` and `year`. **Scope:** F1 (FR-001, FR-002), and the
+        detail rows behind FR-006.
+      parameters:
+        - $ref: '#/components/parameters/YearFilter'
+        - $ref: '#/components/parameters/SeasonFilter'
+        - $ref: '#/components/parameters/RoomTypeFilter'
+        - $ref: '#/components/parameters/CountryFilter'
+      responses:
+        '200':
+          description: Matching bookings (possibly none).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      tags: [Bookings]
+      operationId: createBooking
+      summary: Create a booking
+      description: |
+        Validates the booking with the business rules (FR-003), derives the season and year from
+        `check_in_date`, and stores it immediately (FR-005). If `price_dkk` is omitted or `null`,
+        the price is the room type's standard nightly rate for that season × `days_rented`.
+        **Scope:** F1.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingInput'
+      responses:
+        '201':
+          description: Booking created.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/bookings/{booking_id}:
+    parameters:
+      - $ref: '#/components/parameters/BookingId'
+    get:
+      tags: [Bookings]
+      operationId: getBooking
+      summary: Get one booking
+      responses:
+        '200':
+          description: The booking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      tags: [Bookings]
+      operationId: replaceBooking
+      summary: Replace (edit) a booking
+      description: |
+        Replaces every client-editable field. The same validation applies as on create. If
+        `price_dkk` is omitted or `null`, the standard price is recalculated from the new values.
+        **Scope:** F1.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingInput'
+      responses:
+        '200':
+          description: Booking updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      tags: [Bookings]
+      operationId: deleteBooking
+      summary: Delete a booking
+      description: |
+        Removes the booking permanently. It is excluded from every later KPI. Reviews that
+        referred to it keep counting, with `booking_id` set to `null`. **Scope:** F1.
+      responses:
+        '204':
+          description: Booking deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/reviews:
+    get:
+      tags: [Reviews]
+      operationId: listReviews
+      summary: List guest reviews, newest first
+      parameters:
+        - $ref: '#/components/parameters/YearFilter'
+        - $ref: '#/components/parameters/SeasonFilter'
+        - $ref: '#/components/parameters/RoomTypeFilter'
+      responses:
+        '200':
+          description: Matching reviews (possibly none).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      tags: [Reviews]
+      operationId: createReview
+      summary: Record a guest review (rating 1–5)
+      description: |
+        Give **either** `booking_id` (the booking's room type and check-in date are copied) **or**
+        both `room_type` and `stay_date`. Breaking this rule, or giving a `booking_id` that does not
+        exist, returns `422`. **Scope:** K3 (FR-011).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewInput'
+      responses:
+        '201':
+          description: Review created.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/reviews/{review_id}:
+    parameters:
+      - $ref: '#/components/parameters/ReviewId'
+    get:
+      tags: [Reviews]
+      operationId: getReview
+      summary: Get one review
+      responses:
+        '200':
+          description: The review.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/bar/drink-sales:
+    get:
+      tags: [Bar]
+      operationId: listDrinkSales
+      summary: Drink sales for a year, with revenue per drink, ranks and price tier
+      description: |
+        One row per drink on Helene Christine's menu for the year, ordered by `revenue_rank`.
+        **Scope:** B2 (FR-012, FR-013), plus the per-drink popularity and price tiers of FR-016.
+      parameters:
+        - $ref: '#/components/parameters/ReportYear'
+        - $ref: '#/components/parameters/CategoryFilter'
+      responses:
+        '200':
+          description: Drink sales (none if the year has no bar data).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DrinkSaleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/kpis/hotel/summary:
+    get:
+      tags: [Hotel KPIs]
+      operationId: getHotelSummary
+      summary: Hotel totals for a year
+      description: |
+        **Scope:** A6 and K2 (total room revenue), K1 (occupancy), K3 (satisfaction), and A7
+        (ALOS, ADR, revenue per booking) for the whole hotel.
+      parameters:
+        - $ref: '#/components/parameters/ReportYear'
+      responses:
+        '200':
+          description: Summary for the year.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HotelSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/kpis/hotel/by-room-type:
+    get:
+      tags: [Hotel KPIs]
+      operationId: listHotelKpisByRoomType
+      summary: KPIs per room type, ranked by revenue
+      description: |
+        Always 8 rows, ordered by `revenue_rank`. **Scope:** A4 (FR-008), and K1, K3 and A7 per room
+        type (FR-010, FR-011, FR-015).
+      parameters:
+        - $ref: '#/components/parameters/ReportYear'
+      responses:
+        '200':
+          description: One row per room type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomTypeKpiList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/kpis/hotel/by-season:
+    get:
+      tags: [Hotel KPIs]
+      operationId: listHotelKpisBySeason
+      summary: KPIs per season
+      description: |
+        Always 3 rows, in the order `low`, `mid`, `high`. **Scope:** K1, K3 and A7 per season
+        (FR-010, FR-011, FR-015), and revenue per season.
+      parameters:
+        - $ref: '#/components/parameters/ReportYear'
+      responses:
+        '200':
+          description: One row per season.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonKpiList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/kpis/hotel/by-room-type-and-season:
+    get:
+      tags: [Hotel KPIs]
+      operationId: listHotelKpisByRoomTypeAndSeason
+      summary: Revenue per room type per season
+      description: |
+        Always 24 rows (8 room types × 3 seasons), ordered by room type (T1 order) and then season.
+        **Scope:** A2 (FR-007).
+      parameters:
+        - $ref: '#/components/parameters/ReportYear'
+      responses:
+        '200':
+          description: One row per room type and season.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomTypeSeasonKpiList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/kpis/hotel/by-country:
+    get:
+      tags: [Hotel KPIs]
+      operationId: listHotelKpisByCountry
+      summary: Guest origin and revenue per country, ranked by revenue
+      description: |
+        One row per country that has bookings in the year, ordered by `revenue_rank`.
+        **Scope:** A1 (guest origin), A3 (revenue per country) and A5 (top countries) (FR-009).
+      parameters:
+        - $ref: '#/components/parameters/ReportYear'
+      responses:
+        '200':
+          description: One row per guest country.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CountryKpiList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/kpis/bar/summary:
+    get:
+      tags: [Bar KPIs]
+      operationId: getBarSummary
+      summary: Helene Christine's total bar sales for a year
+      description: '**Scope:** B1 (FR-013).'
+      parameters:
+        - $ref: '#/components/parameters/ReportYear'
+      responses:
+        '200':
+          description: Bar totals for the year.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BarSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/kpis/bar/by-category:
+    get:
+      tags: [Bar KPIs]
+      operationId: listBarKpisByCategory
+      summary: Cocktail vs coffee split (revenue and units)
+      description: |
+        Always 2 rows, in the order `Cocktail`, `Coffee`. Each share column adds up to 100.00 when
+        the year has sales. **Scope:** B3 (FR-014).
+      parameters:
+        - $ref: '#/components/parameters/ReportYear'
+      responses:
+        '200':
+          description: One row per drink category.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BarCategoryKpiList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/kpis/bar/by-price-tier:
+    get:
+      tags: [Bar KPIs]
+      operationId: listBarKpisByPriceTier
+      summary: Demand per price tier (budget, standard, premium)
+      description: |
+        Always 3 rows, in the order `budget` (< 70 DKK), `standard` (70 to < 110 DKK) and
+        `premium` (≥ 110 DKK). **Scope:** A7 / US4 (FR-016).
+      parameters:
+        - $ref: '#/components/parameters/ReportYear'
+      responses:
+        '200':
+          description: One row per price tier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BarPriceTierKpiList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+components:
+  parameters:
+    ReportYear:
+      name: year
+      in: query
+      required: false
+      description: |
+        Reporting year. Bookings count in the year of their `check_in_date`, reviews in the year of
+        their `stay_date`, and drink sales in their sales year. Defaults to the current calendar
+        year (Europe/Copenhagen).
+      schema:
+        type: integer
+        minimum: 2000
+        maximum: 2100
+        example: 2026
+    YearFilter:
+      name: year
+      in: query
+      required: false
+      description: Only records whose derived `year` equals this value. Omit it to get all years.
+      schema:
+        type: integer
+        minimum: 2000
+        maximum: 2100
+        example: 2026
+    SeasonFilter:
+      name: season
+      in: query
+      required: false
+      description: Only records whose derived `season` equals this value.
+      schema:
+        $ref: '#/components/schemas/Season'
+    RoomTypeFilter:
+      name: room_type
+      in: query
+      required: false
+      description: Only records for this room type.
+      schema:
+        $ref: '#/components/schemas/RoomTypeName'
+    CountryFilter:
+      name: country
+      in: query
+      required: false
+      description: Only bookings from this guest country.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+        example: Germany
+    CategoryFilter:
+      name: category
+      in: query
+      required: false
+      description: Only drinks in this category.
+      schema:
+        $ref: '#/components/schemas/DrinkCategory'
+    BookingId:
+      name: booking_id
+      in: path
+      required: true
+      description: Booking identifier.
+      schema:
+        type: integer
+        minimum: 1
+        example: 42
+    ReviewId:
+      name: review_id
+      in: path
+      required: true
+      description: Review identifier.
+      schema:
+        type: integer
+        minimum: 1
+        example: 7
+
+  headers:
+    Location:
+      description: Path of the created resource.
+      schema:
+        type: string
+        example: /api/v1/bookings/1001
+
+  responses:
+    BadRequest:
+      description: Malformed JSON, or an invalid query or path parameter.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: urn:hotel-kong-arthur:problem:malformed-request
+            title: Malformed request
+            status: 400
+            detail: Query parameter 'year' must be a whole number from 2000 to 2100.
+            errors:
+              - field: year
+                message: Must be a whole number from 2000 to 2100.
+    NotFound:
+      description: No resource with this id.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: urn:hotel-kong-arthur:problem:not-found
+            title: Not found
+            status: 404
+            detail: Booking 4242 does not exist.
+    ValidationFailed:
+      description: The body is well-formed JSON, but one or more fields break the validation rules.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: urn:hotel-kong-arthur:problem:validation-error
+            title: Validation failed
+            status: 422
+            detail: 2 fields are invalid.
+            errors:
+              - field: days_rented
+                message: Days rented must be a whole number from 1 to 365.
+              - field: price_dkk
+                message: 4,500.00 DKK for 3 nights is 1,500.00 DKK per night, outside 900.00–1,200.00 DKK per night for Standard Single in low season.
+    ServiceUnavailable:
+      description: The database cannot be reached.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: urn:hotel-kong-arthur:problem:service-unavailable
+            title: Service unavailable
+            status: 503
+            detail: The database is not reachable. Try again shortly.
+
+  schemas:
+    # ---------- Vocabulary ----------
+    RoomTypeName:
+      type: string
+      description: One of Hotel Kong Arthur's 8 room types (English names, as in the sample data).
+      enum:
+        - Standard Single
+        - Grand Lit
+        - Standard Double
+        - Superior Double
+        - Junior Suite
+        - Spa Executive
+        - Suite
+        - LOFT Suite
+      example: Superior Double
+    Season:
+      type: string
+      description: low = Jan, Feb, Nov; mid = Mar, Apr, May, Sep, Oct; high = Jun, Jul, Aug, Dec.
+      enum: [low, mid, high]
+      example: high
+    DrinkCategory:
+      type: string
+      enum: [Cocktail, Coffee]
+      example: Cocktail
+    PriceTier:
+      type: string
+      description: budget < 70 DKK ≤ standard < 110 DKK ≤ premium (unit price).
+      enum: [budget, standard, premium]
+      example: premium
+    AmountDkk:
+      type: number
+      format: double
+      minimum: 0
+      description: Amount in DKK, rounded to 2 decimals.
+      example: 4389.00
+    SharePct:
+      type: number
+      format: double
+      minimum: 0
+      maximum: 100
+      description: Share of a breakdown total in percent (0–100, 2 decimals). The shares of one breakdown add up to 100.00.
+      example: 52.83
+    RatePct:
+      type: number
+      format: double
+      minimum: 0
+      description: Rate in percent with 2 decimals. Occupancy can only exceed 100 if more nights are sold than rooms exist.
+      example: 6.89
+    Year:
+      type: integer
+      minimum: 2000
+      maximum: 2100
+      example: 2026
+    Count:
+      type: integer
+      minimum: 0
+      example: 1000
+    Rank:
+      type: integer
+      minimum: 1
+      description: Competition rank (1 = highest). Equal values share a rank.
+      example: 1
+    Satisfaction:
+      type: number
+      format: double
+      minimum: 0
+      maximum: 5
+      description: Mean rating on the 1–5 scale with 2 decimals. 0 when there are no reviews.
+      example: 3.74
+
+    # ---------- Health ----------
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, database]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        database:
+          type: string
+          enum: [ok]
+
+    # ---------- Reference data ----------
+    SeasonRate:
+      type: object
+      additionalProperties: false
+      required: [season, min_nightly_dkk, max_nightly_dkk, standard_nightly_dkk]
+      properties:
+        season:
+          $ref: '#/components/schemas/Season'
+        min_nightly_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        max_nightly_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        standard_nightly_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+    RoomType:
+      type: object
+      additionalProperties: false
+      required: [name, name_da, room_count, max_guests, rates]
+      properties:
+        name:
+          $ref: '#/components/schemas/RoomTypeName'
+        name_da:
+          type: string
+          description: Danish name from the assignment brief.
+          example: Superior dobbeltværelse
+        room_count:
+          type: integer
+          minimum: 1
+          example: 27
+        max_guests:
+          type: integer
+          minimum: 1
+          maximum: 4
+          example: 2
+        rates:
+          type: array
+          description: One rate band per season, in the order low, mid, high.
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/SeasonRate'
+    RoomTypeList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoomType'
+
+    # ---------- Bookings ----------
+    BookingInput:
+      type: object
+      additionalProperties: false
+      description: |
+        Client-editable booking fields, used by both create (`POST`) and replace (`PUT`).
+        Names and country are trimmed and must not be empty.
+      required: [first_name, family_name, country, room_type, check_in_date, days_rented]
+      properties:
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Elena
+        family_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Müller
+        country:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Germany
+        room_type:
+          $ref: '#/components/schemas/RoomTypeName'
+        check_in_date:
+          type: string
+          format: date
+          description: Check-in date (YYYY-MM-DD, years 2000–2100). The season and reporting year are derived from it.
+          example: '2026-07-14'
+        days_rented:
+          type: integer
+          minimum: 1
+          maximum: 365
+          description: Number of nights.
+          example: 3
+        price_dkk:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          exclusiveMinimum: true
+          description: |
+            Total price in DKK with at most 2 decimals. If it is omitted or `null`, the price is the
+            room type's standard nightly rate for the season × `days_rented`. If it is given,
+            `price_dkk / days_rented` must lie inside the room type's band for the season (see
+            `GET /api/v1/room-types`).
+          example: 6000.00
+    Booking:
+      type: object
+      additionalProperties: false
+      required: [id, first_name, family_name, country, room_type, check_in_date, days_rented, price_dkk, season, year, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          example: 1001
+        first_name:
+          type: string
+          example: Elena
+        family_name:
+          type: string
+          example: Müller
+        country:
+          type: string
+          example: Germany
+        room_type:
+          $ref: '#/components/schemas/RoomTypeName'
+        check_in_date:
+          type: string
+          format: date
+          example: '2026-07-14'
+        days_rented:
+          type: integer
+          minimum: 1
+          maximum: 365
+          example: 3
+        price_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        season:
+          $ref: '#/components/schemas/Season'
+        year:
+          $ref: '#/components/schemas/Year'
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-10-27T12:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-10-27T12:00:00Z'
+    BookingList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+
+    # ---------- Reviews ----------
+    ReviewInput:
+      type: object
+      additionalProperties: false
+      description: Give either `booking_id`, or both `room_type` and `stay_date`.
+      required: [rating]
+      properties:
+        booking_id:
+          type: integer
+          minimum: 1
+          example: 1001
+        room_type:
+          $ref: '#/components/schemas/RoomTypeName'
+        stay_date:
+          type: string
+          format: date
+          description: Check-in date of the reviewed stay (years 2000–2100).
+          example: '2026-07-14'
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 4
+    Review:
+      type: object
+      additionalProperties: false
+      required: [id, booking_id, room_type, stay_date, season, year, rating, created_at]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          example: 501
+        booking_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: The reviewed booking, or `null` if the review was recorded without one or the booking was deleted.
+          example: 1001
+        room_type:
+          $ref: '#/components/schemas/RoomTypeName'
+        stay_date:
+          type: string
+          format: date
+          example: '2026-07-14'
+        season:
+          $ref: '#/components/schemas/Season'
+        year:
+          $ref: '#/components/schemas/Year'
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 4
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-10-27T12:05:00Z'
+    ReviewList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Review'
+
+    # ---------- Bar ----------
+    DrinkSale:
+      type: object
+      additionalProperties: false
+      required: [id, year, drink_name, category, unit_price_dkk, units_sold, revenue_dkk, revenue_rank, units_rank, price_tier]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          example: 21
+        year:
+          $ref: '#/components/schemas/Year'
+        drink_name:
+          type: string
+          example: Espresso
+        category:
+          $ref: '#/components/schemas/DrinkCategory'
+        unit_price_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        units_sold:
+          $ref: '#/components/schemas/Count'
+        revenue_dkk:
+          allOf:
+            - $ref: '#/components/schemas/AmountDkk'
+          description: unit_price_dkk × units_sold (B2).
+        revenue_rank:
+          $ref: '#/components/schemas/Rank'
+        units_rank:
+          $ref: '#/components/schemas/Rank'
+        price_tier:
+          $ref: '#/components/schemas/PriceTier'
+    DrinkSaleList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DrinkSale'
+
+    # ---------- Hotel KPIs ----------
+    HotelSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - year
+        - booking_count
+        - nights_sold
+        - total_revenue_dkk
+        - available_room_nights
+        - occupancy_rate_pct
+        - review_count
+        - average_satisfaction
+        - satisfied_share_pct
+        - average_length_of_stay_nights
+        - average_daily_rate_dkk
+        - average_revenue_per_booking_dkk
+      properties:
+        year:
+          $ref: '#/components/schemas/Year'
+        booking_count:
+          $ref: '#/components/schemas/Count'
+        nights_sold:
+          $ref: '#/components/schemas/Count'
+        total_revenue_dkk:
+          allOf:
+            - $ref: '#/components/schemas/AmountDkk'
+          description: The hotel's room revenue for the year (A6, K2).
+        available_room_nights:
+          allOf:
+            - $ref: '#/components/schemas/Count'
+          description: 214 rooms × days in the year (78,110 in 2026).
+        occupancy_rate_pct:
+          allOf:
+            - $ref: '#/components/schemas/RatePct'
+          description: nights_sold ÷ available_room_nights × 100 (K1).
+        review_count:
+          $ref: '#/components/schemas/Count'
+        average_satisfaction:
+          $ref: '#/components/schemas/Satisfaction'
+        satisfied_share_pct:
+          allOf:
+            - $ref: '#/components/schemas/RatePct'
+          description: Share of reviews rated 4 or 5 (K3).
+        average_length_of_stay_nights:
+          type: number
+          format: double
+          minimum: 0
+          description: ALOS = nights_sold ÷ booking_count (A7).
+          example: 5.38
+        average_daily_rate_dkk:
+          allOf:
+            - $ref: '#/components/schemas/AmountDkk'
+          description: ADR = room revenue ÷ nights_sold (A7).
+        average_revenue_per_booking_dkk:
+          allOf:
+            - $ref: '#/components/schemas/AmountDkk'
+          description: Room revenue ÷ booking_count (A7).
+      example:
+        year: 2026
+        booking_count: 1000
+        nights_sold: 5379
+        total_revenue_dkk: 11234034.00
+        available_room_nights: 78110
+        occupancy_rate_pct: 6.89
+        review_count: 500
+        average_satisfaction: 3.74
+        satisfied_share_pct: 64.20
+        average_length_of_stay_nights: 5.38
+        average_daily_rate_dkk: 2088.50
+        average_revenue_per_booking_dkk: 11234.03
+    RoomTypeKpi:
+      type: object
+      additionalProperties: false
+      required:
+        - year
+        - revenue_rank
+        - room_type
+        - room_count
+        - booking_count
+        - nights_sold
+        - revenue_dkk
+        - revenue_share_pct
+        - available_room_nights
+        - occupancy_rate_pct
+        - review_count
+        - average_satisfaction
+        - satisfied_share_pct
+        - average_length_of_stay_nights
+        - average_daily_rate_dkk
+        - average_revenue_per_booking_dkk
+      properties:
+        year:
+          $ref: '#/components/schemas/Year'
+        revenue_rank:
+          $ref: '#/components/schemas/Rank'
+        room_type:
+          $ref: '#/components/schemas/RoomTypeName'
+        room_count:
+          type: integer
+          minimum: 1
+          example: 26
+        booking_count:
+          $ref: '#/components/schemas/Count'
+        nights_sold:
+          $ref: '#/components/schemas/Count'
+        revenue_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        revenue_share_pct:
+          $ref: '#/components/schemas/SharePct'
+        available_room_nights:
+          allOf:
+            - $ref: '#/components/schemas/Count'
+          description: room_count × days in the year.
+        occupancy_rate_pct:
+          $ref: '#/components/schemas/RatePct'
+        review_count:
+          $ref: '#/components/schemas/Count'
+        average_satisfaction:
+          $ref: '#/components/schemas/Satisfaction'
+        satisfied_share_pct:
+          $ref: '#/components/schemas/RatePct'
+        average_length_of_stay_nights:
+          type: number
+          format: double
+          minimum: 0
+          example: 5.15
+        average_daily_rate_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        average_revenue_per_booking_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+    RoomTypeKpiList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 8
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/RoomTypeKpi'
+    SeasonKpi:
+      type: object
+      additionalProperties: false
+      required:
+        - year
+        - season
+        - season_days
+        - booking_count
+        - nights_sold
+        - revenue_dkk
+        - revenue_share_pct
+        - available_room_nights
+        - occupancy_rate_pct
+        - review_count
+        - average_satisfaction
+        - satisfied_share_pct
+        - average_length_of_stay_nights
+        - average_daily_rate_dkk
+        - average_revenue_per_booking_dkk
+      properties:
+        year:
+          $ref: '#/components/schemas/Year'
+        season:
+          $ref: '#/components/schemas/Season'
+        season_days:
+          type: integer
+          minimum: 1
+          description: Days of the season in this year (2026 has low 89, mid 153, high 123).
+          example: 89
+        booking_count:
+          $ref: '#/components/schemas/Count'
+        nights_sold:
+          $ref: '#/components/schemas/Count'
+        revenue_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        revenue_share_pct:
+          $ref: '#/components/schemas/SharePct'
+        available_room_nights:
+          allOf:
+            - $ref: '#/components/schemas/Count'
+          description: 214 rooms × season_days.
+        occupancy_rate_pct:
+          $ref: '#/components/schemas/RatePct'
+        review_count:
+          $ref: '#/components/schemas/Count'
+        average_satisfaction:
+          $ref: '#/components/schemas/Satisfaction'
+        satisfied_share_pct:
+          $ref: '#/components/schemas/RatePct'
+        average_length_of_stay_nights:
+          type: number
+          format: double
+          minimum: 0
+          example: 5.36
+        average_daily_rate_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        average_revenue_per_booking_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+    SeasonKpiList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/SeasonKpi'
+    RoomTypeSeasonKpi:
+      type: object
+      additionalProperties: false
+      required: [year, room_type, season, booking_count, nights_sold, revenue_dkk]
+      properties:
+        year:
+          $ref: '#/components/schemas/Year'
+        room_type:
+          $ref: '#/components/schemas/RoomTypeName'
+        season:
+          $ref: '#/components/schemas/Season'
+        booking_count:
+          $ref: '#/components/schemas/Count'
+        nights_sold:
+          $ref: '#/components/schemas/Count'
+        revenue_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+    RoomTypeSeasonKpiList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 24
+          maxItems: 24
+          items:
+            $ref: '#/components/schemas/RoomTypeSeasonKpi'
+    CountryKpi:
+      type: object
+      additionalProperties: false
+      required: [year, revenue_rank, country, booking_count, booking_share_pct, nights_sold, revenue_dkk, revenue_share_pct]
+      properties:
+        year:
+          $ref: '#/components/schemas/Year'
+        revenue_rank:
+          $ref: '#/components/schemas/Rank'
+        country:
+          type: string
+          example: South Korea
+        booking_count:
+          $ref: '#/components/schemas/Count'
+        booking_share_pct:
+          allOf:
+            - $ref: '#/components/schemas/SharePct'
+          description: Share of the year's bookings from this country (A1).
+        nights_sold:
+          $ref: '#/components/schemas/Count'
+        revenue_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        revenue_share_pct:
+          $ref: '#/components/schemas/SharePct'
+    CountryKpiList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CountryKpi'
+
+    # ---------- Bar KPIs ----------
+    BarSummary:
+      type: object
+      additionalProperties: false
+      required: [year, drink_count, units_sold, total_revenue_dkk]
+      properties:
+        year:
+          $ref: '#/components/schemas/Year'
+        drink_count:
+          $ref: '#/components/schemas/Count'
+        units_sold:
+          $ref: '#/components/schemas/Count'
+        total_revenue_dkk:
+          allOf:
+            - $ref: '#/components/schemas/AmountDkk'
+          description: Helene Christine's total bar sales for the year (B1).
+      example:
+        year: 2026
+        drink_count: 30
+        units_sold: 179958
+        total_revenue_dkk: 13448640.34
+    BarCategoryKpi:
+      type: object
+      additionalProperties: false
+      required: [year, category, drink_count, units_sold, unit_share_pct, revenue_dkk, revenue_share_pct]
+      properties:
+        year:
+          $ref: '#/components/schemas/Year'
+        category:
+          $ref: '#/components/schemas/DrinkCategory'
+        drink_count:
+          $ref: '#/components/schemas/Count'
+        units_sold:
+          $ref: '#/components/schemas/Count'
+        unit_share_pct:
+          $ref: '#/components/schemas/SharePct'
+        revenue_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        revenue_share_pct:
+          $ref: '#/components/schemas/SharePct'
+    BarCategoryKpiList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/BarCategoryKpi'
+    BarPriceTierKpi:
+      type: object
+      additionalProperties: false
+      required: [year, price_tier, price_from_dkk, price_to_dkk, drink_count, units_sold, unit_share_pct, revenue_dkk, revenue_share_pct]
+      properties:
+        year:
+          $ref: '#/components/schemas/Year'
+        price_tier:
+          $ref: '#/components/schemas/PriceTier'
+        price_from_dkk:
+          type: number
+          format: double
+          minimum: 0
+          description: Inclusive lower bound of the tier's unit price.
+          example: 110.00
+        price_to_dkk:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+          description: Exclusive upper bound of the tier's unit price, or `null` for the top tier.
+          example: null
+        drink_count:
+          $ref: '#/components/schemas/Count'
+        units_sold:
+          $ref: '#/components/schemas/Count'
+        unit_share_pct:
+          $ref: '#/components/schemas/SharePct'
+        revenue_dkk:
+          $ref: '#/components/schemas/AmountDkk'
+        revenue_share_pct:
+          $ref: '#/components/schemas/SharePct'
+    BarPriceTierKpiList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/BarPriceTierKpi'
+
+    # ---------- Errors ----------
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          description: Name of the invalid field or parameter.
+          example: days_rented
+        message:
+          type: string
+          example: Days rented must be a whole number from 1 to 365.
+    Problem:
+      type: object
+      additionalProperties: false
+      description: RFC 9457 Problem Details.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          enum:
+            - urn:hotel-kong-arthur:problem:malformed-request
+            - urn:hotel-kong-arthur:problem:not-found
+            - urn:hotel-kong-arthur:problem:validation-error
+            - urn:hotel-kong-arthur:problem:service-unavailable
+            - urn:hotel-kong-arthur:problem:internal-error
+        title:
+          type: string
+          example: Validation failed
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+          example: 422
+        detail:
+          type: string
+          example: 2 fields are invalid.
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
