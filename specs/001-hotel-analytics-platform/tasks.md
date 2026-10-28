@@ -136,7 +136,7 @@
 - [X] T051 [US1] Create `frontend/public/app.js` (depends on T049, T050): loads room types and bookings, renders the list, submits create / edit, deletes with confirmation, reloads the list after each change, shows `errors[]` next to the matching field, clears the price field when room type, check-in date or nights change (the API recalculates). **No business rule in JavaScript**: no season mapping, no price calculation (R15)
 - [X] T052 [P] [US1] Create `frontend/nginx.conf` (serves `/`, proxies `/api/` to `http://api:8000`) and `frontend/Dockerfile` (`nginx:1.30-alpine`, copies `public/` and config)
 - [X] T053 [US1] Add the `frontend` service to `docker-compose.yml` (port 8080, `depends_on: api: condition: service_healthy`, healthcheck)
-- [ ] T054 [US1] Run quickstart §3 by hand in the browser and with `curl`: create/edit/delete each take under 30 seconds (SC-001), invalid entries show a message next to the field, `Müller` displays correctly; record the result in `SPEC/checklists/` or the PR description
+- [X] T054 [US1] Run quickstart §3 by hand in the browser and with `curl`: create/edit/delete each take under 30 seconds (SC-001), invalid entries show a message next to the field, `Müller` displays correctly; record the result in `SPEC/checklists/` or the PR description
 
 **Checkpoint**: US1 works on its own. This is the MVP: live bookings in MySQL through REST and the browser.
 
