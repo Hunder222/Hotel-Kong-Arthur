@@ -47,14 +47,14 @@
 
 ### Database bootstrap (Data layer, deployment)
 
-- [ ] T006 Create `db/init/01_schema.sql` with InnoDB, `utf8mb4`, `utf8mb4_0900_ai_ci` tables per data-model.md §2–§3:
+- [X] T006 Create `db/init/01_schema.sql` with InnoDB, `utf8mb4`, `utf8mb4_0900_ai_ci` tables per data-model.md §2–§3:
   - `room_types`: `id TINYINT UNSIGNED` PK; `name VARCHAR(40) NOT NULL UNIQUE`; `name_da VARCHAR(60) NOT NULL`; `room_count SMALLINT UNSIGNED NOT NULL CHECK (room_count > 0)`; `max_guests TINYINT UNSIGNED NOT NULL CHECK (max_guests BETWEEN 1 AND 4)`
   - `room_type_rates`: PK (`room_type_id` FK → `room_types.id`, `season ENUM('low','mid','high')`); `min_nightly_dkk DECIMAL(10,2) NOT NULL CHECK (> 0)`; `max_nightly_dkk DECIMAL(10,2) NOT NULL CHECK (>= min_nightly_dkk)`; `standard_nightly_dkk DECIMAL(10,2) NOT NULL CHECK (between min and max)`
   - `bookings`: `id INT UNSIGNED AUTO_INCREMENT` PK; `first_name`, `family_name`, `country` each `VARCHAR(100) NOT NULL`; `room_type_id TINYINT UNSIGNED NOT NULL` FK; `check_in_date DATE NOT NULL` with index `ix_bookings_check_in_date`; `days_rented SMALLINT UNSIGNED NOT NULL CHECK (days_rented BETWEEN 1 AND 365)`; `price_dkk DECIMAL(10,2) NOT NULL CHECK (price_dkk > 0)`; `created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`; `updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`
   - `reviews`: `id INT UNSIGNED AUTO_INCREMENT` PK; `booking_id INT UNSIGNED NULL` FK → `bookings.id` **ON DELETE SET NULL**; `room_type_id TINYINT UNSIGNED NOT NULL` FK; `stay_date DATE NOT NULL` with index `ix_reviews_stay_date`; `rating TINYINT UNSIGNED NOT NULL CHECK (rating BETWEEN 1 AND 5)`; `created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`
   - `bar_drink_sales`: `id INT UNSIGNED AUTO_INCREMENT` PK; `sales_year SMALLINT UNSIGNED NOT NULL`; `drink_name VARCHAR(100) NOT NULL` with `UNIQUE (sales_year, drink_name)`; `category ENUM('Cocktail','Coffee') NOT NULL`; `unit_price_dkk DECIMAL(10,2) NOT NULL CHECK (unit_price_dkk > 0)`; `units_sold INT UNSIGNED NOT NULL`
-- [ ] T007 [P] Create `db/init/02_reference_data.sql`: the 8 room types (ids 1–8 in T1 order; counts 27,27,27,27,27,27,26,26 = **214**; Danish names and `max_guests` from data-model.md §2.1) and the 24 `room_type_rates` rows with min / max / standard (midpoint) from the data-model.md §2.2 table
-- [ ] T008 [P] Create `db/init/03_test_database.sql`: `CREATE DATABASE IF NOT EXISTS hotel_test CHARACTER SET utf8mb4` plus a `GRANT ALL` on `hotel_test.*` to the application user (R16)
+- [X] T007 [P] Create `db/init/02_reference_data.sql`: the 8 room types (ids 1–8 in T1 order; counts 27,27,27,27,27,27,26,26 = **214**; Danish names and `max_guests` from data-model.md §2.1) and the 24 `room_type_rates` rows with min / max / standard (midpoint) from the data-model.md §2.2 table
+- [X] T008 [P] Create `db/init/03_test_database.sql`: `CREATE DATABASE IF NOT EXISTS hotel_test CHARACTER SET utf8mb4` plus a `GRANT ALL` on `hotel_test.*` to the application user (R16)
 
 ### Business layer foundations
 
