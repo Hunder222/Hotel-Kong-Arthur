@@ -76,14 +76,14 @@
 
 ### Data layer foundations
 
-- [ ] T019 Create `SRC/config.py`: settings from environment variables with development defaults only (DB host `db`, port 3306, name `hotel`, user, password, CORS origins incl. `http://localhost:8081` and `http://localhost:8080`, `TZ=Europe/Copenhagen`); no real secrets
-- [ ] T020 Create `SRC/data/connection.py` (depends on T009, T019): PyMySQL connection factory (`utf8mb4`, autocommit off, `DictCursor`); wraps driver errors as `StorageUnavailable`; one connection per request/CLI run
-- [ ] T021 [P] Implement `SRC/data/repositories/room_types.py` (parameterised SQL; builds `RoomType` with `rates` ordered low, mid, high)
-- [ ] T022 [P] Implement `SRC/data/repositories/bookings.py`: list with filters (`year` as `check_in_date >= ? AND < ?`, `season` via month list, `room_type`, `country`; ordered by `id` DESC), get, add (reads the row back for id and timestamps), replace, delete, and bulk insert with explicit ids for the seed
-- [ ] T023 [P] Implement `SRC/data/repositories/reviews.py`: list (year/season/room_type filters, newest first), get, add (copies room type and `stay_date`), bulk insert for the seed
-- [ ] T024 [P] Implement `SRC/data/repositories/bar_sales.py`: list by `sales_year` and optional category, bulk insert with explicit ids for the seed
-- [ ] T025 [P] Implement `SRC/data/repositories/health.py`: `SELECT 1` ping
-- [ ] T026 Integration tests for the repositories in `backend/tests/integration/test_repositories.py` against `hotel_test` (round trip of each table, `ON DELETE SET NULL` on reviews, filters, UTF-8 `Müller`)
+- [X] T019 Create `SRC/config.py`: settings from environment variables with development defaults only (DB host `db`, port 3306, name `hotel`, user, password, CORS origins incl. `http://localhost:8081` and `http://localhost:8080`, `TZ=Europe/Copenhagen`); no real secrets
+- [X] T020 Create `SRC/data/connection.py` (depends on T009, T019): PyMySQL connection factory (`utf8mb4`, autocommit off, `DictCursor`); wraps driver errors as `StorageUnavailable`; one connection per request/CLI run
+- [X] T021 [P] Implement `SRC/data/repositories/room_types.py` (parameterised SQL; builds `RoomType` with `rates` ordered low, mid, high)
+- [X] T022 [P] Implement `SRC/data/repositories/bookings.py`: list with filters (`year` as `check_in_date >= ? AND < ?`, `season` via month list, `room_type`, `country`; ordered by `id` DESC), get, add (reads the row back for id and timestamps), replace, delete, and bulk insert with explicit ids for the seed
+- [X] T023 [P] Implement `SRC/data/repositories/reviews.py`: list (year/season/room_type filters, newest first), get, add (copies room type and `stay_date`), bulk insert for the seed
+- [X] T024 [P] Implement `SRC/data/repositories/bar_sales.py`: list by `sales_year` and optional category, bulk insert with explicit ids for the seed
+- [X] T025 [P] Implement `SRC/data/repositories/health.py`: `SELECT 1` ping
+- [X] T026 Integration tests for the repositories in `backend/tests/integration/test_repositories.py` against `hotel_test` (round trip of each table, `ON DELETE SET NULL` on reviews, filters, UTF-8 `Müller`)
 
 ### Presentation foundations and composition root
 
