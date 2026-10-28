@@ -203,18 +203,18 @@
 
 ### Tests for User Story 4
 
-- [ ] T074 [P] [US4] Unit tests in `backend/tests/unit/test_price_tiers.py`: `budget` < 70, `standard` 70 ≤ price < 110, `premium` ≥ 110 (boundaries 69.99, 70, 109.99, 110)
-- [ ] T075 [P] [US4] Unit tests in `backend/tests/unit/test_bar_kpis.py`: revenue per drink = `unit_price_dkk × units_sold` exact with `Decimal` (e.g. 72.47), bar totals, category split by revenue and by units (each column sums to exactly 100.00), zero sales returns 0 (no division error), ranks by revenue and by units
-- [ ] T076 [P] [US4] Contract tests in `backend/tests/contract/test_bar.py`: `GET /bar/drink-sales` (`200`, `category` filter, `400` bad `year` or `category`, ordered by `revenue_rank`), `GET /kpis/bar/summary` (`200`; an empty year returns zeros), `GET /kpis/bar/by-category` (always 2 rows `Cocktail`, `Coffee`)
-- [ ] T077 [P] [US4] Golden-value integration test in `backend/tests/integration/test_golden_bar.py`: `drink_count` 30, `units_sold` 179958, `total_revenue_dkk` 13448640.34; Espresso 1012729.60 (14656 units, `units_rank` 1); Margarita rank 30 = 171101.67; top cocktail Mint Julep 524351.62; `Cocktail` 20 drinks / 62077 units (34.50%) / 7104755.43 DKK (52.83%), `Coffee` 10 drinks / 117881 units (65.50%) / 6343884.91 DKK (47.17%); `?year=2030` returns both categories with 0
+- [X] T074 [P] [US4] Unit tests in `backend/tests/unit/test_price_tiers.py`: `budget` < 70, `standard` 70 ≤ price < 110, `premium` ≥ 110 (boundaries 69.99, 70, 109.99, 110)
+- [X] T075 [P] [US4] Unit tests in `backend/tests/unit/test_bar_kpis.py`: revenue per drink = `unit_price_dkk × units_sold` exact with `Decimal` (e.g. 72.47), bar totals, category split by revenue and by units (each column sums to exactly 100.00), zero sales returns 0 (no division error), ranks by revenue and by units
+- [X] T076 [P] [US4] Contract tests in `backend/tests/contract/test_bar.py`: `GET /bar/drink-sales` (`200`, `category` filter, `400` bad `year` or `category`, ordered by `revenue_rank`), `GET /kpis/bar/summary` (`200`; an empty year returns zeros), `GET /kpis/bar/by-category` (always 2 rows `Cocktail`, `Coffee`)
+- [X] T077 [P] [US4] Golden-value integration test in `backend/tests/integration/test_golden_bar.py`: `drink_count` 30, `units_sold` 179958, `total_revenue_dkk` 13448640.34; Espresso 1012729.60 (14656 units, `units_rank` 1); Margarita rank 30 = 171101.67; top cocktail Mint Julep 524351.62; `Cocktail` 20 drinks / 62077 units (34.50%) / 7104755.43 DKK (52.83%), `Coffee` 10 drinks / 117881 units (65.50%) / 6343884.91 DKK (47.17%); `?year=2030` returns both categories with 0
 
 ### Implementation for User Story 4
 
-- [ ] T078 [P] [US4] Implement `SRC/business/rules/price_tiers.py` (data-model §4.4, FR-016)
-- [ ] T079 [US4] Implement `SRC/business/kpis/bar.py` (depends on T078, T013, T014): revenue per drink (B2), ranks by revenue and units, bar summary (B1), category split with largest-remainder shares (B3)
-- [ ] T080 [US4] Create `SRC/business/services/bar_service.py` (depends on T024, T079): list ranked drink sales, summary, by category; extend `SRC/business/services/kpi_service.py` or a separate `BarKpiService` consistently with US2 (one service module per concern in plan.md)
-- [ ] T081 [P] [US4] Create `SRC/presentation/api/schemas/bar.py` (`DrinkSale`, `DrinkSaleList`, `BarSummary`, `BarCategoryKpi` and lists) as the contract
-- [ ] T082 [US4] Create routers `SRC/presentation/api/routers/bar.py` (`GET /api/v1/bar/drink-sales`, `year` and `category` parameters) and `SRC/presentation/api/routers/kpis_bar.py` (`GET /api/v1/kpis/bar/summary`, `GET /api/v1/kpis/bar/by-category`); register both and the service provider in `SRC/main.py` and `SRC/presentation/api/dependencies.py`
+- [X] T078 [P] [US4] Implement `SRC/business/rules/price_tiers.py` (data-model §4.4, FR-016)
+- [X] T079 [US4] Implement `SRC/business/kpis/bar.py` (depends on T078, T013, T014): revenue per drink (B2), ranks by revenue and units, bar summary (B1), category split with largest-remainder shares (B3)
+- [X] T080 [US4] Create `SRC/business/services/bar_service.py` (depends on T024, T079): list ranked drink sales, summary, by category; extend `SRC/business/services/kpi_service.py` or a separate `BarKpiService` consistently with US2 (one service module per concern in plan.md)
+- [X] T081 [P] [US4] Create `SRC/presentation/api/schemas/bar.py` (`DrinkSale`, `DrinkSaleList`, `BarSummary`, `BarCategoryKpi` and lists) as the contract
+- [X] T082 [US4] Create routers `SRC/presentation/api/routers/bar.py` (`GET /api/v1/bar/drink-sales`, `year` and `category` parameters) and `SRC/presentation/api/routers/kpis_bar.py` (`GET /api/v1/kpis/bar/summary`, `GET /api/v1/kpis/bar/by-category`); register both and the service provider in `SRC/main.py` and `SRC/presentation/api/dependencies.py`
 - [ ] T083 [US4] Run quickstart §6 by hand and check the values against the golden table
 
 **Checkpoint**: B1–B3 verified. Bar data is read-only through the API (no write endpoint; seed only).

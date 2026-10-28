@@ -3,8 +3,7 @@
 Expected numbers are in specs/001-hotel-analytics-platform/quickstart.md §6, computed from the CSV
 independently of the application.
 
-Skipped until `services/bar_service.py` exists (T080); remove the guard then and mark T077 done. The test
-defines its API (ranks are over all drinks of the year; `category` only selects rows):
+The API of `services/bar_service.py` (ranks are over all drinks of the year; `category` only selects rows):
 
     BarService(bar_sales_repository)
       .drink_sales(year, category=None) -> list[RankedDrinkSale]   ordered by revenue_rank, then name
@@ -23,7 +22,7 @@ from hotel_api.data.connection import connection_scope
 from hotel_api.data.repositories.bar_sales import MySqlBarSalesRepository
 from hotel_api.presentation.cli.seed import main as seed_main
 
-bar_service = pytest.importorskip("hotel_api.business.services.bar_service", reason="bar_service.py not written yet (T080)")
+from hotel_api.business.services import bar_service
 
 pytestmark = pytest.mark.integration
 

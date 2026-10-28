@@ -1,6 +1,4 @@
 """Price tiers (T074, FR-016, data-model §4.4): budget < 70, standard 70 <= price < 110, premium >= 110 DKK.
-
-Skipped until `rules/price_tiers.py` exists (T078); remove the guard then and mark T074 done.
 """
 
 from __future__ import annotations
@@ -10,8 +8,7 @@ from decimal import Decimal
 import pytest
 
 from hotel_api.business.domain.models import PriceTier
-
-price_tiers = pytest.importorskip("hotel_api.business.rules.price_tiers", reason="price_tiers.py not written yet (T078)")
+from hotel_api.business.rules import price_tiers
 
 pytestmark = pytest.mark.unit
 

@@ -1,6 +1,6 @@
 """Bar KPI functions (T075, B1-B3, FR-012-FR-014): pure, no database.
 
-Skipped until `kpis/bar.py` exists (T079); remove the guard then and mark T075 done. The tests define its API:
+The tests define the API of `kpis/bar.py`:
 
     ranked_drink_sales(sales)       -> list[RankedDrinkSale] ordered by revenue_rank, then name
     bar_summary(sales, year)        -> BarSummary
@@ -15,7 +15,7 @@ import pytest
 
 from hotel_api.business.domain.models import BarDrinkSale, DrinkCategory
 
-bar = pytest.importorskip("hotel_api.business.kpis.bar", reason="kpis/bar.py not written yet (T079)")
+from hotel_api.business.kpis import bar
 
 pytestmark = pytest.mark.unit
 

@@ -1,7 +1,5 @@
 """Contract tests for the bar endpoints (T076), every response validated with openapi-core.
 
-Skipped until the bar routers are registered (T082); remove the guard then and mark T076 done.
-
 Rank semantics assumed by these tests: `revenue_rank` and `units_rank` are always ranks among ALL drinks of
 the year; the `category` filter only selects which rows are returned.
 """
@@ -14,14 +12,8 @@ from fastapi.testclient import TestClient
 from hotel_api.config import Settings
 from hotel_api.main import create_app
 from hotel_api.presentation.cli.seed import main as seed_main
-from tests.contract.test_contract_validity import app_operations
 
-REQUIRED = {("GET", "/api/v1/bar/drink-sales"), ("GET", "/api/v1/kpis/bar/summary"), ("GET", "/api/v1/kpis/bar/by-category")}
-
-pytestmark = [
-    pytest.mark.contract,
-    pytest.mark.skipif(not REQUIRED <= app_operations(), reason="bar routers not registered yet (T082)"),
-]
+pytestmark = pytest.mark.contract
 
 
 @pytest.fixture()

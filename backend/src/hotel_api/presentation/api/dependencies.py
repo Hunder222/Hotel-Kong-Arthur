@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import Depends, Query
 
+from hotel_api.business.services.bar_service import BarService
 from hotel_api.business.services.booking_service import BookingService
 from hotel_api.business.services.health_service import HealthService
 from hotel_api.business.services.kpi_service import KpiService
@@ -35,6 +36,10 @@ def get_booking_service() -> BookingService:
 
 
 def get_review_service() -> ReviewService:
+    raise NotImplementedError("bound by the composition root (main.py)")
+
+
+def get_bar_service() -> BarService:
     raise NotImplementedError("bound by the composition root (main.py)")
 
 
