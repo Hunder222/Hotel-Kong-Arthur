@@ -69,6 +69,5 @@ def test_every_implemented_route_is_in_the_contract(spec: dict) -> None:
     assert not undocumented, f"implemented but not in the contract: {sorted(undocumented)}"
 
 
-@pytest.mark.xfail(reason="routers are added story by story; remove this marker in T102", strict=False)
 def test_route_parity_every_contract_operation_is_implemented(spec: dict) -> None:
     assert app_operations() == contract_operations(spec)

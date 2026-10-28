@@ -1,8 +1,4 @@
-"""Contract tests for `GET /kpis/bar/by-price-tier` (T086), validated with openapi-core.
-
-Skipped until the route exists (T092); remove the guard then and mark T086 done (with the A7 part in
-test_kpis_hotel_summary.py).
-"""
+"""Contract tests for `GET /kpis/bar/by-price-tier` (T086), validated with openapi-core."""
 
 from __future__ import annotations
 
@@ -12,12 +8,8 @@ from fastapi.testclient import TestClient
 from hotel_api.config import Settings
 from hotel_api.main import create_app
 from hotel_api.presentation.cli.seed import main as seed_main
-from tests.contract.test_contract_validity import app_operations
 
-pytestmark = [
-    pytest.mark.contract,
-    pytest.mark.skipif(("GET", "/api/v1/kpis/bar/by-price-tier") not in app_operations(), reason="route not registered yet (T092)"),
-]
+pytestmark = pytest.mark.contract
 
 URL = "/api/v1/kpis/bar/by-price-tier"
 

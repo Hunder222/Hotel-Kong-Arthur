@@ -231,7 +231,7 @@
 
 - [X] T084 [P] [US5] Unit tests in `backend/tests/unit/test_hotel_stay_kpis.py`: ALOS = Σ `days_rented` ÷ booking count, ADR = Σ `price_dkk` ÷ Σ `days_rented`, revenue per booking = Σ `price_dkk` ÷ booking count, each rounded half-up to 2 decimals, each 0 for an empty scope
 - [X] T085 [P] [US5] Unit tests in `backend/tests/unit/test_bar_price_tier_kpis.py`: units and revenue per tier, tier shares sum to exactly 100.00, an empty year returns 3 rows with 0
-- [ ] T086 [US5] Extend `backend/tests/contract/test_kpis_hotel_summary.py` (from T067) so `summary`, `by-room-type` and `by-season` are validated against the **complete** contract schemas incl. `average_length_of_stay_nights`, `average_daily_rate_dkk`, `average_revenue_per_booking_dkk`; add `backend/tests/contract/test_kpis_bar_price_tier.py` for `GET /kpis/bar/by-price-tier` (always 3 rows: `budget` with `price_from_dkk` 0, `standard`, `premium` with `price_to_dkk` null)
+- [X] T086 [US5] Extend `backend/tests/contract/test_kpis_hotel_summary.py` (from T067) so `summary`, `by-room-type` and `by-season` are validated against the **complete** contract schemas incl. `average_length_of_stay_nights`, `average_daily_rate_dkk`, `average_revenue_per_booking_dkk`; add `backend/tests/contract/test_kpis_bar_price_tier.py` for `GET /kpis/bar/by-price-tier` (always 3 rows: `budget` with `price_from_dkk` 0, `standard`, `premium` with `price_to_dkk` null)
 - [X] T087 [P] [US5] Golden-value integration test in `backend/tests/integration/test_golden_a7.py`: the hotel values above (summary and by season); tiers `budget` 10 drinks / 117881 units / 6343884.91 DKK (47.17%), `standard` 10 / 29306 / 2739242.59 (20.37%), `premium` 10 / 32771 / 4365512.84 (32.46%); `?year=2030` hotel summary returns 0 for all counts, amounts, averages and rates, with `available_room_nights` 78110
 
 ### Implementation for User Story 5
@@ -239,9 +239,9 @@
 - [X] T088 [US5] Extend `SRC/business/kpis/hotel.py`: ALOS, ADR, revenue per booking for summary, per room type and per season (FR-015)
 - [X] T089 [US5] Extend `SRC/business/kpis/bar.py` and the bar service from T080 with price-tier demand (units, revenue, shares per tier; FR-016)
 - [X] T090 [US5] Extend `SRC/business/services/kpi_service.py` to include ALOS / ADR / revenue per booking in summary, by room type and by season
-- [ ] T091 [P] [US5] Add the A7 fields to the DTOs in `SRC/presentation/api/schemas/kpis_hotel.py`, and add `BarPriceTierKpi` and `BarPriceTierKpiList` to `SRC/presentation/api/schemas/bar.py` (`price_tier`, `price_from_dkk`, `price_to_dkk` nullable, `drink_count`, `units_sold`, `unit_share_pct`, `revenue_dkk`, `revenue_share_pct`)
-- [ ] T092 [US5] Add `GET /api/v1/kpis/bar/by-price-tier` to `SRC/presentation/api/routers/kpis_bar.py`
-- [ ] T093 [US5] Run quickstart §7 by hand, including the edge cases (`?year=2030`, `?year=abc` → `400`)
+- [X] T091 [P] [US5] Add the A7 fields to the DTOs in `SRC/presentation/api/schemas/kpis_hotel.py`, and add `BarPriceTierKpi` and `BarPriceTierKpiList` to `SRC/presentation/api/schemas/bar.py` (`price_tier`, `price_from_dkk`, `price_to_dkk` nullable, `drink_count`, `units_sold`, `unit_share_pct`, `revenue_dkk`, `revenue_share_pct`)
+- [X] T092 [US5] Add `GET /api/v1/kpis/bar/by-price-tier` to `SRC/presentation/api/routers/kpis_bar.py`
+- [X] T093 [US5] Run quickstart §7 by hand, including the edge cases (`?year=2030`, `?year=abc` → `400`)
 
 **Checkpoint**: All five stories work. All 19 operations exist.
 

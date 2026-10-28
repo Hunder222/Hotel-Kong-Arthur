@@ -1,15 +1,13 @@
 """The partly-shared hotel KPI endpoints (T067): `summary`, `by-room-type` and `by-season`.
 
-They are checked here for the shape produced so far (revenue, occupancy, satisfaction). They are
-validated against the complete contract schemas, including ALOS / ADR, in T086; until then openapi-core
-cannot be used on them because `required` lists fields that do not exist yet.
+The first tests check the shape and values field by field (T067); the last ones validate the responses
+against the complete contract schemas with openapi-core, including ALOS / ADR (T086).
 """
 
 from __future__ import annotations
 
 import pytest
 
-from hotel_api.presentation.api.schemas.kpis_hotel import HotelSummary
 from hotel_api.presentation.cli.seed import main as seed_main
 
 pytestmark = pytest.mark.contract
@@ -63,13 +61,6 @@ def test_a_bad_year_is_400(client):
 
 # ---- T086: the same endpoints against the COMPLETE contract schemas (incl. ALOS / ADR / revenue per booking) ----
 
-complete_only = pytest.mark.skipif(
-    "average_length_of_stay_nights" not in HotelSummary.model_fields,
-    reason="A7 DTO fields not added yet (T091)",
-)
-
-
-@complete_only
 @pytest.mark.parametrize("path", ["summary", "by-room-type", "by-season"])
 @pytest.mark.parametrize("year", ["2026", "2030"])
 def test_complete_contract_schemas(client, check_contract, seeded, path, year):
@@ -78,7 +69,6 @@ def test_complete_contract_schemas(client, check_contract, seeded, path, year):
     check_contract(response)
 
 
-@complete_only
 def test_a7_values_in_the_responses(client, check_contract, seeded):
     body = client.get("/api/v1/kpis/hotel/summary?year=2026").json()
     assert (body["average_length_of_stay_nights"], body["average_daily_rate_dkk"],
@@ -88,7 +78,6 @@ def test_a7_values_in_the_responses(client, check_contract, seeded):
             for i in seasons] == [(5.36, 1885.37, 10102.64), (5.48, 2073.7, 11371.3), (5.29, 2308.89, 12223.93)]
 
 
-@complete_only
 def test_bad_year_is_400_with_the_contract_error_shape(client, check_contract):
     response = client.get("/api/v1/kpis/hotel/summary?year=abc")
     assert response.status_code == 400
