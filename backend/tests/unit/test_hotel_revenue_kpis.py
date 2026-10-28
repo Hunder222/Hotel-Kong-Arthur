@@ -7,7 +7,7 @@ from decimal import Decimal
 
 import pytest
 
-from hotel_api.business.domain.models import Booking, Season
+from hotel_api.business.domain.models import Booking, RoomType, Season
 from hotel_api.business.kpis import hotel
 from hotel_api.business.services.kpi_service import KpiService
 
@@ -28,31 +28,32 @@ BOOKINGS = [
     booking(6, "Suite", "Japan", date(2027, 1, 1), 5, 15000),            # 2027: ignored
 ]
 TOTAL = Decimal("21850.50")
+ROOMS = [RoomType(1, "Suite", "Suite", 26, 2)]  # only the room count matters for these revenue tests
 
 
 def test_summary_sums_revenue_bookings_and_nights():
-    s = hotel.hotel_revenue_summary(BOOKINGS, 2026)
+    s = hotel.hotel_revenue_summary(BOOKINGS, [], ROOMS, 2026)
     assert (s.year, s.booking_count, s.nights_sold, s.total_revenue_dkk) == (2026, 4, 10, TOTAL)
 
 
 def test_a_booking_belongs_to_the_year_of_its_check_in_date():
-    assert hotel.hotel_revenue_summary(BOOKINGS, 2025).total_revenue_dkk == Decimal("15000.00")
-    assert hotel.hotel_revenue_summary(BOOKINGS, 2027).booking_count == 1
+    assert hotel.hotel_revenue_summary(BOOKINGS, [], ROOMS, 2025).total_revenue_dkk == Decimal("15000.00")
+    assert hotel.hotel_revenue_summary(BOOKINGS, [], ROOMS, 2027).booking_count == 1
     # a stay that starts on 31 December and runs into January still counts entirely in 2025
     assert hotel.bookings_of_year(BOOKINGS, 2025)[0].id == 5
 
 
 def test_empty_dataset_returns_zeros_not_errors(room_types):
-    s = hotel.hotel_revenue_summary([], 2026)
+    s = hotel.hotel_revenue_summary([], [], room_types, 2026)
     assert (s.booking_count, s.nights_sold, s.total_revenue_dkk) == (0, 0, Decimal("0.00"))
-    assert all(r.revenue_share_pct == 0 and r.revenue_dkk == 0 for r in hotel.revenue_by_room_type([], room_types, 2026))
-    assert all(r.revenue_share_pct == 0 for r in hotel.revenue_by_season([], 2026))
+    assert all(r.revenue_share_pct == 0 and r.revenue_dkk == 0 for r in hotel.revenue_by_room_type([], [], room_types, 2026))
+    assert all(r.revenue_share_pct == 0 for r in hotel.revenue_by_season([], [], room_types, 2026))
     assert hotel.revenue_by_country([], 2026) == []
     assert len(hotel.revenue_by_room_type_and_season([], room_types, 2026)) == 24
 
 
 def test_by_room_type_has_all_eight_rows_ranked_by_revenue(room_types):
-    rows = hotel.revenue_by_room_type(BOOKINGS, room_types, 2026)
+    rows = hotel.revenue_by_room_type(BOOKINGS, [], room_types, 2026)
     assert len(rows) == 8
     top = rows[:3]
     assert [(r.revenue_rank, r.room_type) for r in top] == [(1, "Suite"), (2, "Grand Lit"), (3, "Standard Single")]
@@ -66,14 +67,14 @@ def test_by_room_type_has_all_eight_rows_ranked_by_revenue(room_types):
 
 
 def test_room_type_revenue_shares_sum_to_exactly_100(room_types):
-    rows = hotel.revenue_by_room_type(BOOKINGS, room_types, 2026)
+    rows = hotel.revenue_by_room_type(BOOKINGS, [], room_types, 2026)
     assert sum(r.revenue_share_pct for r in rows) == Decimal("100.00")
     assert rows[0].revenue_share_pct == Decimal("69.79")  # 15250 / 21850.5
     assert sum(r.revenue_dkk for r in rows) == TOTAL
 
 
 def test_by_season_has_three_rows_low_mid_high_with_calendar_days():
-    rows = hotel.revenue_by_season(BOOKINGS, 2026)
+    rows = hotel.revenue_by_season(BOOKINGS, [], ROOMS, 2026)
     assert [r.season for r in rows] == [Season.LOW, Season.MID, Season.HIGH]
     assert [r.season_days for r in rows] == [89, 153, 123]
     assert [r.revenue_dkk for r in rows] == [Decimal("6500.50"), Decimal("5600.00"), Decimal("9750.00")]
@@ -84,7 +85,7 @@ def test_by_season_has_three_rows_low_mid_high_with_calendar_days():
 
 def test_season_is_taken_from_the_check_in_month():
     edge = [booking(1, "Suite", "X", date(2026, 11, 30), 10, 30000), booking(2, "Suite", "X", date(2026, 12, 1), 1, 3000)]
-    low, mid, high = hotel.revenue_by_season(edge, 2026)
+    low, mid, high = hotel.revenue_by_season(edge, [], ROOMS, 2026)
     assert (low.booking_count, high.booking_count, mid.booking_count) == (1, 1, 0)
 
 
@@ -143,9 +144,14 @@ class FakeRoomTypes:
         return list(self._r)
 
 
+class FakeReviews:
+    def list(self, year=None, season=None, room_type=None):
+        return []
+
+
 def test_service_loads_one_year_and_delegates(room_types):
     repo = FakeBookings(BOOKINGS)
-    service = KpiService(repo, FakeRoomTypes(room_types))
+    service = KpiService(repo, FakeRoomTypes(room_types), FakeReviews())
     assert service.summary(2026).total_revenue_dkk == TOTAL
     assert len(service.by_room_type(2026)) == 8
     assert len(service.by_season(2026)) == 3

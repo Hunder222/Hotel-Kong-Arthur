@@ -1,7 +1,7 @@
 """Use case: hotel KPIs. Loads one reporting year of data through the ports and calls the pure KPI
 functions in `business/kpis`; it contains no formulas itself (Constitution VII).
 
-Revenue part (US2). The occupancy / satisfaction (US3) and ALOS / ADR (US5) figures extend it.
+Revenue (US2), occupancy and satisfaction (US3). ALOS / ADR (US5) extend it.
 """
 
 from __future__ import annotations
@@ -14,22 +14,31 @@ from hotel_api.business.domain.models import (
     SeasonRevenue,
 )
 from hotel_api.business.kpis import hotel
-from hotel_api.business.ports import BookingRepository, RoomTypeRepository
+from hotel_api.business.ports import BookingRepository, ReviewRepository, RoomTypeRepository
 
 
 class KpiService:
-    def __init__(self, bookings: BookingRepository, room_types: RoomTypeRepository) -> None:
+    def __init__(
+        self, bookings: BookingRepository, room_types: RoomTypeRepository, reviews: ReviewRepository
+    ) -> None:
         self._bookings = bookings
         self._room_types = room_types
+        self._reviews = reviews
 
     def summary(self, year: int) -> HotelRevenueSummary:
-        return hotel.hotel_revenue_summary(self._bookings.list(year=year), year)
+        return hotel.hotel_revenue_summary(
+            self._bookings.list(year=year), self._reviews.list(year=year), self._room_types.list_all(), year
+        )
 
     def by_room_type(self, year: int) -> list[RoomTypeRevenue]:
-        return hotel.revenue_by_room_type(self._bookings.list(year=year), self._room_types.list_all(), year)
+        return hotel.revenue_by_room_type(
+            self._bookings.list(year=year), self._reviews.list(year=year), self._room_types.list_all(), year
+        )
 
     def by_season(self, year: int) -> list[SeasonRevenue]:
-        return hotel.revenue_by_season(self._bookings.list(year=year), year)
+        return hotel.revenue_by_season(
+            self._bookings.list(year=year), self._reviews.list(year=year), self._room_types.list_all(), year
+        )
 
     def by_room_type_and_season(self, year: int) -> list[RoomTypeSeasonKpi]:
         return hotel.revenue_by_room_type_and_season(

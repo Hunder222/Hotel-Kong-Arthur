@@ -101,7 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return BookingService(MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn))
 
     def kpi_service(conn: Connection = connection) -> KpiService:
-        return KpiService(MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn))
+        return KpiService(MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn), MySqlReviewRepository(conn))
 
     app.dependency_overrides[deps.get_health_service] = health_service
     app.dependency_overrides[deps.get_kpi_service] = kpi_service

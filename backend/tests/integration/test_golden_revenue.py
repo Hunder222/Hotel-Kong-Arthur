@@ -14,6 +14,7 @@ from hotel_api.business.domain.models import Season
 from hotel_api.business.services.kpi_service import KpiService
 from hotel_api.data.connection import connection_scope
 from hotel_api.data.repositories.bookings import MySqlBookingRepository
+from hotel_api.data.repositories.reviews import MySqlReviewRepository
 from hotel_api.data.repositories.room_types import MySqlRoomTypeRepository
 from hotel_api.presentation.cli.seed import main as seed_main
 
@@ -27,7 +28,7 @@ def kpi(test_settings, clean_db, capsys):
     seed_main(settings=test_settings)
     capsys.readouterr()
     with connection_scope(test_settings) as conn:
-        yield KpiService(MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn))
+        yield KpiService(MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn), MySqlReviewRepository(conn))
 
 
 def test_annual_revenue_a6_k2(kpi):
