@@ -156,6 +156,41 @@ class HotelSummary:
     average_revenue_per_booking_dkk: Decimal
 
 
+# Revenue part of the hotel KPIs (US2). The complete summary / room-type / season KPIs above add
+# occupancy, satisfaction (US3) and ALOS/ADR (US5) on top of these figures.
+
+
+@dataclass(frozen=True)
+class HotelRevenueSummary:
+    year: int
+    booking_count: int
+    nights_sold: int
+    total_revenue_dkk: Decimal
+
+
+@dataclass(frozen=True)
+class RoomTypeRevenue:
+    year: int
+    revenue_rank: int
+    room_type: str
+    room_count: int
+    booking_count: int
+    nights_sold: int
+    revenue_dkk: Decimal
+    revenue_share_pct: Decimal
+
+
+@dataclass(frozen=True)
+class SeasonRevenue:
+    year: int
+    season: Season
+    season_days: int
+    booking_count: int
+    nights_sold: int
+    revenue_dkk: Decimal
+    revenue_share_pct: Decimal
+
+
 @dataclass(frozen=True)
 class RoomTypeKpi:
     year: int
