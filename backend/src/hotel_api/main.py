@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymysql.connections import Connection
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from hotel_api.business.services.booking_service import BookingService
 from hotel_api.business.services.health_service import HealthService
 from hotel_api.business.services.room_type_service import RoomTypeService
 from hotel_api.business.services.sample_data_service import SampleDataService
@@ -28,7 +29,7 @@ from hotel_api.data.repositories.reviews import MySqlReviewRepository
 from hotel_api.data.repositories.room_types import MySqlRoomTypeRepository
 from hotel_api.presentation.api import dependencies as deps
 from hotel_api.presentation.api.errors import register_error_handlers
-from hotel_api.presentation.api.routers import health, room_types
+from hotel_api.presentation.api.routers import bookings, health, room_types
 
 
 @contextmanager
@@ -95,11 +96,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def room_type_service(conn: Connection = connection) -> RoomTypeService:
         return RoomTypeService(MySqlRoomTypeRepository(conn))
 
+    def booking_service(conn: Connection = connection) -> BookingService:
+        return BookingService(MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn))
+
     app.dependency_overrides[deps.get_health_service] = health_service
+    app.dependency_overrides[deps.get_booking_service] = booking_service
     app.dependency_overrides[deps.get_room_type_service] = room_type_service
 
     app.include_router(health.router)
     app.include_router(room_types.router)
+    app.include_router(bookings.router)
     return app
 
 

@@ -1,23 +1,14 @@
-"""Contract tests for the 5 booking operations (T043), every response validated with openapi-core.
-
-Skipped until the bookings router is registered (T047/T048); remove the skip when it is, then
-mark T043 done.
-"""
+"""Contract tests for the 5 booking operations (T043), every response validated with openapi-core."""
 
 from __future__ import annotations
 
 import pytest
+from fastapi.testclient import TestClient
 
 from hotel_api.config import Settings
 from hotel_api.main import create_app
 
-pytestmark = [
-    pytest.mark.contract,
-    pytest.mark.skipif(
-        "/api/v1/bookings" not in {getattr(r, "path", "") for r in create_app(Settings()).routes},
-        reason="bookings router not registered yet (T047/T048)",
-    ),
-]
+pytestmark = pytest.mark.contract
 
 QUICKSTART = {
     "first_name": "Elena",
@@ -134,8 +125,6 @@ def test_delete_then_404(client, check_contract, created):
 
 
 def test_bookings_give_503_when_the_database_is_down(check_contract):
-    from fastapi.testclient import TestClient
-
     down = TestClient(create_app(Settings(db_host="127.0.0.1", db_port=1, db_name="hotel_test")),
                       raise_server_exceptions=False)
     for response in (down.get("/api/v1/bookings"), down.post("/api/v1/bookings", json=QUICKSTART)):

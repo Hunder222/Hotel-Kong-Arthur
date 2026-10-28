@@ -30,12 +30,21 @@ def contract_operations(spec: dict) -> set[tuple[str, str]]:
     }
 
 
+def api_routes(routes, prefix: str = ""):
+    """Yield (full path, APIRoute) for every route. FastAPI 0.16x wraps included routers in lazy
+    `_IncludedRouter` objects, so `app.routes` alone does not list the endpoints."""
+    for route in routes:
+        if isinstance(route, APIRoute):
+            yield prefix + route.path, route
+        elif hasattr(route, "original_router"):
+            yield from api_routes(route.original_router.routes, prefix + route.include_context.prefix)
+
+
 def app_operations() -> set[tuple[str, str]]:
     app = create_app(Settings())
     return {
-        (method, route.path)
-        for route in app.routes
-        if isinstance(route, APIRoute)
+        (method, path)
+        for path, route in api_routes(app.routes)
         for method in route.methods
         if method not in {"HEAD", "OPTIONS"}
     }
@@ -48,6 +57,11 @@ def test_contract_is_valid_openapi_3_0_3(spec: dict) -> None:
 
 def test_contract_has_19_operations(spec: dict) -> None:
     assert len(contract_operations(spec)) == 19
+
+
+def test_the_route_scan_is_not_vacuous() -> None:
+    assert ("GET", "/api/v1/health") in app_operations()
+    assert ("DELETE", "/api/v1/bookings/{booking_id}") in app_operations()
 
 
 def test_every_implemented_route_is_in_the_contract(spec: dict) -> None:
