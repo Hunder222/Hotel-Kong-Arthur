@@ -1,4 +1,4 @@
-# Hotel Kong Arthur: `docker compose up` starts db, api and swagger-ui (the frontend service is added with the frontend tasks).
+# Hotel Kong Arthur: `docker compose up` starts db, api, frontend and swagger-ui.
 # All values below are development defaults, not secrets.
 
 x-db-env: &db-env
@@ -49,6 +49,22 @@ services:
       timeout: 5s
       retries: 12
       start_period: 5s
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # 127.0.0.1, not localhost: nginx listens on IPv4 only.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 3s
 
   swagger-ui:
     image: swaggerapi/swagger-ui:v5.33.3

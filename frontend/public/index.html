@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hotel Kong Arthur · Bookings</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="page-header">
+    <h1>Hotel Kong Arthur</h1>
+    <p>Bookings for reception</p>
+  </header>
+
+  <main>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <section class="card" aria-labelledby="form-title">
+      <h2 id="form-title">New booking</h2>
+      <form id="booking-form" novalidate>
+        <div class="grid">
+          <label>First name
+            <input name="first_name" autocomplete="off" maxlength="100">
+            <span class="field-error" data-error-for="first_name"></span>
+          </label>
+          <label>Family name
+            <input name="family_name" autocomplete="off" maxlength="100">
+            <span class="field-error" data-error-for="family_name"></span>
+          </label>
+          <label>Country
+            <input name="country" autocomplete="off" maxlength="100">
+            <span class="field-error" data-error-for="country"></span>
+          </label>
+          <label>Room type
+            <select name="room_type"></select>
+            <span class="hint" id="rate-hint"></span>
+            <span class="field-error" data-error-for="room_type"></span>
+          </label>
+          <label>Check-in date
+            <input name="check_in_date" type="date" min="2000-01-01" max="2100-12-31">
+            <span class="field-error" data-error-for="check_in_date"></span>
+          </label>
+          <label>Nights
+            <input name="days_rented" type="number" min="1" max="365" step="1" inputmode="numeric">
+            <span class="field-error" data-error-for="days_rented"></span>
+          </label>
+          <label>Total price (DKK)
+            <input name="price_dkk" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Standard price">
+            <span class="hint">Leave empty to use the standard price.</span>
+            <span class="field-error" data-error-for="price_dkk"></span>
+          </label>
+        </div>
+        <p class="field-error form-error" data-error-for="_form"></p>
+        <div class="actions">
+          <button type="submit" id="submit-button" class="primary">Create booking</button>
+          <button type="button" id="cancel-button" hidden>Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="list-title">
+      <h2 id="list-title">Bookings <span id="count" class="muted"></span></h2>
+      <div class="table-wrap">
+        <table>
+          <caption class="visually-hidden">Bookings, newest first</caption>
+          <thead>
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col">Guest</th>
+              <th scope="col">Country</th>
+              <th scope="col">Room type</th>
+              <th scope="col">Check-in</th>
+              <th scope="col" class="num">Nights</th>
+              <th scope="col">Season</th>
+              <th scope="col" class="num">Price</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="booking-rows"></tbody>
+        </table>
+      </div>
+      <p id="empty" class="muted" hidden>No bookings yet.</p>
+      <button type="button" id="more-button" hidden>Show more</button>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
