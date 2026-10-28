@@ -1,23 +1,12 @@
-"""Contract tests for the two complete US2 endpoints (T056), validated with openapi-core.
-
-Skipped until the routes exist (T061/T062); remove the skip then and mark T056 done.
-"""
+"""Contract tests for the two complete US2 endpoints (T056), validated with openapi-core."""
 
 from __future__ import annotations
 
 import pytest
 
 from hotel_api.presentation.cli.seed import main as seed_main
-from tests.contract.test_contract_validity import app_operations
 
-pytestmark = [
-    pytest.mark.contract,
-    pytest.mark.skipif(
-        ("GET", "/api/v1/kpis/hotel/by-country") not in app_operations()
-        or ("GET", "/api/v1/kpis/hotel/by-room-type-and-season") not in app_operations(),
-        reason="KPI hotel routes not registered yet (T061/T062)",
-    ),
-]
+pytestmark = pytest.mark.contract
 
 ROOM_TYPES = ["Standard Single", "Grand Lit", "Standard Double", "Superior Double",
               "Junior Suite", "Spa Executive", "Suite", "LOFT Suite"]
