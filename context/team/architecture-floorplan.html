@@ -1,0 +1,2162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hotel Kong Arthur · Architecture Floorplan & Dependency Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b101b;
+      --bg-elevated: #111827;
+      --bg-panel: #161f33;
+      --bg-card: #1e293b;
+      --bg-hover: #283548;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #2e3c56;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.14);
+
+      /* Layer colors */
+      --layer-client: #f59e0b;
+      --layer-client-bg: rgba(245, 158, 11, 0.08);
+      --layer-presentation: #38bdf8;
+      --layer-presentation-bg: rgba(56, 189, 248, 0.08);
+      --layer-services: #a855f7;
+      --layer-services-bg: rgba(168, 85, 247, 0.08);
+      --layer-domain: #ec4899;
+      --layer-domain-bg: rgba(236, 72, 153, 0.08);
+      --layer-data: #10b981;
+      --layer-data-bg: rgba(16, 185, 129, 0.08);
+
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top Header & Controls */
+    .topbar {
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #1d4e5f, #38bdf8);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(56, 189, 248, 0.25);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .brand p {
+      margin: 0.1rem 0 0;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .toolbar-stats {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .stat-pill {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      padding: 0.3rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .stat-pill strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Filter Bar */
+    .filterbar {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 0.6rem 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.9rem;
+      z-index: 15;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-right: 0.25rem;
+    }
+
+    .chip {
+      background: var(--bg-elevated);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.32rem 0.6rem;
+      font-size: 0.76rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s ease;
+    }
+
+    .chip:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .chip[aria-pressed="true"] {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .layer-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .search-input {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.34rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      min-width: 210px;
+    }
+
+    .search-input:focus {
+      outline: 2px solid var(--accent);
+      border-color: transparent;
+    }
+
+    .divider {
+      width: 1px;
+      height: 22px;
+      background: var(--border);
+    }
+
+    /* Main Workspace */
+    .workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.12) 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+
+    #floorplan-svg {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      display: block;
+    }
+
+    #floorplan-svg:active {
+      cursor: grabbing;
+    }
+
+    /* Floating Canvas Controls & Legend */
+    .canvas-controls {
+      position: absolute;
+      bottom: 1rem;
+      left: 1rem;
+      display: flex;
+      gap: 0.4rem;
+      background: rgba(17, 24, 39, 0.9);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      padding: 0.35rem;
+      border-radius: 8px;
+      z-index: 10;
+    }
+
+    .icon-btn {
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.35rem 0.6rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .icon-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+    }
+
+    .canvas-legend {
+      position: absolute;
+      top: 0.85rem;
+      left: 1rem;
+      background: rgba(17, 24, 39, 0.88);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.55rem 0.8rem;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .legend-line {
+      width: 22px;
+      height: 2px;
+      display: inline-block;
+    }
+
+    /* SVG Graph Elements */
+    .layer-band {
+      rx: 12px;
+      ry: 12px;
+      stroke-width: 1.5px;
+      transition: opacity 0.2s ease;
+    }
+
+    .layer-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      fill: #cbd5e1;
+    }
+
+    .layer-subtitle {
+      font-size: 11px;
+      fill: #94a3b8;
+    }
+
+    .edge-path {
+      fill: none;
+      stroke-width: 1.75px;
+      transition: opacity 0.2s ease, stroke-width 0.2s ease;
+    }
+
+    .edge-path.highlighted {
+      stroke-width: 3px;
+      opacity: 1 !important;
+    }
+
+    .edge-path.dimmed {
+      opacity: 0.08 !important;
+    }
+
+    .edge-label {
+      font-size: 9.5px;
+      fill: #94a3b8;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .edge-label.visible {
+      opacity: 1;
+    }
+
+    .node-group {
+      cursor: pointer;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .node-group.dimmed {
+      opacity: 0.16;
+    }
+
+    .node-rect {
+      rx: 10px;
+      ry: 10px;
+      fill: #172033;
+      stroke-width: 1.75px;
+      transition: all 0.15s ease;
+    }
+
+    .node-group:hover .node-rect {
+      fill: #1f2b44;
+      stroke-width: 2.5px;
+      filter: drop-shadow(0 4px 14px rgba(56, 189, 248, 0.25));
+    }
+
+    .node-group.selected .node-rect {
+      fill: #1e2d4a;
+      stroke-width: 3px;
+      filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.45));
+    }
+
+    .node-title {
+      font-size: 12px;
+      font-weight: 700;
+      fill: #f8fafc;
+    }
+
+    .node-sub {
+      font-size: 10.5px;
+      fill: #94a3b8;
+    }
+
+    .node-badge {
+      font-size: 9.5px;
+      font-weight: 600;
+      fill: #cbd5e1;
+    }
+
+    /* Inspector Drawer */
+    .inspector-drawer {
+      width: 430px;
+      max-width: 92vw;
+      background: var(--bg-elevated);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 25;
+      box-shadow: -8px 0 28px rgba(0, 0, 0, 0.45);
+    }
+
+    .inspector-drawer.closed {
+      display: none;
+    }
+
+    .drawer-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      background: var(--bg-panel);
+    }
+
+    .drawer-layer-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      margin-bottom: 0.4rem;
+    }
+
+    .drawer-header h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.3;
+    }
+
+    .close-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+      font-size: 1rem;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .close-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .drawer-body {
+      padding: 1.1rem 1.25rem;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+    }
+
+    .drawer-section h3 {
+      margin: 0 0 0.5rem;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .summary-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 0.9rem;
+      font-size: 0.86rem;
+      line-height: 1.5;
+      color: #e2e8f0;
+    }
+
+    .file-list, .interface-list, .dep-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .file-item {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.45rem 0.65rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.76rem;
+      color: #38bdf8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      word-break: break-all;
+    }
+
+    .file-role {
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .interface-pill {
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 6px;
+      padding: 0.4rem 0.65rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.75rem;
+      color: #e9d5ff;
+    }
+
+    .interface-pill span {
+      display: block;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 0.15rem;
+    }
+
+    .dep-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.7rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .dep-card:hover {
+      border-color: var(--accent);
+      background: var(--bg-hover);
+    }
+
+    .dep-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .dep-card-via {
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .journey-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .journey-tag {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.2rem 0.55rem;
+      font-size: 0.72rem;
+      color: #cbd5e1;
+      cursor: pointer;
+    }
+
+    .journey-tag:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Modal for Layer Boundary Matrix */
+    dialog {
+      background: var(--bg-elevated);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      max-width: 780px;
+      width: 92vw;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+    }
+
+    dialog::backdrop {
+      background: rgba(5, 8, 15, 0.72);
+      backdrop-filter: blur(4px);
+    }
+
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.75rem;
+      font-size: 0.82rem;
+    }
+
+    .matrix-table th, .matrix-table td {
+      border: 1px solid var(--border);
+      padding: 0.55rem 0.7rem;
+      text-align: left;
+    }
+
+    .matrix-table th {
+      background: var(--bg-panel);
+      color: var(--text-muted);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+    }
+
+    .ok-badge {
+      color: #34d399;
+      font-weight: 600;
+    }
+
+    .forbid-badge {
+      color: #f87171;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">KA</div>
+      <div>
+        <h1>Hotel Kong Arthur · Architecture Floorplan</h1>
+        <p>Interactive 3-Layer Backend, REST Contract, Web Reception UI &amp; MySQL 8.4 Dependency Map</p>
+      </div>
+    </div>
+
+    <div class="toolbar-stats">
+      <span class="stat-pill"><strong>5</strong> Architectural Tiers</span>
+      <span class="stat-pill"><strong id="stat-nodes">20</strong> Components (41 Files)</span>
+      <span class="stat-pill"><strong id="stat-edges">49</strong> Dependency Edges</span>
+      <span class="stat-pill"><strong>19</strong> OpenAPI Operations</span>
+      <button class="chip" id="btn-rules-modal" type="button" title="Inspect test_layers.py &amp; FR-017 architectural constraints">
+        🛡️ Layer Rules &amp; Guardrails
+      </button>
+      <button class="chip" id="btn-orientation" type="button" aria-pressed="false" title="Toggle between Vertical Floorplan and Horizontal Flow">
+        ↕️ Layout: Vertical Floorplan
+      </button>
+    </div>
+  </header>
+
+  <section class="filterbar" aria-label="Architecture filters">
+    <div class="filter-group" id="layer-filters">
+      <span class="filter-label">Layers:</span>
+      <button class="chip" data-layer="all" aria-pressed="true" type="button">All Layers</button>
+      <button class="chip" data-layer="client" aria-pressed="false" type="button">
+        <span class="layer-dot" style="background: var(--layer-client)"></span>Clients &amp; External
+      </button>
+      <button class="chip" data-layer="presentation" aria-pressed="false" type="button">
+        <span class="layer-dot" style="background: var(--layer-presentation)"></span>1. Presentation / API
+      </button>
+      <button class="chip" data-layer="services" aria-pressed="false" type="button">
+        <span class="layer-dot" style="background: var(--layer-services)"></span>2a. Business Services
+      </button>
+      <button class="chip" data-layer="domain" aria-pressed="false" type="button">
+        <span class="layer-dot" style="background: var(--layer-domain)"></span>2b. Domain, KPIs &amp; Rules
+      </button>
+      <button class="chip" data-layer="data" aria-pressed="false" type="button">
+        <span class="layer-dot" style="background: var(--layer-data)"></span>3. Data Access &amp; MySQL
+      </button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="filter-group" id="journey-filters">
+      <span class="filter-label">User Journeys:</span>
+      <button class="chip" data-journey="all" aria-pressed="true" type="button">All Journeys</button>
+      <button class="chip" data-journey="us1" aria-pressed="false" type="button">US1 · Booking CRUD (F1)</button>
+      <button class="chip" data-journey="us2" aria-pressed="false" type="button">US2 · Hotel Revenue (A1–A6)</button>
+      <button class="chip" data-journey="us3" aria-pressed="false" type="button">US3 · Occupancy &amp; Reviews (K1/K3)</button>
+      <button class="chip" data-journey="us4" aria-pressed="false" type="button">US4 · Lobby Bar &amp; Tiers (B1–B3)</button>
+      <button class="chip" data-journey="us5" aria-pressed="false" type="button">US5 · Stay KPIs (A7: ALOS/ADR)</button>
+      <button class="chip" data-journey="seed" aria-pressed="false" type="button">CLI · CSV Sample Seed (R13)</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <input
+      type="search"
+      id="search-box"
+      class="search-input"
+      placeholder="Search files, exports, routes..."
+      aria-label="Search components, files, and exported symbols"
+    />
+  </section>
+
+  <main class="workspace">
+    <div class="canvas-container" id="canvas-container">
+      <div class="canvas-legend">
+        <span class="legend-item">
+          <span class="legend-line" style="background: #38bdf8"></span> HTTP / REST / Call Flow
+        </span>
+        <span class="legend-item">
+          <span class="legend-line" style="background: #a855f7"></span> Service / Rule Import
+        </span>
+        <span class="legend-item">
+          <span class="legend-line" style="background: #10b981"></span> Repository Port / SQL Flow
+        </span>
+        <span class="legend-item">
+          <span class="legend-line" style="border-top: 2px dashed #64748b; background: transparent"></span> DI Wiring / Contract Verification
+        </span>
+        <span style="color: #cbd5e1; font-weight: 600">💡 Click any node to open the Inspector Drawer</span>
+      </div>
+
+      <svg id="floorplan-svg" role="img" aria-label="Architecture dependency graph"></svg>
+
+      <div class="canvas-controls">
+        <button class="icon-btn" id="btn-zoom-in" type="button" title="Zoom In">＋ Zoom In</button>
+        <button class="icon-btn" id="btn-zoom-out" type="button" title="Zoom Out">－ Zoom Out</button>
+        <button class="icon-btn" id="btn-zoom-reset" type="button" title="Fit Floorplan to Screen">⊡ Fit View</button>
+        <button class="icon-btn" id="btn-toggle-labels" type="button" title="Toggle Edge Labels">🏷️ Edge Labels</button>
+      </div>
+    </div>
+
+    <aside class="inspector-drawer" id="inspector-drawer" aria-label="Component Inspector">
+      <div class="drawer-header">
+        <div>
+          <div class="drawer-layer-tag" id="drawer-layer-tag">Layer</div>
+          <h2 id="drawer-title">Select a component</h2>
+        </div>
+        <button class="close-btn" id="btn-close-drawer" type="button" aria-label="Close inspector drawer">✕</button>
+      </div>
+      <div class="drawer-body" id="drawer-body"></div>
+    </aside>
+  </main>
+
+  <dialog id="rules-dialog">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+      <h2 style="margin: 0; font-size: 1.1rem;">Enforced Architectural Guardrails (`tests/architecture/`)</h2>
+      <button class="close-btn" id="btn-close-dialog" type="button" aria-label="Close modal">✕</button>
+    </div>
+    <p style="margin: 0 0 0.75rem; font-size: 0.85rem; color: var(--text-muted);">
+      Verified automatically on every test run by <code>backend/tests/architecture/test_layers.py</code> and
+      <code>backend/tests/architecture/test_no_tableau_files.py</code>:
+    </p>
+    <table class="matrix-table">
+      <thead>
+        <tr>
+          <th>Layer / Scope</th>
+          <th>Permitted Imports</th>
+          <th>Forbidden Imports (AST Enforced)</th>
+          <th>Key Architectural Rule</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Frontend Web UI</strong><br/><code>frontend/public/*</code></td>
+          <td><span class="ok-badge">✓</span> Same-origin <code>/api/v1/*</code></td>
+          <td><span class="forbid-badge">✗</span> Business formulas, direct DB</td>
+          <td>Contains zero pricing, season, or validation logic (Research R15).</td>
+        </tr>
+        <tr>
+          <td><strong>1. Presentation Layer</strong><br/><code>hotel_api.presentation.*</code></td>
+          <td><span class="ok-badge">✓</span> <code>hotel_api.business.*</code>, FastAPI, Pydantic</td>
+          <td><span class="forbid-badge">✗</span> <code>hotel_api.data.*</code>, PyMySQL</td>
+          <td>Routers depend on Service stubs in <code>dependencies.py</code>; <code>main.py</code> binds them per request.</td>
+        </tr>
+        <tr>
+          <td><strong>2. Business Layer</strong><br/><code>hotel_api.business.*</code></td>
+          <td><span class="ok-badge">✓</span> Pure Python stdlib, <code>hotel_api.business.*</code></td>
+          <td><span class="forbid-badge">✗</span> <code>presentation</code>, <code>data</code>, <code>fastapi</code>, <code>starlette</code>, <code>pymysql</code></td>
+          <td>Single source of truth for KPIs, seasons, pricing, ranking, and validation (Constitution VII).</td>
+        </tr>
+        <tr>
+          <td><strong>3. Data Layer</strong><br/><code>hotel_api.data.*</code></td>
+          <td><span class="ok-badge">✓</span> <code>business.domain.models</code>, <code>business.ports</code>, <code>business.rules.seasons</code>, PyMySQL</td>
+          <td><span class="forbid-badge">✗</span> <code>hotel_api.presentation.*</code>, <code>hotel_api.business.services.*</code></td>
+          <td>Parameterised SQL over one transactional connection per request; maps driver errors to <code>StorageUnavailable</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>Tableau Handover</strong><br/><code>FR-017</code></td>
+          <td><span class="ok-badge">✓</span> External HTTP GET JSON via REST API Connector</td>
+          <td><span class="forbid-badge">✗</span> <code>.twb</code>, <code>.twbx</code>, <code>.tbm</code>, <code>.tds</code>, <code>.hyper</code>, WDC JS</td>
+          <td>Dashboard is built manually by the team against the REST API; repo stores zero Tableau files.</td>
+        </tr>
+      </tbody>
+    </table>
+  </dialog>
+
+  <script>
+    // ============================================================================
+    // 1. ARCHITECTURAL LAYERS & COMPLETE REPOSITORY COMPONENT CATALOG
+    // ============================================================================
+    const LAYERS = [
+      {
+        id: "client",
+        index: 0,
+        name: "Tier 0 · Clients, External Consumers & Data Inputs",
+        subtitle: "Reception Browser SPA, Nginx Proxy, Tableau CFO Dashboard, Swagger UI & Teacher CSVs",
+        color: "#f59e0b",
+        bg: "rgba(245, 158, 11, 0.07)"
+      },
+      {
+        id: "presentation",
+        index: 1,
+        name: "Tier 1 · Presentation Layer & Composition Root (hotel_api.presentation)",
+        subtitle: "FastAPI Routers, Pydantic DTO Schemas, RFC 9457 Problem Details, Seed CLI & main.py Wiring",
+        color: "#38bdf8",
+        bg: "rgba(56, 189, 248, 0.07)"
+      },
+      {
+        id: "services",
+        index: 2,
+        name: "Tier 2a · Business Layer — Application Services (hotel_api.business.services)",
+        subtitle: "Use-Case Orchestrators coordinating Pure Rules/KPIs with Repository Protocol Ports",
+        color: "#a855f7",
+        bg: "rgba(168, 85, 247, 0.07)"
+      },
+      {
+        id: "domain",
+        index: 3,
+        name: "Tier 2b · Business Layer — Pure KPIs, Rules, Models & Ports (hotel_api.business.*)",
+        subtitle: "Zero-I/O KPI Calculators, Validation & Pricing Rules, Domain Dataclasses & Repository Protocols",
+        color: "#ec4899",
+        bg: "rgba(236, 72, 153, 0.07)"
+      },
+      {
+        id: "data",
+        index: 4,
+        name: "Tier 3 · Data Access Layer & Persistence (hotel_api.data + MySQL 8.4)",
+        subtitle: "PyMySQL Transactional Connection Scope, Parameterised SQL Repositories & MySQL 8.4 Tables",
+        color: "#10b981",
+        bg: "rgba(16, 185, 129, 0.07)"
+      }
+    ];
+
+    const NODES = [
+      // ---------------- TIER 0: CLIENTS & EXTERNAL ----------------
+      {
+        id: "frontend-ui",
+        layer: "client",
+        slot: 0,
+        title: "Reception Booking Web UI",
+        subtitle: "frontend/public/{index.html,app.js}",
+        badge: "Browser SPA · F1",
+        journeys: ["us1"],
+        summary: "Static browser application used by hotel receptionists on port 8080 to list, create, edit, and delete guest room bookings. Intentionally contains zero business rules, pricing formulas, or season mappings—it renders rate hints and field-level validation errors directly from the REST API.",
+        files: [
+          { path: "frontend/public/index.html", role: "Booking form & table markup" },
+          { path: "frontend/public/app.js", role: "UI state, rendering & event wiring" },
+          { path: "frontend/public/styles.css", role: "Responsive reception stylesheet" }
+        ],
+        exports: [
+          { sig: "init() / reload()", desc: "Loads room types and newest bookings on startup" },
+          { sig: "onSubmit(event)", desc: "Dispatches createBooking() or replaceBooking() and maps 400/422 errors to fields" },
+          { sig: "startEdit(booking) / removeBooking(booking)", desc: "Switches form into edit mode or confirms deletion" },
+          { sig: "renderRoomTypes() / showRateHint()", desc: "Populates room select and displays seasonal min–max rate bands" }
+        ]
+      },
+      {
+        id: "frontend-api-proxy",
+        layer: "client",
+        slot: 1,
+        title: "Browser API Client & Nginx Proxy",
+        subtitle: "frontend/public/api.js + nginx.conf",
+        badge: "ES Module + Nginx :8080",
+        journeys: ["us1"],
+        summary: "Thin fetch wrapper module (`api.js`) paired with an Nginx 1.30 reverse proxy (`nginx.conf`). The browser talks to its own origin on port 8080; Nginx forwards `/api/*` requests to `http://api:8000` using Docker's internal DNS resolver.",
+        files: [
+          { path: "frontend/public/api.js", role: "Fetch wrappers & ApiError class" },
+          { path: "frontend/nginx.conf", role: "Static serving + /api/ reverse proxy" },
+          { path: "frontend/Dockerfile", role: "nginx:1.30-alpine container image" }
+        ],
+        exports: [
+          { sig: "class ApiError(status, problem)", desc: "Wraps RFC 9457 Problem Details and exposes .fieldErrors" },
+          { sig: "listRoomTypes()", desc: "GET /api/v1/room-types -> items[]" },
+          { sig: "listBookings()", desc: "GET /api/v1/bookings -> items[]" },
+          { sig: "createBooking(booking)", desc: "POST /api/v1/bookings" },
+          { sig: "replaceBooking(id, booking)", desc: "PUT /api/v1/bookings/{id}" },
+          { sig: "deleteBooking(id)", desc: "DELETE /api/v1/bookings/{id}" }
+        ]
+      },
+      {
+        id: "tableau-client",
+        layer: "client",
+        slot: 2,
+        title: "Tableau Desktop CFO Dashboard",
+        subtitle: "External Consumer (REST API Connector)",
+        badge: "Analytics · A1–A7, B1–B3, K1–K3",
+        journeys: ["us2", "us3", "us4", "us5"],
+        summary: "External analytics client used by the Hotel CFO. Connects to `http://localhost:8000/api/v1/*` via Tableau's REST API Connector (JSONPath `$.items[*]` or `$`). Per FR-017 (enforced by `test_no_tableau_files.py`), the repository stores no `.twb`/`.twbx` files and Tableau never recomputes business rules.",
+        files: [
+          { path: "README.md", role: "Tableau REST API Connector handover guide" },
+          { path: "backend/tests/architecture/test_no_tableau_files.py", role: "AST/filesystem guardrail enforcing FR-017" }
+        ],
+        exports: [
+          { sig: "GET /api/v1/kpis/hotel/*?year=2026", desc: "Consumes summary, by-room-type, by-season, by-room-type-and-season, by-country" },
+          { sig: "GET /api/v1/kpis/bar/* & /bar/drink-sales", desc: "Consumes bar summary, category split, price-tier demand & ranked drinks" }
+        ]
+      },
+      {
+        id: "openapi-swagger",
+        layer: "client",
+        slot: 3,
+        title: "OpenAPI 3.0.3 Contract & Swagger UI",
+        subtitle: "contracts/openapi.yaml (:8081)",
+        badge: "19 Operations · R4",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "The single authoritative API specification (`openapi.yaml`) mounted read-only into the `swagger-ui` Docker container on port 8081 and validated against every live route response by `backend/tests/contract/`.",
+        files: [
+          { path: "specs/001-hotel-analytics-platform/contracts/openapi.yaml", role: "Single authoritative OpenAPI 3.0.3 contract" },
+          { path: "backend/tests/contract/test_contract_validity.py", role: "Verifies 19-operation route parity & schema conformance" },
+          { path: "docker-compose.yml", role: "Mounts openapi.yaml into swaggerapi/swagger-ui:v5.33.3" }
+        ],
+        exports: [
+          { sig: "19 OperationIds", desc: "getHealth, listRoomTypes, Bookings CRUD (5), Reviews (3), Bar (4), Hotel KPIs (5)" },
+          { sig: "Schemas: Problem, Booking, HotelSummary, ...", desc: "Strict DTO contracts with extra='forbid'" }
+        ]
+      },
+      {
+        id: "csv-sample-files",
+        layer: "client",
+        slot: 4,
+        title: "Teacher Sample CSV Datasets",
+        subtitle: "context/teacher/*.csv",
+        badge: "1,000 Bookings · 30 Drinks",
+        journeys: ["seed"],
+        summary: "Raw CSV datasets provided for the course assignment. Read only on-demand by the `seed` CLI profile—never at runtime by the web API. Includes 1,000 international room bookings (with 54 `M\\ufffdller` rows repaired during seed) and 30 lobby bar drinks.",
+        files: [
+          { path: "context/teacher/international_names_with_rooms_1000.csv", role: "1,000 sample bookings (comma-delimited)" },
+          { path: "context/teacher/drinks_menu_with_sales.csv", role: "30 bar drink sales (semicolon-delimited, decimal comma)" }
+        ],
+        exports: [
+          { sig: "international_names_with_rooms_1000.csv", desc: "Columns: First Name, Family Name, Country, Room Type, Days Rented, Season, Price" },
+          { sig: "drinks_menu_with_sales.csv", desc: "Columns: Drink Name, Category, Price (DKK), Units Sold" }
+        ]
+      },
+
+      // ---------------- TIER 1: PRESENTATION LAYER ----------------
+      {
+        id: "composition-root",
+        layer: "presentation",
+        slot: 0,
+        title: "Composition Root & Settings",
+        subtitle: "hotel_api/main.py + config.py",
+        badge: "FastAPI App · R3",
+        journeys: ["us1", "us2", "us3", "us4", "us5", "seed"],
+        summary: "The only module in the backend that imports all three layers (`presentation`, `business`, `data`). Builds the FastAPI app, attaches CORS and `NoStoreMiddleware` (`Cache-Control: no-store`), registers RFC 9457 error handlers, and binds each presentation dependency stub to a request-scoped transactional connection.",
+        files: [
+          { path: "backend/src/hotel_api/main.py", role: "FastAPI factory, NoStoreMiddleware & DI wiring" },
+          { path: "backend/src/hotel_api/config.py", role: "Frozen Settings dataclass from env vars" },
+          { path: "backend/Dockerfile", role: "Python 3.13 multi-stage runtime & test image" },
+          { path: "docker-compose.yml", role: "Orchestrates db, api, frontend, swagger-ui, seed, tests" }
+        ],
+        exports: [
+          { sig: "create_app(settings: Settings | None) -> FastAPI", desc: "Builds FastAPI app and wires dependency_overrides" },
+          { sig: "sample_data_service_scope(settings) -> Iterator[SampleDataService]", desc: "Transactional context manager for CLI seeding" },
+          { sig: "class NoStoreMiddleware", desc: "Enforces Cache-Control: no-store on all HTTP responses" },
+          { sig: "Settings.from_env() / get_settings()", desc: "Loads DB_HOST, DB_PORT, DB_NAME, CORS_ORIGINS, TZ" }
+        ]
+      },
+      {
+        id: "api-deps-errors",
+        layer: "presentation",
+        slot: 1,
+        title: "DI Stubs, RFC 9457 Errors & Shared DTOs",
+        subtitle: "presentation/api/{dependencies,errors}.py",
+        badge: "Problem+JSON · Europe/Copenhagen",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "Provides the dependency injection provider stubs (`get_booking_service`, `get_kpi_service`, etc.) so routers never import `data/`, resolves the default reporting year in `Europe/Copenhagen`, and translates `ValidationFailed` (422), `NotFound` (404), `StorageUnavailable` (503), and malformed requests (400) into RFC 9457 `application/problem+json`.",
+        files: [
+          { path: "backend/src/hotel_api/presentation/api/dependencies.py", role: "Service provider stubs & report_year(2000..2100)" },
+          { path: "backend/src/hotel_api/presentation/api/errors.py", role: "Exception handlers -> RFC 9457 Problem JSON" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/common.py", role: "AmountDkk, Percent float serializers & with_zone()" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/problem.py", role: "Problem & FieldError Pydantic schemas" }
+        ],
+        exports: [
+          { sig: "get_booking_service / get_kpi_service / get_bar_service / ...", desc: "6 service DI stubs overridden by main.py" },
+          { sig: "report_year(year, default_year) -> int", desc: "Validates ?year=2000..2100 or defaults to Copenhagen year" },
+          { sig: "register_error_handlers(app: FastAPI)", desc: "Maps domain & FastAPI errors to RFC 9457 Problem responses" },
+          { sig: "AmountDkk / Percent / with_zone()", desc: "Serializes Decimal as JSON number & attaches Europe/Copenhagen tz" }
+        ]
+      },
+      {
+        id: "router-bookings-rooms",
+        layer: "presentation",
+        slot: 2,
+        title: "Bookings & Room Types Routers + DTOs",
+        subtitle: "routers/{bookings,room_types}.py",
+        badge: "6 Endpoints · F1",
+        journeys: ["us1"],
+        summary: "Handles `/api/v1/room-types` (`GET`) and `/api/v1/bookings` (`GET`, `POST`, `GET /{id}`, `PUT /{id}`, `DELETE /{id}`). `BookingInput` intentionally accepts `Any` field values with `extra='forbid'` so all value validation runs uniformly in the business layer and returns all broken rules at once.",
+        files: [
+          { path: "backend/src/hotel_api/presentation/api/routers/bookings.py", role: "5 CRUD endpoints for /api/v1/bookings" },
+          { path: "backend/src/hotel_api/presentation/api/routers/room_types.py", role: "GET /api/v1/room-types endpoint" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/bookings.py", role: "BookingInput, Booking, BookingList, RoomTypeName" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/room_types.py", role: "RoomType, SeasonRate, RoomTypeList DTOs" }
+        ],
+        exports: [
+          { sig: "list_bookings / create_booking / get_booking / replace_booking / delete_booking", desc: "Bookings CRUD route handlers" },
+          { sig: "list_room_types()", desc: "Returns 8 room types with low/mid/high rate bands" },
+          { sig: "Booking.from_model() / RoomType.from_model()", desc: "1:1 DTO mappers from domain models" }
+        ]
+      },
+      {
+        id: "router-kpis-hotel",
+        layer: "presentation",
+        slot: 3,
+        title: "Hotel KPIs Router & DTOs",
+        subtitle: "routers/kpis_hotel.py + schemas/kpis_hotel.py",
+        badge: "5 Endpoints · A1–A7, K1–K3",
+        journeys: ["us2", "us3", "us5"],
+        summary: "Exposes the 5 authoritative hotel analytics endpoints under `/api/v1/kpis/hotel/*` (`summary`, `by-room-type`, `by-season`, `by-room-type-and-season`, `by-country`). Delegates all computation to `KpiService` and serializes flat JSON tables for Tableau.",
+        files: [
+          { path: "backend/src/hotel_api/presentation/api/routers/kpis_hotel.py", role: "5 GET endpoints under /api/v1/kpis/hotel" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/kpis_hotel.py", role: "HotelSummary, RoomTypeKpi, SeasonKpi, RoomTypeSeasonKpi, CountryKpi" }
+        ],
+        exports: [
+          { sig: "get_hotel_summary(year)", desc: "GET /api/v1/kpis/hotel/summary (A6, K1, K2, K3, A7)" },
+          { sig: "list_by_room_type(year)", desc: "GET /api/v1/kpis/hotel/by-room-type (A4, K1, K3, A7)" },
+          { sig: "list_by_season(year)", desc: "GET /api/v1/kpis/hotel/by-season (K1, K3, A7)" },
+          { sig: "list_by_room_type_and_season(year)", desc: "GET /api/v1/kpis/hotel/by-room-type-and-season (24 rows, A2)" },
+          { sig: "list_by_country(year)", desc: "GET /api/v1/kpis/hotel/by-country (A1, A3, A5)" }
+        ]
+      },
+      {
+        id: "router-reviews",
+        layer: "presentation",
+        slot: 4,
+        title: "Guest Reviews Router & DTOs",
+        subtitle: "routers/reviews.py + schemas/reviews.py",
+        badge: "3 Endpoints · K3",
+        journeys: ["us3"],
+        summary: "Exposes `/api/v1/reviews` (`GET`, `POST`) and `/api/v1/reviews/{review_id}` (`GET`) for guest satisfaction ratings (1–5) linked either to an existing `booking_id` or an explicit `room_type` + `stay_date`.",
+        files: [
+          { path: "backend/src/hotel_api/presentation/api/routers/reviews.py", role: "list_reviews, create_review, get_review" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/reviews.py", role: "ReviewInput, Review, ReviewList DTOs" }
+        ],
+        exports: [
+          { sig: "list_reviews(year, season, room_type)", desc: "GET /api/v1/reviews" },
+          { sig: "create_review(body)", desc: "POST /api/v1/reviews -> 201 Created + Location header" },
+          { sig: "get_review(review_id)", desc: "GET /api/v1/reviews/{review_id}" }
+        ]
+      },
+      {
+        id: "router-bar",
+        layer: "presentation",
+        slot: 5,
+        title: "Lobby Bar & Bar KPIs Routers + DTOs",
+        subtitle: "routers/{bar,kpis_bar}.py + schemas/bar.py",
+        badge: "4 Endpoints · B1–B3, A7",
+        journeys: ["us4"],
+        summary: "Read-only endpoints for Helene Christine's lobby bar: `/api/v1/bar/drink-sales` (B2 ranked drinks) and `/api/v1/kpis/bar/{summary,by-category,by-price-tier}` (B1 total sales, B3 Cocktail vs Coffee split, and CFO price-tier demand).",
+        files: [
+          { path: "backend/src/hotel_api/presentation/api/routers/bar.py", role: "GET /api/v1/bar/drink-sales" },
+          { path: "backend/src/hotel_api/presentation/api/routers/kpis_bar.py", role: "GET /api/v1/kpis/bar/{summary,by-category,by-price-tier}" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/bar.py", role: "DrinkSale, BarSummary, BarCategoryKpi, BarPriceTierKpi DTOs" }
+        ],
+        exports: [
+          { sig: "list_drink_sales(category, year)", desc: "GET /api/v1/bar/drink-sales (B2)" },
+          { sig: "get_bar_summary(year)", desc: "GET /api/v1/kpis/bar/summary (B1)" },
+          { sig: "list_by_category(year)", desc: "GET /api/v1/kpis/bar/by-category (B3 Cocktail vs Coffee)" },
+          { sig: "list_by_price_tier(year)", desc: "GET /api/v1/kpis/bar/by-price-tier (Budget/Standard/Premium)" }
+        ]
+      },
+      {
+        id: "router-health-seed",
+        layer: "presentation",
+        slot: 6,
+        title: "Health Router & Sample Seed CLI",
+        subtitle: "routers/health.py + cli/seed.py",
+        badge: "Health + CLI Seeder",
+        journeys: ["seed"],
+        summary: "Includes `GET /api/v1/health` for container healthchecks and `python -m hotel_api.presentation.cli.seed` for parsing the teacher CSVs, repairing `M\\ufffdller` -> `Müller`, and delegating atomic database replacement to `SampleDataService`.",
+        files: [
+          { path: "backend/src/hotel_api/presentation/api/routers/health.py", role: "GET /api/v1/health" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/health.py", role: "Health(status='ok', database='ok') DTO" },
+          { path: "backend/src/hotel_api/presentation/cli/seed.py", role: "CSV parser, U+FFFD repair & CLI entry point" }
+        ],
+        exports: [
+          { sig: "get_health()", desc: "GET /api/v1/health liveness & DB reachability probe" },
+          { sig: "run_seed() / main()", desc: "Parses CSVs and runs SampleDataService in one transaction" },
+          { sig: "parse_bookings_csv() / parse_drinks_csv() / repair_text()", desc: "Applies REPAIR_MAP {'M\\ufffdller': 'Müller'} and rejects unknown U+FFFD" }
+        ]
+      },
+
+      // ---------------- TIER 2a: BUSINESS SERVICES ----------------
+      {
+        id: "service-booking-room",
+        layer: "services",
+        slot: 0,
+        title: "BookingService & RoomTypeService",
+        subtitle: "business/services/{booking,room_type}_service.py",
+        badge: "CRUD + Auto-Pricing",
+        journeys: ["us1"],
+        summary: "Orchestrates booking CRUD and room-type reference lookups. Validates raw payloads through `validate_booking()`, automatically applies `pricing.standard_price()` when `price_dkk` is omitted, and raises `NotFound` or `ValidationFailed`.",
+        files: [
+          { path: "backend/src/hotel_api/business/services/booking_service.py", role: "Booking CRUD orchestration & standard price fallback" },
+          { path: "backend/src/hotel_api/business/services/room_type_service.py", role: "Read-only room type reference service" }
+        ],
+        exports: [
+          { sig: "BookingService.list / get / create / replace / delete", desc: "Full booking lifecycle over BookingRepository & RoomTypeRepository" },
+          { sig: "RoomTypeService.list_all() -> list[RoomType]", desc: "Returns all 8 room types with seasonal rate bands" }
+        ]
+      },
+      {
+        id: "service-kpi",
+        layer: "services",
+        slot: 1,
+        title: "KpiService (Hotel Analytics)",
+        subtitle: "business/services/kpi_service.py",
+        badge: "A1–A7 · K1–K3",
+        journeys: ["us2", "us3", "us5"],
+        summary: "Loads one reporting year of bookings, reviews, and room types through repository ports and delegates all math to pure functions in `business/kpis/hotel.py`.",
+        files: [
+          { path: "backend/src/hotel_api/business/services/kpi_service.py", role: "Year-scoped hotel KPI use-case service" }
+        ],
+        exports: [
+          { sig: "KpiService.summary(year) -> HotelSummary", desc: "Year totals for revenue, occupancy, satisfaction, ALOS & ADR" },
+          { sig: "KpiService.by_room_type(year) -> list[RoomTypeKpi]", desc: "8 room types ranked by revenue with occupancy & satisfaction" },
+          { sig: "KpiService.by_season(year) -> list[SeasonKpi]", desc: "low, mid, high season breakdown" },
+          { sig: "KpiService.by_room_type_and_season(year) -> list[RoomTypeSeasonKpi]", desc: "24 room-type × season revenue rows (A2)" },
+          { sig: "KpiService.by_country(year) -> list[CountryKpi]", desc: "Countries ranked by revenue with booking & revenue shares" }
+        ]
+      },
+      {
+        id: "service-review",
+        layer: "services",
+        slot: 2,
+        title: "ReviewService (Satisfaction)",
+        subtitle: "business/services/review_service.py",
+        badge: "Guest Reviews · K3",
+        journeys: ["us3"],
+        summary: "Manages guest satisfaction reviews. Validates payloads via `validate_review()`, copying `room_type` and `stay_date` from the referenced booking when `booking_id` is supplied.",
+        files: [
+          { path: "backend/src/hotel_api/business/services/review_service.py", role: "Review list, get & create use cases" }
+        ],
+        exports: [
+          { sig: "ReviewService.list(year, season, room_type)", desc: "Lists reviews filtered by stay_date year/season or room type" },
+          { sig: "ReviewService.get(review_id)", desc: "Fetches single review or raises NotFound" },
+          { sig: "ReviewService.create(raw)", desc: "Validates & persists a new GuestReview" }
+        ]
+      },
+      {
+        id: "service-bar",
+        layer: "services",
+        slot: 3,
+        title: "BarService (Lobby Bar Analytics)",
+        subtitle: "business/services/bar_service.py",
+        badge: "B1–B3 · Price Tiers",
+        journeys: ["us4"],
+        summary: "Loads a reporting year's drink sales from `BarSalesRepository` and calls the pure calculators in `business/kpis/bar.py`. Computes global ranks before optional category filtering.",
+        files: [
+          { path: "backend/src/hotel_api/business/services/bar_service.py", role: "Bar drink sales & KPI orchestration" }
+        ],
+        exports: [
+          { sig: "BarService.drink_sales(year, category)", desc: "Drinks ordered by revenue rank (ranks computed across all drinks)" },
+          { sig: "BarService.summary(year) -> BarSummary", desc: "Total bar revenue, units sold & drink count (B1)" },
+          { sig: "BarService.by_category(year) -> list[BarCategoryKpi]", desc: "Cocktail vs Coffee split (B3)" },
+          { sig: "BarService.by_price_tier(year) -> list[BarPriceTierKpi]", desc: "Budget, Standard, Premium demand breakdown (FR-016)" }
+        ]
+      },
+      {
+        id: "service-sample-health",
+        layer: "services",
+        slot: 4,
+        title: "SampleDataService & HealthService",
+        subtitle: "business/services/{sample_data,health}_service.py",
+        badge: "Atomic Seed + Ping",
+        journeys: ["seed"],
+        summary: "`SampleDataService` deterministically assigns 2026 check-in dates (`k mod N` per season), validates all 1,000 bookings and 30 drinks, generates 500 synthetic reviews (`random.Random(2026)` on odd booking IDs), and atomically replaces operational tables. `HealthService` checks DB reachability.",
+        files: [
+          { path: "backend/src/hotel_api/business/services/sample_data_service.py", role: "Deterministic date assignment, synthetic reviews & atomic reset" },
+          { path: "backend/src/hotel_api/business/services/health_service.py", role: "Database reachability check" }
+        ],
+        exports: [
+          { sig: "SampleDataService.replace_with_sample_data(...)", desc: "Validates & replaces reviews, bookings, and bar_drink_sales" },
+          { sig: "build_sample_bookings / build_sample_reviews / build_sample_drinks", desc: "Pure builders for deterministic 2026 seed records" },
+          { sig: "HealthService.check()", desc: "Delegates ping() to HealthRepository" }
+        ]
+      },
+
+      // ---------------- TIER 2b: PURE DOMAIN, KPIS, RULES & PORTS ----------------
+      {
+        id: "kpis-hotel",
+        layer: "domain",
+        slot: 0,
+        title: "Pure Hotel KPI Calculators",
+        subtitle: "business/kpis/hotel.py",
+        badge: "Pure Math · A1–A7, K1–K3",
+        journeys: ["us2", "us3", "us5"],
+        summary: "Zero-I/O functions implementing every hotel KPI formula once (Constitution VII): revenue breakdowns, competition ranking, largest-remainder percentage shares summing to 100.00%, room occupancy (`nights_sold / available_room_nights`), guest satisfaction (`rating >= 4`), and stay metrics (`ALOS`, `ADR`, `Rev/Booking`).",
+        files: [
+          { path: "backend/src/hotel_api/business/kpis/hotel.py", role: "Pure hotel KPI functions" }
+        ],
+        exports: [
+          { sig: "hotel_summary(bookings, reviews, room_types, year)", desc: "Computes HotelSummary (A6, K1, K2, K3, A7)" },
+          { sig: "kpis_by_room_type / kpis_by_season", desc: "Computes RoomTypeKpi[] (8 rows) & SeasonKpi[] (3 rows)" },
+          { sig: "revenue_by_room_type_and_season / revenue_by_country", desc: "Computes 24-row matrix (A2) & ranked CountryKpi[] (A1, A3, A5)" },
+          { sig: "stay_figures / occupancy_rate_pct / satisfaction_figures", desc: "Core A7, K1, and K3 formulas" }
+        ]
+      },
+      {
+        id: "kpis-bar",
+        layer: "domain",
+        slot: 1,
+        title: "Pure Bar KPI Calculators",
+        subtitle: "business/kpis/bar.py",
+        badge: "Pure Math · B1–B3",
+        journeys: ["us4"],
+        summary: "Zero-I/O functions for Helene Christine's lobby bar: dual competition ranking (by revenue and by units sold), annual summary totals, Cocktail vs Coffee percentage shares, and Budget/Standard/Premium price-tier demand.",
+        files: [
+          { path: "backend/src/hotel_api/business/kpis/bar.py", role: "Pure bar KPI calculators" }
+        ],
+        exports: [
+          { sig: "ranked_drink_sales(sales) -> list[RankedDrinkSale]", desc: "Attaches revenue_rank & units_rank ('1224' competition ranking)" },
+          { sig: "bar_summary(sales, year) -> BarSummary", desc: "Total revenue, units sold & drink count (B1)" },
+          { sig: "bar_by_category(sales, year) -> list[BarCategoryKpi]", desc: "Cocktail vs Coffee revenue & unit shares summing to 100.00% (B3)" },
+          { sig: "bar_by_price_tier(sales, year) -> list[BarPriceTierKpi]", desc: "Demand across budget (<70), standard (70–109.99), premium (>=110)" }
+        ]
+      },
+      {
+        id: "rules-validation-pricing",
+        layer: "domain",
+        slot: 2,
+        title: "Validation & Seasonal Pricing Rules",
+        subtitle: "business/rules/{booking_validation,review_validation,pricing,_parsing}.py",
+        badge: "Multi-Field Validation · R9",
+        journeys: ["us1", "us3", "seed"],
+        summary: "Validates raw client dictionaries, collecting every broken field rule at once rather than failing on the first error. Enforces seasonal nightly price bands (`min_nightly_dkk <= price / nights <= max_nightly_dkk`), standard price calculation, and `booking_id` XOR `(room_type, stay_date)` on reviews.",
+        files: [
+          { path: "backend/src/hotel_api/business/rules/booking_validation.py", role: "validate_booking() multi-error validator" },
+          { path: "backend/src/hotel_api/business/rules/review_validation.py", role: "validate_review() XOR & booking lookup validator" },
+          { path: "backend/src/hotel_api/business/rules/pricing.py", role: "rate_for(), standard_price() & price_error()" },
+          { path: "backend/src/hotel_api/business/rules/_parsing.py", role: "Strict parsing: clean_text, whole_number, iso_date, money" }
+        ],
+        exports: [
+          { sig: "validate_booking(raw, room_types) -> (NewBooking | None, list[FieldError])", desc: "Validates guest names, country, room_type, check_in_date, days_rented, price_dkk" },
+          { sig: "validate_review(raw, room_types, find_booking)", desc: "Validates rating 1..5 and resolves booking_id or room_type+stay_date" },
+          { sig: "standard_price(room_type, check_in_date, days_rented)", desc: "standard_nightly_dkk for check-in season × nights" },
+          { sig: "price_error(room_type, check_in_date, days_rented, price_dkk)", desc: "Checks nightly rate against seasonal min–max band" }
+        ]
+      },
+      {
+        id: "rules-core",
+        layer: "domain",
+        slot: 3,
+        title: "Seasons, Numbers, Ranking & Price Tiers",
+        subtitle: "business/rules/{seasons,numbers,ranking,price_tiers}.py",
+        badge: "ROUND_HALF_UP · 1224 Rank",
+        journeys: ["us1", "us2", "us3", "us4", "us5", "seed"],
+        summary: "Foundational domain rules: maps months to seasons (`low`: Jan/Feb/Nov, `mid`: Mar/Apr/May/Sep/Oct, `high`: Jun/Jul/Aug/Dec), computes calendar days per season (89/153/123 in 2026), rounds half-up to 2 decimals, guarantees percentage breakdowns sum to `100.00` via largest-remainder (`shares_pct`), and defines bar price tiers.",
+        files: [
+          { path: "backend/src/hotel_api/business/rules/seasons.py", role: "Month-to-season mapping & available_room_nights()" },
+          { path: "backend/src/hotel_api/business/rules/numbers.py", role: "round_half_up(), safe_average(), safe_pct(), shares_pct()" },
+          { path: "backend/src/hotel_api/business/rules/ranking.py", role: "rank_descending() '1224' competition ranking" },
+          { path: "backend/src/hotel_api/business/rules/price_tiers.py", role: "tier_for_price() & tier_bounds() (<70, 70..110, >=110 DKK)" }
+        ],
+        exports: [
+          { sig: "season_of(day) / season_days(year) / available_room_nights(rooms, days)", desc: "Single definition of hotel seasons and capacity denominator" },
+          { sig: "round_half_up / safe_average / safe_pct / shares_pct", desc: "Exact Decimal & Fraction math; shares always sum to 100.00" },
+          { sig: "rank_descending(items, value, name)", desc: "Competition ranking with alphabetical tie-breaking" },
+          { sig: "tier_for_price(unit_price_dkk) -> PriceTier", desc: "Classifies drink price into budget, standard, or premium" }
+        ]
+      },
+      {
+        id: "domain-models-ports",
+        layer: "domain",
+        slot: 4,
+        title: "Domain Models, Ports & Business Errors",
+        subtitle: "business/{domain/models,ports,errors}.py",
+        badge: "Dataclasses & Protocols",
+        journeys: ["us1", "us2", "us3", "us4", "us5", "seed"],
+        summary: "Defines immutable domain dataclasses (`Booking`, `RoomType`, `GuestReview`, `BarDrinkSale`, and all KPI value objects), the 5 `Protocol` repository interfaces (`ports.py`) implemented by the data layer, and HTTP-agnostic domain exceptions (`ValidationFailed`, `NotFound`, `StorageUnavailable`).",
+        files: [
+          { path: "backend/src/hotel_api/business/domain/models.py", role: "Frozen domain entities, enums & KPI value objects" },
+          { path: "backend/src/hotel_api/business/ports.py", role: "5 Repository Protocol interfaces (Dependency Inversion)" },
+          { path: "backend/src/hotel_api/business/errors.py", role: "BusinessError, ValidationFailed, NotFound, StorageUnavailable" }
+        ],
+        exports: [
+          { sig: "Booking / RoomType / GuestReview / BarDrinkSale", desc: "Core domain entities with derived .season, .year, .revenue_dkk, .price_tier" },
+          { sig: "RoomTypeRepository / BookingRepository / ReviewRepository / BarSalesRepository / HealthRepository", desc: "Structural Protocol ports decoupling business from MySQL" },
+          { sig: "ValidationFailed / NotFound / StorageUnavailable / FieldError", desc: "Domain exceptions mapped to HTTP 422/404/503 by presentation" }
+        ]
+      },
+
+      // ---------------- TIER 3: DATA ACCESS & MYSQL ----------------
+      {
+        id: "repo-bookings-rooms",
+        layer: "data",
+        slot: 0,
+        title: "MySQL Booking & RoomType Repositories",
+        subtitle: "data/repositories/{bookings,room_types}.py",
+        badge: "SQL · bookings + room_types",
+        journeys: ["us1", "us2", "us3", "us5", "seed"],
+        summary: "Implements `BookingRepository` and `RoomTypeRepository` using parameterised SQL over PyMySQL `DictCursor`. Resolves `room_type` names via `JOIN room_types`, filters bookings by `check_in_date` year and `MONTH(check_in_date)` season, and supports bulk seeding.",
+        files: [
+          { path: "backend/src/hotel_api/data/repositories/bookings.py", role: "MySqlBookingRepository CRUD & bulk seed SQL" },
+          { path: "backend/src/hotel_api/data/repositories/room_types.py", role: "MySqlRoomTypeRepository canonical T1 room & rate queries" },
+          { path: "backend/src/hotel_api/data/repositories/__init__.py", role: "Re-exports all 5 MySQL repository classes" }
+        ],
+        exports: [
+          { sig: "MySqlBookingRepository (BookingRepo)", desc: "list, get, add, replace, delete, delete_all, insert_many" },
+          { sig: "MySqlRoomTypeRepository (RoomTypeRepo)", desc: "list_all() ordered by id ASC with rates low/mid/high, get_by_name()" }
+        ]
+      },
+      {
+        id: "repo-reviews-bar",
+        layer: "data",
+        slot: 1,
+        title: "MySQL Review & BarSales Repositories",
+        subtitle: "data/repositories/{reviews,bar_sales}.py",
+        badge: "SQL · reviews + bar_drink_sales",
+        journeys: ["us3", "us4", "seed"],
+        summary: "Implements `ReviewRepository` (`reviews` joined with `room_types`, filtered by `stay_date` year/season) and `BarSalesRepository` (`bar_drink_sales` filtered by `sales_year` and optional `category`), plus `delete_all()` and `insert_many()` for atomic seeding.",
+        files: [
+          { path: "backend/src/hotel_api/data/repositories/reviews.py", role: "MySqlReviewRepository queries & inserts" },
+          { path: "backend/src/hotel_api/data/repositories/bar_sales.py", role: "MySqlBarSalesRepository queries & bulk seed" }
+        ],
+        exports: [
+          { sig: "MySqlReviewRepository (ReviewRepo)", desc: "list, get, add, delete_all, insert_many" },
+          { sig: "MySqlBarSalesRepository (BarSalesRepo)", desc: "list(sales_year, category), delete_all, insert_many" }
+        ]
+      },
+      {
+        id: "data-conn-health",
+        layer: "data",
+        slot: 2,
+        title: "PyMySQL Connection Scope & HealthRepo",
+        subtitle: "data/connection.py + repositories/health.py",
+        badge: "Transactional · utf8mb4",
+        journeys: ["us1", "us2", "us3", "us4", "us5", "seed"],
+        summary: "Manages request-scoped and CLI-scoped PyMySQL connections (`autocommit=False`, `utf8mb4`, `DictCursor`). `connection_scope()` commits on success and rolls back on any exception, translating `pymysql.MySQLError` and `OSError` into `StorageUnavailable` (HTTP 503).",
+        files: [
+          { path: "backend/src/hotel_api/data/connection.py", role: "open_connection(), db_cursor() & connection_scope()" },
+          { path: "backend/src/hotel_api/data/repositories/health.py", role: "MySqlHealthRepository executing SELECT 1" }
+        ],
+        exports: [
+          { sig: "connection_scope(settings) -> Iterator[Connection]", desc: "One transaction per HTTP request or CLI seed run" },
+          { sig: "db_cursor(conn) -> Iterator[DictCursor]", desc: "Wraps cursor execution and translates MySQLError -> StorageUnavailable" },
+          { sig: "MySqlHealthRepository.ping()", desc: "Executes SELECT 1 to verify DB readiness" }
+        ]
+      },
+      {
+        id: "mysql-database",
+        layer: "data",
+        slot: 3,
+        title: "MySQL 8.4 Database & Schema Init",
+        subtitle: "db/init/{01_schema,02_reference_data,03_test_database}.sql",
+        badge: "5 Tables · 214 Rooms · No Host Port",
+        journeys: ["us1", "us2", "us3", "us4", "us5", "seed"],
+        summary: "MySQL 8.4 container (`utf8mb4_0900_ai_ci`, `TZ=Europe/Copenhagen`, persistent volume `mysql-data`) with no host port exposed (Constitution IV). Initialized with 5 relational tables, 8 canonical room types totaling 214 rooms, 24 seasonal nightly rate bands, and the isolated `hotel_test` database.",
+        files: [
+          { path: "db/init/01_schema.sql", role: "DDL for room_types, room_type_rates, bookings, reviews, bar_drink_sales" },
+          { path: "db/init/02_reference_data.sql", role: "Seeds 8 room types (214 rooms) & 24 seasonal price bands" },
+          { path: "db/init/03_test_database.sql", role: "Creates hotel_test database for pytest suite" }
+        ],
+        exports: [
+          { sig: "Tables: room_types (8), room_type_rates (24)", desc: "Static reference tables protected by foreign keys" },
+          { sig: "Tables: bookings, reviews, bar_drink_sales", desc: "Operational tables queried & mutated via repositories" },
+          { sig: "Database: hotel & hotel_test", desc: "Production/dev schema and isolated test schema" }
+        ]
+      }
+    ];
+
+    // ============================================================================
+    // 2. DIRECTIONAL EDGES (DATA & IMPORT DEPENDENCY FLOW)
+    // ============================================================================
+    const EDGES = [
+      // Client -> Presentation
+      { source: "frontend-ui", target: "frontend-api-proxy", type: "http", label: "imports api.js" },
+      { source: "frontend-api-proxy", target: "router-bookings-rooms", type: "http", label: "GET /room-types, CRUD /bookings" },
+      { source: "tableau-client", target: "router-kpis-hotel", type: "http", label: "GET /kpis/hotel/*" },
+      { source: "tableau-client", target: "router-bar", type: "http", label: "GET /kpis/bar/* & /bar/drink-sales" },
+      { source: "tableau-client", target: "router-reviews", type: "http", label: "GET /reviews" },
+      { source: "openapi-swagger", target: "router-bookings-rooms", type: "wire", label: "contract validates routes" },
+      { source: "openapi-swagger", target: "router-kpis-hotel", type: "wire", label: "contract validates KPIs" },
+      { source: "openapi-swagger", target: "router-bar", type: "wire", label: "contract validates bar" },
+      { source: "csv-sample-files", target: "router-health-seed", type: "http", label: "read by cli/seed.py" },
+
+      // Composition Root wiring
+      { source: "composition-root", target: "api-deps-errors", type: "wire", label: "overrides DI stubs + error handlers" },
+      { source: "composition-root", target: "router-bookings-rooms", type: "wire", label: "includes routers" },
+      { source: "composition-root", target: "router-kpis-hotel", type: "wire", label: "includes router" },
+      { source: "composition-root", target: "router-reviews", type: "wire", label: "includes router" },
+      { source: "composition-root", target: "router-bar", type: "wire", label: "includes routers" },
+      { source: "composition-root", target: "router-health-seed", type: "wire", label: "includes health + seed scope" },
+      { source: "composition-root", target: "data-conn-health", type: "wire", label: "opens connection_scope per request" },
+
+      // Presentation Routers -> DI & Business Services
+      { source: "router-bookings-rooms", target: "api-deps-errors", type: "service", label: "Depends(get_booking/room_type_service)" },
+      { source: "router-kpis-hotel", target: "api-deps-errors", type: "service", label: "Depends(get_kpi_service, report_year)" },
+      { source: "router-reviews", target: "api-deps-errors", type: "service", label: "Depends(get_review_service)" },
+      { source: "router-bar", target: "api-deps-errors", type: "service", label: "Depends(get_bar_service, report_year)" },
+      { source: "router-bookings-rooms", target: "service-booking-room", type: "service", label: "calls BookingService & RoomTypeService" },
+      { source: "router-kpis-hotel", target: "service-kpi", type: "service", label: "calls KpiService" },
+      { source: "router-reviews", target: "service-review", type: "service", label: "calls ReviewService" },
+      { source: "router-bar", target: "service-bar", type: "service", label: "calls BarService" },
+      { source: "router-health-seed", target: "service-sample-health", type: "service", label: "calls SampleDataService & HealthService" },
+
+      // Business Services -> Pure KPIs, Rules & Domain Models/Ports
+      { source: "service-booking-room", target: "rules-validation-pricing", type: "service", label: "validate_booking + standard_price" },
+      { source: "service-booking-room", target: "domain-models-ports", type: "service", label: "BookingRepository & RoomTypeRepository ports" },
+      { source: "service-kpi", target: "kpis-hotel", type: "service", label: "delegates all hotel KPI formulas" },
+      { source: "service-kpi", target: "domain-models-ports", type: "service", label: "Booking, Review & RoomType ports" },
+      { source: "service-review", target: "rules-validation-pricing", type: "service", label: "validate_review()" },
+      { source: "service-review", target: "domain-models-ports", type: "service", label: "Review, Booking & RoomType ports" },
+      { source: "service-bar", target: "kpis-bar", type: "service", label: "delegates bar KPIs & ranking" },
+      { source: "service-bar", target: "domain-models-ports", type: "service", label: "BarSalesRepository port" },
+      { source: "service-sample-health", target: "rules-validation-pricing", type: "service", label: "validates & prices 1,000 seed rows" },
+      { source: "service-sample-health", target: "rules-core", type: "service", label: "season_of() for 2026 dates" },
+      { source: "service-sample-health", target: "domain-models-ports", type: "service", label: "all 5 repository ports" },
+
+      // Intra-Business Layer (KPIs & Validation -> Core Rules & Domain Models)
+      { source: "kpis-hotel", target: "rules-core", type: "service", label: "numbers, ranking & seasons" },
+      { source: "kpis-hotel", target: "domain-models-ports", type: "service", label: "builds HotelSummary & KPI models" },
+      { source: "kpis-bar", target: "rules-core", type: "service", label: "shares_pct, rank_descending, price_tiers" },
+      { source: "kpis-bar", target: "domain-models-ports", type: "service", label: "builds BarSummary & RankedDrinkSale" },
+      { source: "rules-validation-pricing", target: "rules-core", type: "service", label: "season_of() & round_half_up()" },
+      { source: "rules-validation-pricing", target: "domain-models-ports", type: "service", label: "NewBooking, NewReview, FieldError" },
+
+      // Services / Ports -> Data Layer Repositories
+      { source: "service-booking-room", target: "repo-bookings-rooms", type: "data", label: "bound via main.py DI" },
+      { source: "service-kpi", target: "repo-bookings-rooms", type: "data", label: "reads bookings & room_types" },
+      { source: "service-kpi", target: "repo-reviews-bar", type: "data", label: "reads reviews" },
+      { source: "service-review", target: "repo-reviews-bar", type: "data", label: "reads/writes reviews" },
+      { source: "service-review", target: "repo-bookings-rooms", type: "data", label: "resolves booking_id & room_types" },
+      { source: "service-bar", target: "repo-reviews-bar", type: "data", label: "reads bar_drink_sales" },
+      { source: "service-sample-health", target: "repo-bookings-rooms", type: "data", label: "delete_all + insert_many" },
+      { source: "service-sample-health", target: "repo-reviews-bar", type: "data", label: "delete_all + insert_many" },
+      { source: "service-sample-health", target: "data-conn-health", type: "data", label: "HealthRepo.ping()" },
+
+      // Data Layer Repositories -> Connection & MySQL
+      { source: "repo-bookings-rooms", target: "data-conn-health", type: "data", label: "uses db_cursor(conn)" },
+      { source: "repo-reviews-bar", target: "data-conn-health", type: "data", label: "uses db_cursor(conn)" },
+      { source: "repo-bookings-rooms", target: "mysql-database", type: "data", label: "SQL on bookings, room_types, room_type_rates" },
+      { source: "repo-reviews-bar", target: "mysql-database", type: "data", label: "SQL on reviews, bar_drink_sales" },
+      { source: "data-conn-health", target: "mysql-database", type: "data", label: "PyMySQL TCP db:3306 (SELECT 1 / tx)" }
+    ];
+
+    // ============================================================================
+    // 3. GRAPH LAYOUT & RENDERING ENGINE (D3.js + Built-in SVG Engine)
+    // ============================================================================
+    const state = {
+      selectedNodeId: "composition-root",
+      activeLayer: "all",
+      activeJourney: "all",
+      searchQuery: "",
+      orientation: "vertical", // "vertical" | "horizontal"
+      showEdgeLabels: false,
+      transform: { x: 0, y: 0, k: 1 }
+    };
+
+    const EDGE_COLORS = {
+      http: "#38bdf8",
+      service: "#a855f7",
+      data: "#10b981",
+      wire: "#64748b"
+    };
+
+    const nodeMap = new Map(NODES.map((n) => [n.id, n]));
+    const layerMap = new Map(LAYERS.map((l) => [l.id, l]));
+
+    const svgEl = document.getElementById("floorplan-svg");
+    const containerEl = document.getElementById("canvas-container");
+
+    function computeLayout() {
+      const isVert = state.orientation === "vertical";
+      const NODE_W = 225;
+      const NODE_H = 74;
+
+      if (isVert) {
+        const BAND_W = 1780;
+        const BAND_H = 148;
+        const BAND_GAP = 54;
+        const START_X = 60;
+        const START_Y = 50;
+
+        LAYERS.forEach((layer, idx) => {
+          layer.x = START_X;
+          layer.y = START_Y + idx * (BAND_H + BAND_GAP);
+          layer.w = BAND_W;
+          layer.h = BAND_H;
+        });
+
+        LAYERS.forEach((layer) => {
+          const layerNodes = NODES.filter((n) => n.layer === layer.id);
+          const count = layerNodes.length;
+          const totalNodesW = count * NODE_W;
+          const availableGap = Math.max(20, (layer.w - 60 - totalNodesW) / Math.max(1, count - 1));
+          layerNodes.forEach((node, i) => {
+            node.w = NODE_W;
+            node.h = NODE_H;
+            node.x = layer.x + 30 + i * (NODE_W + availableGap);
+            node.y = layer.y + 52;
+          });
+        });
+
+        return { totalW: START_X * 2 + BAND_W, totalH: START_Y * 2 + LAYERS.length * (BAND_H + BAND_GAP) };
+      } else {
+        // Horizontal Left-to-Right swimlanes
+        const COL_W = 310;
+        const COL_H = 920;
+        const COL_GAP = 65;
+        const START_X = 50;
+        const START_Y = 50;
+
+        LAYERS.forEach((layer, idx) => {
+          layer.x = START_X + idx * (COL_W + COL_GAP);
+          layer.y = START_Y;
+          layer.w = COL_W;
+          layer.h = COL_H;
+        });
+
+        LAYERS.forEach((layer) => {
+          const layerNodes = NODES.filter((n) => n.layer === layer.id);
+          const count = layerNodes.length;
+          const stepY = Math.min(118, (COL_H - 90) / Math.max(1, count));
+          layerNodes.forEach((node, i) => {
+            node.w = NODE_W + 35;
+            node.h = NODE_H;
+            node.x = layer.x + (COL_W - (NODE_W + 35)) / 2;
+            node.y = layer.y + 68 + i * stepY;
+          });
+        });
+
+        return { totalW: START_X * 2 + LAYERS.length * (COL_W + COL_GAP), totalH: START_Y * 2 + COL_H };
+      }
+    }
+
+    function edgePathD(edge) {
+      const s = nodeMap.get(edge.source);
+      const t = nodeMap.get(edge.target);
+      if (!s || !t) return "";
+
+      if (state.orientation === "vertical") {
+        const sameLayer = s.layer === t.layer;
+        if (sameLayer) {
+          const x1 = s.x + s.w / 2;
+          const y1 = s.y + s.h;
+          const x2 = t.x + t.w / 2;
+          const y2 = t.y + t.h;
+          const arcY = Math.max(y1, y2) + 28;
+          return `M ${x1} ${y1} C ${x1} ${arcY}, ${x2} ${arcY}, ${x2} ${y2}`;
+        }
+        const goingDown = s.y < t.y;
+        const x1 = s.x + s.w / 2;
+        const y1 = goingDown ? s.y + s.h : s.y;
+        const x2 = t.x + t.w / 2;
+        const y2 = goingDown ? t.y : t.y + t.h;
+        const midY = (y1 + y2) / 2;
+        return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+      } else {
+        const sameLayer = s.layer === t.layer;
+        if (sameLayer) {
+          const x1 = s.x + s.w;
+          const y1 = s.y + s.h / 2;
+          const x2 = t.x + t.w;
+          const y2 = t.y + t.h / 2;
+          const arcX = Math.max(x1, x2) + 28;
+          return `M ${x1} ${y1} C ${arcX} ${y1}, ${arcX} ${y2}, ${x2} ${y2}`;
+        }
+        const x1 = s.x + s.w;
+        const y1 = s.y + s.h / 2;
+        const x2 = t.x;
+        const y2 = t.y + t.h / 2;
+        const midX = (x1 + x2) / 2;
+        return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+      }
+    }
+
+    function isNodeMatchingFilter(node) {
+      if (state.activeLayer !== "all" && node.layer !== state.activeLayer) {
+        return false;
+      }
+      if (state.activeJourney !== "all" && !node.journeys.includes(state.activeJourney)) {
+        return false;
+      }
+      if (state.searchQuery.trim() !== "") {
+        const q = state.searchQuery.trim().toLowerCase();
+        const hay = [
+          node.title,
+          node.subtitle,
+          node.badge,
+          node.summary,
+          ...node.files.map((f) => f.path + " " + f.role),
+          ...node.exports.map((e) => e.sig + " " + e.desc)
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    }
+
+    function renderGraph() {
+      computeLayout();
+      const ns = "http://www.w3.org/2000/svg";
+      svgEl.innerHTML = "";
+
+      // Defs: arrow markers
+      const defs = document.createElementNS(ns, "defs");
+      Object.entries(EDGE_COLORS).forEach(([type, color]) => {
+        const marker = document.createElementNS(ns, "marker");
+        marker.setAttribute("id", `arrow-${type}`);
+        marker.setAttribute("viewBox", "0 -5 10 10");
+        marker.setAttribute("refX", "8");
+        marker.setAttribute("refY", "0");
+        marker.setAttribute("markerWidth", "6");
+        marker.setAttribute("markerHeight", "6");
+        marker.setAttribute("orient", "auto");
+        const path = document.createElementNS(ns, "path");
+        path.setAttribute("d", "M0,-4L10,0L0,4");
+        path.setAttribute("fill", color);
+        marker.appendChild(path);
+        defs.appendChild(marker);
+      });
+      svgEl.appendChild(defs);
+
+      const viewport = document.createElementNS(ns, "g");
+      viewport.setAttribute("id", "viewport");
+      viewport.setAttribute(
+        "transform",
+        `translate(${state.transform.x}, ${state.transform.y}) scale(${state.transform.k})`
+      );
+      svgEl.appendChild(viewport);
+
+      // 1. Render Layer Swimlanes
+      const bandsGroup = document.createElementNS(ns, "g");
+      LAYERS.forEach((layer) => {
+        const g = document.createElementNS(ns, "g");
+        const rect = document.createElementNS(ns, "rect");
+        rect.setAttribute("class", "layer-band");
+        rect.setAttribute("x", layer.x);
+        rect.setAttribute("y", layer.y);
+        rect.setAttribute("width", layer.w);
+        rect.setAttribute("height", layer.h);
+        rect.setAttribute("fill", layer.bg);
+        rect.setAttribute("stroke", layer.color);
+        rect.setAttribute("stroke-opacity", "0.45");
+        g.appendChild(rect);
+
+        const title = document.createElementNS(ns, "text");
+        title.setAttribute("class", "layer-title");
+        title.setAttribute("x", layer.x + 18);
+        title.setAttribute("y", layer.y + 22);
+        title.setAttribute("fill", layer.color);
+        title.textContent = layer.name;
+        g.appendChild(title);
+
+        const sub = document.createElementNS(ns, "text");
+        sub.setAttribute("class", "layer-subtitle");
+        sub.setAttribute("x", layer.x + 18);
+        sub.setAttribute("y", layer.y + 39);
+        sub.textContent = state.orientation === "vertical" ? layer.subtitle : `${NODES.filter(n => n.layer === layer.id).length} components`;
+        g.appendChild(sub);
+
+        bandsGroup.appendChild(g);
+      });
+      viewport.appendChild(bandsGroup);
+
+      // 2. Render Directional Edges
+      const edgesGroup = document.createElementNS(ns, "g");
+      EDGES.forEach((edge, idx) => {
+        const path = document.createElementNS(ns, "path");
+        path.setAttribute("class", "edge-path");
+        path.setAttribute("data-source", edge.source);
+        path.setAttribute("data-target", edge.target);
+        path.setAttribute("d", edgePathD(edge));
+        path.setAttribute("stroke", EDGE_COLORS[edge.type] || "#94a3b8");
+        path.setAttribute("stroke-opacity", edge.type === "wire" ? "0.45" : "0.68");
+        if (edge.type === "wire") {
+          path.setAttribute("stroke-dasharray", "5,4");
+        }
+        path.setAttribute("marker-end", `url(#arrow-${edge.type})`);
+        edgesGroup.appendChild(path);
+
+        // Edge midpoint label
+        const s = nodeMap.get(edge.source);
+        const t = nodeMap.get(edge.target);
+        if (s && t) {
+          const text = document.createElementNS(ns, "text");
+          text.setAttribute("class", "edge-label" + (state.showEdgeLabels ? " visible" : ""));
+          text.setAttribute("data-source", edge.source);
+          text.setAttribute("data-target", edge.target);
+          const mx = (s.x + s.w / 2 + t.x + t.w / 2) / 2;
+          const my = (s.y + s.h / 2 + t.y + t.h / 2) / 2 - (idx % 2 === 0 ? 4 : -10);
+          text.setAttribute("x", mx);
+          text.setAttribute("y", my);
+          text.setAttribute("text-anchor", "middle");
+          text.textContent = edge.label;
+          edgesGroup.appendChild(text);
+        }
+      });
+      viewport.appendChild(edgesGroup);
+
+      // 3. Render Component Nodes
+      const nodesGroup = document.createElementNS(ns, "g");
+      NODES.forEach((node) => {
+        const layer = layerMap.get(node.layer);
+        const g = document.createElementNS(ns, "g");
+        g.setAttribute("class", "node-group" + (state.selectedNodeId === node.id ? " selected" : ""));
+        g.setAttribute("data-id", node.id);
+        g.setAttribute("transform", `translate(${node.x}, ${node.y})`);
+
+        const rect = document.createElementNS(ns, "rect");
+        rect.setAttribute("class", "node-rect");
+        rect.setAttribute("width", node.w);
+        rect.setAttribute("height", node.h);
+        rect.setAttribute("stroke", layer ? layer.color : "#38bdf8");
+        g.appendChild(rect);
+
+        // Left accent stripe
+        const stripe = document.createElementNS(ns, "rect");
+        stripe.setAttribute("x", "0");
+        stripe.setAttribute("y", "0");
+        stripe.setAttribute("width", "6");
+        stripe.setAttribute("height", node.h);
+        stripe.setAttribute("rx", "4");
+        stripe.setAttribute("fill", layer ? layer.color : "#38bdf8");
+        g.appendChild(stripe);
+
+        const title = document.createElementNS(ns, "text");
+        title.setAttribute("class", "node-title");
+        title.setAttribute("x", "14");
+        title.setAttribute("y", "22");
+        title.textContent = node.title;
+        g.appendChild(title);
+
+        const sub = document.createElementNS(ns, "text");
+        sub.setAttribute("class", "node-sub");
+        sub.setAttribute("x", "14");
+        sub.setAttribute("y", "40");
+        sub.textContent = node.subtitle;
+        g.appendChild(sub);
+
+        const badgeBg = document.createElementNS(ns, "rect");
+        badgeBg.setAttribute("x", "14");
+        badgeBg.setAttribute("y", "49");
+        badgeBg.setAttribute("width", Math.min(node.w - 24, node.badge.length * 6.2 + 14));
+        badgeBg.setAttribute("height", "17");
+        badgeBg.setAttribute("rx", "4");
+        badgeBg.setAttribute("fill", "rgba(148, 163, 184, 0.14)");
+        g.appendChild(badgeBg);
+
+        const badge = document.createElementNS(ns, "text");
+        badge.setAttribute("class", "node-badge");
+        badge.setAttribute("x", "20");
+        badge.setAttribute("y", "61");
+        badge.textContent = node.badge;
+        g.appendChild(badge);
+
+        g.addEventListener("click", (e) => {
+          e.stopPropagation();
+          selectNode(node.id);
+        });
+
+        g.addEventListener("mouseenter", () => highlightNeighborhood(node.id));
+        g.addEventListener("mouseleave", () => applyFilterVisibility());
+
+        nodesGroup.appendChild(g);
+      });
+      viewport.appendChild(nodesGroup);
+
+      applyFilterVisibility();
+    }
+
+    function applyFilterVisibility() {
+      const visibleIds = new Set(NODES.filter(isNodeMatchingFilter).map((n) => n.id));
+
+      document.querySelectorAll(".node-group").forEach((el) => {
+        const id = el.getAttribute("data-id");
+        el.classList.toggle("dimmed", !visibleIds.has(id));
+        el.classList.toggle("selected", id === state.selectedNodeId);
+      });
+
+      document.querySelectorAll(".edge-path").forEach((el) => {
+        const s = el.getAttribute("data-source");
+        const t = el.getAttribute("data-target");
+        const active = visibleIds.has(s) && visibleIds.has(t);
+        el.classList.toggle("dimmed", !active);
+        el.classList.toggle(
+          "highlighted",
+          active && (s === state.selectedNodeId || t === state.selectedNodeId)
+        );
+      });
+
+      document.querySelectorAll(".edge-label").forEach((el) => {
+        const s = el.getAttribute("data-source");
+        const t = el.getAttribute("data-target");
+        const show =
+          state.showEdgeLabels && visibleIds.has(s) && visibleIds.has(t);
+        el.classList.toggle("visible", show);
+      });
+    }
+
+    function highlightNeighborhood(nodeId) {
+      const connectedNodes = new Set([nodeId]);
+      EDGES.forEach((e) => {
+        if (e.source === nodeId) connectedNodes.add(e.target);
+        if (e.target === nodeId) connectedNodes.add(e.source);
+      });
+
+      document.querySelectorAll(".node-group").forEach((el) => {
+        const id = el.getAttribute("data-id");
+        el.classList.toggle("dimmed", !connectedNodes.has(id));
+      });
+
+      document.querySelectorAll(".edge-path").forEach((el) => {
+        const s = el.getAttribute("data-source");
+        const t = el.getAttribute("data-target");
+        const touches = s === nodeId || t === nodeId;
+        el.classList.toggle("highlighted", touches);
+        el.classList.toggle("dimmed", !touches);
+      });
+
+      document.querySelectorAll(".edge-label").forEach((el) => {
+        const s = el.getAttribute("data-source");
+        const t = el.getAttribute("data-target");
+        el.classList.toggle("visible", s === nodeId || t === nodeId || state.showEdgeLabels);
+      });
+    }
+
+    // ============================================================================
+    // 4. INSPECTOR DRAWER RENDERING
+    // ============================================================================
+    const JOURNEY_NAMES = {
+      us1: "US1 · Booking CRUD (F1)",
+      us2: "US2 · Hotel Revenue (A1–A6)",
+      us3: "US3 · Occupancy & Reviews (K1/K3)",
+      us4: "US4 · Lobby Bar & Price Tiers (B1–B3)",
+      us5: "US5 · Stay KPIs (A7: ALOS/ADR)",
+      seed: "CLI · Idempotent CSV Seed (R13)"
+    };
+
+    function selectNode(nodeId) {
+      state.selectedNodeId = nodeId;
+      const node = nodeMap.get(nodeId);
+      const drawer = document.getElementById("inspector-drawer");
+      if (!node) {
+        drawer.classList.add("closed");
+        applyFilterVisibility();
+        return;
+      }
+
+      drawer.classList.remove("closed");
+      const layer = layerMap.get(node.layer);
+      const tagEl = document.getElementById("drawer-layer-tag");
+      tagEl.textContent = layer ? layer.name : node.layer;
+      tagEl.style.background = layer ? layer.bg : "var(--accent-soft)";
+      tagEl.style.color = layer ? layer.color : "var(--accent)";
+      tagEl.style.border = `1px solid ${layer ? layer.color : "var(--accent)"}`;
+
+      document.getElementById("drawer-title").textContent = node.title;
+
+      const upstream = EDGES.filter((e) => e.target === node.id).map((e) => ({
+        node: nodeMap.get(e.source),
+        via: e.label
+      }));
+      const downstream = EDGES.filter((e) => e.source === node.id).map((e) => ({
+        node: nodeMap.get(e.target),
+        via: e.label
+      }));
+
+      const body = document.getElementById("drawer-body");
+      body.innerHTML = `
+        <section class="drawer-section">
+          <h3>Plain-English Purpose</h3>
+          <div class="summary-box">${node.summary}</div>
+        </section>
+
+        <section class="drawer-section">
+          <h3>User Journeys (${node.journeys.length})</h3>
+          <div class="journey-badges">
+            ${node.journeys
+              .map(
+                (j) =>
+                  `<button type="button" class="journey-tag" data-trigger-journey="${j}">${
+                    JOURNEY_NAMES[j] || j
+                  }</button>`
+              )
+              .join("")}
+          </div>
+        </section>
+
+        <section class="drawer-section">
+          <h3>Files Included (${node.files.length})</h3>
+          <ul class="file-list">
+            ${node.files
+              .map(
+                (f) => `
+              <li class="file-item">
+                <span>${f.path}</span>
+                <span class="file-role">${f.role}</span>
+              </li>`
+              )
+              .join("")}
+          </ul>
+        </section>
+
+        <section class="drawer-section">
+          <h3>Primary Exported Interfaces (${node.exports.length})</h3>
+          <ul class="interface-list">
+            ${node.exports
+              .map(
+                (ex) => `
+              <li class="interface-pill">
+                ${ex.sig}
+                <span>${ex.desc}</span>
+              </li>`
+              )
+              .join("")}
+          </ul>
+        </section>
+
+        <section class="drawer-section">
+          <h3>⬆️ Upstream Callers (${upstream.length})</h3>
+          ${
+            upstream.length === 0
+              ? `<div class="summary-box" style="color: var(--text-muted); font-size: 0.78rem;">Top-level entry point / external actor (no upstream callers in repo).</div>`
+              : `<div class="dep-list">
+                ${upstream
+                  .map(
+                    (u) => `
+                  <div class="dep-card" data-jump="${u.node.id}">
+                    <div class="dep-card-top">
+                      <span>← ${u.node.title}</span>
+                      <span style="font-size: 0.7rem; color: var(--accent);">Inspect</span>
+                    </div>
+                    <div class="dep-card-via">${u.via}</div>
+                  </div>`
+                  )
+                  .join("")}
+              </div>`
+          }
+        </section>
+
+        <section class="drawer-section">
+          <h3>⬇️ Downstream Dependencies (${downstream.length})</h3>
+          ${
+            downstream.length === 0
+              ? `<div class="summary-box" style="color: var(--text-muted); font-size: 0.78rem;">Terminal persistence store (no downstream dependencies).</div>`
+              : `<div class="dep-list">
+                ${downstream
+                  .map(
+                    (d) => `
+                  <div class="dep-card" data-jump="${d.node.id}">
+                    <div class="dep-card-top">
+                      <span>→ ${d.node.title}</span>
+                      <span style="font-size: 0.7rem; color: var(--accent);">Inspect</span>
+                    </div>
+                    <div class="dep-card-via">${d.via}</div>
+                  </div>`
+                  )
+                  .join("")}
+              </div>`
+          }
+        </section>
+      `;
+
+      body.querySelectorAll("[data-jump]").forEach((card) => {
+        card.addEventListener("click", () => {
+          selectNode(card.getAttribute("data-jump"));
+        });
+      });
+
+      body.querySelectorAll("[data-trigger-journey]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          setJourneyFilter(btn.getAttribute("data-trigger-journey"));
+        });
+      });
+
+      applyFilterVisibility();
+    }
+
+    // ============================================================================
+    // 5. PAN, ZOOM & UI CONTROLS (D3.js v7 Zoom + Offline Pointer Fallback)
+    // ============================================================================
+    let d3ZoomBehavior = null;
+
+    function fitToScreen() {
+      const dims = computeLayout();
+      const rect = containerEl.getBoundingClientRect();
+      const pad = 36;
+      const scaleX = (rect.width - pad * 2) / dims.totalW;
+      const scaleY = (rect.height - pad * 2) / dims.totalH;
+      const k = Math.max(0.35, Math.min(1.05, Math.min(scaleX, scaleY)));
+      const x = Math.max(16, (rect.width - dims.totalW * k) / 2);
+      const y = Math.max(16, (rect.height - dims.totalH * k) / 2);
+
+      if (window.d3 && d3ZoomBehavior) {
+        d3.select(svgEl)
+          .transition()
+          .duration(260)
+          .call(d3ZoomBehavior.transform, d3.zoomIdentity.translate(x, y).scale(k));
+      } else {
+        state.transform = { x, y, k };
+        updateViewportTransform();
+      }
+    }
+
+    function updateViewportTransform() {
+      const vp = document.getElementById("viewport");
+      if (vp) {
+        vp.setAttribute(
+          "transform",
+          `translate(${state.transform.x}, ${state.transform.y}) scale(${state.transform.k})`
+        );
+      }
+    }
+
+    if (window.d3) {
+      d3ZoomBehavior = d3
+        .zoom()
+        .scaleExtent([0.25, 2.4])
+        .filter((event) => !event.target.closest(".node-group") || event.type === "wheel")
+        .on("zoom", (event) => {
+          state.transform = {
+            x: event.transform.x,
+            y: event.transform.y,
+            k: event.transform.k
+          };
+          updateViewportTransform();
+        });
+      d3.select(svgEl).call(d3ZoomBehavior);
+    } else {
+      // Offline pointer pan & wheel zoom fallback
+      let isDragging = false;
+      let dragStart = { x: 0, y: 0 };
+
+      svgEl.addEventListener("mousedown", (e) => {
+        if (e.target.closest(".node-group")) return;
+        isDragging = true;
+        dragStart = { x: e.clientX - state.transform.x, y: e.clientY - state.transform.y };
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        state.transform.x = e.clientX - dragStart.x;
+        state.transform.y = e.clientY - dragStart.y;
+        updateViewportTransform();
+      });
+
+      window.addEventListener("mouseup", () => {
+        isDragging = false;
+      });
+
+      svgEl.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          const factor = e.deltaY < 0 ? 1.1 : 0.9;
+          const newK = Math.max(0.25, Math.min(2.4, state.transform.k * factor));
+          const rect = svgEl.getBoundingClientRect();
+          const mx = e.clientX - rect.left;
+          const my = e.clientY - rect.top;
+          state.transform.x = mx - ((mx - state.transform.x) / state.transform.k) * newK;
+          state.transform.y = my - ((my - state.transform.y) / state.transform.k) * newK;
+          state.transform.k = newK;
+          updateViewportTransform();
+        },
+        { passive: false }
+      );
+    }
+
+    // Filter Toggles
+    function setLayerFilter(layerId) {
+      state.activeLayer = layerId;
+      document.querySelectorAll("#layer-filters .chip").forEach((btn) => {
+        btn.setAttribute("aria-pressed", String(btn.getAttribute("data-layer") === layerId));
+      });
+      applyFilterVisibility();
+    }
+
+    function setJourneyFilter(journeyId) {
+      state.activeJourney = journeyId;
+      document.querySelectorAll("#journey-filters .chip").forEach((btn) => {
+        btn.setAttribute("aria-pressed", String(btn.getAttribute("data-journey") === journeyId));
+      });
+      applyFilterVisibility();
+    }
+
+    document.querySelectorAll("#layer-filters .chip").forEach((btn) => {
+      btn.addEventListener("click", () => setLayerFilter(btn.getAttribute("data-layer")));
+    });
+
+    document.querySelectorAll("#journey-filters .chip").forEach((btn) => {
+      btn.addEventListener("click", () => setJourneyFilter(btn.getAttribute("data-journey")));
+    });
+
+    document.getElementById("search-box").addEventListener("input", (e) => {
+      state.searchQuery = e.target.value;
+      applyFilterVisibility();
+    });
+
+    document.getElementById("btn-close-drawer").addEventListener("click", () => {
+      state.selectedNodeId = null;
+      document.getElementById("inspector-drawer").classList.add("closed");
+      applyFilterVisibility();
+    });
+
+    document.getElementById("btn-zoom-in").addEventListener("click", () => {
+      if (window.d3 && d3ZoomBehavior) {
+        d3.select(svgEl).transition().duration(180).call(d3ZoomBehavior.scaleBy, 1.18);
+      } else {
+        state.transform.k = Math.min(2.4, state.transform.k * 1.18);
+        updateViewportTransform();
+      }
+    });
+
+    document.getElementById("btn-zoom-out").addEventListener("click", () => {
+      if (window.d3 && d3ZoomBehavior) {
+        d3.select(svgEl).transition().duration(180).call(d3ZoomBehavior.scaleBy, 0.85);
+      } else {
+        state.transform.k = Math.max(0.25, state.transform.k * 0.85);
+        updateViewportTransform();
+      }
+    });
+
+    document.getElementById("btn-zoom-reset").addEventListener("click", fitToScreen);
+
+    document.getElementById("btn-toggle-labels").addEventListener("click", () => {
+      state.showEdgeLabels = !state.showEdgeLabels;
+      applyFilterVisibility();
+    });
+
+    document.getElementById("btn-orientation").addEventListener("click", (e) => {
+      state.orientation = state.orientation === "vertical" ? "horizontal" : "vertical";
+      const isHoriz = state.orientation === "horizontal";
+      e.currentTarget.setAttribute("aria-pressed", String(isHoriz));
+      e.currentTarget.textContent = isHoriz
+        ? "↔️ Layout: Horizontal Flow"
+        : "↕️ Layout: Vertical Floorplan";
+      renderGraph();
+      fitToScreen();
+    });
+
+    // Rules Modal
+    const rulesDialog = document.getElementById("rules-dialog");
+    document.getElementById("btn-rules-modal").addEventListener("click", () => {
+      rulesDialog.showModal();
+    });
+    document.getElementById("btn-close-dialog").addEventListener("click", () => {
+      rulesDialog.close();
+    });
+    rulesDialog.addEventListener("click", (e) => {
+      if (e.target === rulesDialog) rulesDialog.close();
+    });
+
+    window.addEventListener("resize", fitToScreen);
+
+    // Initial boot
+    renderGraph();
+    selectNode("composition-root");
+    requestAnimationFrame(fitToScreen);
+  </script>
+</body>
+</html>
