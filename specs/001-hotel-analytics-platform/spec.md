@@ -20,6 +20,11 @@
 - Q: Should `docker compose up` automatically seed historical bookings and sales data on startup? (FR-004, SC-005) → A: No; `docker compose up` MUST start the system with the database schema and 8 static room types (`214` rooms) ready, but with zero booking history, bar sales, or reviews. A separate idempotent command MUST be used to seed (reset/replace) the database with the sample inspiration data.
 - Q: Should this repository produce the Tableau dashboard itself (workbooks, data sources, extracts or connector code), or only the data Tableau reads? (FR-006, FR-017) → A: Only the data. For KPI data in Tableau, the repository's scope is exclusively the REST/JSON API and its OpenAPI contract. The repository MUST NOT produce Tableau files such as `.twb`, `.twbx` or `.tbm`; the team builds the Tableau dashboard manually against the API.
 
+### Amendments after planning, 2026-10-28
+
+- `FR-003` now lists the value limits the plan introduced (research R17): at most `365` nights, dates between `2000` and `2100`, text up to `100` characters, prices with at most `2` decimals.
+- `FR-010` now derives the available room-nights and the season day counts from the calendar of the reporting year instead of a fixed 365-day year. The figures for `2026` are unchanged (`78,110`; `89` / `153` / `123`); a leap year has `366` days.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Manage Room Bookings (Priority: P1)
@@ -168,6 +173,7 @@ Per Constitution Phase Gate 1 (*Specify*), the table below maps every mandatory 
   - `Days Rented` as a whole number greater than or equal to `1`.
   - A valid `Check-In Date` (`YYYY-MM-DD`), from which the business layer derives the booking's `Season` (`low` = Jan, Feb, Nov; `mid` = Mar, Apr, May, Sep, Oct; `high` = Jun, Jul, Aug, Dec) and reporting year.
   - `Price` (total booking price in DKK) as a positive number consistent with the room type's seasonal pricing rules (or automatically calculated from the room type's seasonal nightly rate multiplied by `Days Rented` when not manually overridden).
+  - Value limits that keep every value inside what the data store can hold and every KPI meaningful: `Days Rented` at most `365`; `Check-In Date` (and a review's stay date) between `2000-01-01` and `2100-12-31`, written exactly as `YYYY-MM-DD`; guest names and country trimmed and at most `100` characters; `Price` with at most `2` decimals. A value outside these limits is rejected like any other invalid value.
   - Booking records and the booking form exclude satisfaction ratings (which are stored separately in `reviews` per `FR-011`).
 - **FR-004**: Starting the system via `docker compose up` MUST initialize the database schema and the 8 static hotel room types (`214` rooms) with **no booking history, bar sales, or guest review data** (`0` bookings, `0` bar sales, `0` reviews) so new bookings can be created immediately. The system MUST provide a separate explicit, idempotent command (which resets/replaces sample records without duplicates) to seed the database with the sample inspiration data: the baseline guest booking records (`1,000` bookings seeded with deterministic `2026` `Check-In Date` values within each row's corresponding season months), synthetic guest review records (`1`–`5` scale in the `reviews` table), and Helene Christine's lobby bar sales records (`30` drinks: `20` cocktails and `10` coffee types for reporting year `2026`).
 - **FR-005**: All changes to bookings (create, edit, delete) MUST be persisted immediately in the central MySQL data store so that subsequent on-demand REST API queries from the browser interface or the analytics dashboard return the updated live state within 5 seconds on load/refresh. Runtime CRUD is required for bookings (`F1`), whereas lobby bar sales are seeded into MySQL and queried dynamically through the REST API.
@@ -184,9 +190,9 @@ Per Constitution Phase Gate 1 (*Specify*), the table below maps every mandatory 
 
 #### Capacity, Occupancy Rate & Customer Satisfaction KPIs (`K1`, `K3`)
 
-- **FR-010**: The system MUST calculate the hotel's occupancy rate (`belægningsgrad`, `K1`) in the central business logic using Hotel Kong Arthur's binding capacity of **214 rooms** (`78,110` available room-nights per 365-day year):
+- **FR-010**: The system MUST calculate the hotel's occupancy rate (`belægningsgrad`, `K1`) in the central business logic using Hotel Kong Arthur's binding capacity of **214 rooms** (available room-nights = rooms × the days of the reporting year, taken from the calendar: `78,110` for a 365-day year such as `2026`, `78,324` for a leap year):
   - $\text{Occupancy Rate (\%)} = \left(\frac{\sum \text{Days Rented}}{\text{Available Room-Nights}}\right) \times 100$
-  - The system MUST provide overall annual occupancy rate as well as occupancy rate segmented by `Season` (`low` = 89 days / `19,046` room-nights; `mid` = 153 days / `32,742` room-nights; `high` = 123 days / `26,322` room-nights) and by `Room Type` (using the balanced 214-room inventory: `27` rooms each for `Standard Single`, `Grand Lit`, `Standard Double`, `Superior Double`, `Junior Suite`, and `Spa Executive`; `26` rooms each for `Suite` and `LOFT Suite`).
+  - The system MUST provide overall annual occupancy rate as well as occupancy rate segmented by `Season` (for `2026`: `low` = 89 days / `19,046` room-nights; `mid` = 153 days / `32,742` room-nights; `high` = 123 days / `26,322` room-nights; in a leap year February has 29 days, so `low` has 90) and by `Room Type` (using the balanced 214-room inventory: `27` rooms each for `Standard Single`, `Grand Lit`, `Standard Double`, `Superior Double`, `Junior Suite`, and `Spa Executive`; `26` rooms each for `Suite` and `LOFT Suite`).
 - **FR-011**: The system MUST store guest satisfaction ratings (`1` to `5` integer scale) in a dedicated `reviews` table exposed via its own REST API endpoint (separate from the booking form) and calculate customer satisfaction (`kundetilfredshed`, `K3`) in the central business logic as the arithmetic mean of review scores overall, per `Room Type`, and per `Season`, along with the percentage of satisfied guests (score $\ge 4$).
 
 #### Cocktail Bar Operations & KPIs (`B1`–`B3`)

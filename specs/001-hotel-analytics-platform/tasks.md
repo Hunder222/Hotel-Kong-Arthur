@@ -263,7 +263,7 @@
 - [X] T103 Verify Swagger UI at `http://localhost:8081`: the contract renders, *Try it out* on `GET /api/v1/room-types` returns 200 (CORS allows `http://localhost:8081`); verify persistence (`docker compose down` then `up -d` keeps bookings)
 - [ ] T104 [P] Team-owned, manual, outside the repository (FR-017): the first day the API runs, prove the Tableau route against `GET /api/v1/kpis/hotel/by-room-type?year=2026` (quickstart §8). After that, build the dashboard from quickstart §4–§7 and compare every figure within 0.01 DKK / 0.01% (SC-003). Run `git ls-files | grep -Ei '\.(twb|twbx|tbm|tds|tdsx|hyper)$'` and confirm no output
 - [ ] T105 [P] Process items from plan.md "Spec follow-ups" that need the team: amend the constitution wording (Gate VI/VIII, WDC hint, OQ-1, OQ-4) with `/speckit-constitution`; amend FR-010 (366-day leap year) and FR-003 (R17 bounds) in `SPEC/spec.md`; then run `/speckit-checklist` and `/speckit-analyze` before `/speckit-implement`
-- [ ] T106 Run every quickstart section (§1–§10) one last time and tick off each golden value
+- [X] T106 Run every quickstart section (§1–§10) one last time and tick off each golden value
 
 ---
 
