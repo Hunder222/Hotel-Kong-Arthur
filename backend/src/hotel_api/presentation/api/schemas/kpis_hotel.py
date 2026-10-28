@@ -2,9 +2,8 @@
 `RoomTypeSeasonKpi`, `CountryKpi` and their `{"items": [...]}` lists).
 
 `CountryKpi` and `RoomTypeSeasonKpi` are complete. `HotelSummary`, `RoomTypeKpi` and `SeasonKpi`
-carry only the revenue fields so far; the occupancy and satisfaction fields (US3, T071) and ALOS / ADR
-(US5, T091) are added when their stories are built, and until then these three do not yet match
-the full contract.
+carry revenue, occupancy and satisfaction so far; ALOS / ADR (US5, T091) are added when that story
+is built, and until then these three do not yet match the full contract.
 """
 
 from __future__ import annotations
@@ -31,11 +30,19 @@ class HotelSummary(BaseModel):
     booking_count: int
     nights_sold: int
     total_revenue_dkk: AmountDkk
+    available_room_nights: int
+    occupancy_rate_pct: Percent
+    review_count: int
+    average_satisfaction: AmountDkk
+    satisfied_share_pct: Percent
 
     @classmethod
     def from_model(cls, m: HotelRevenueSummary) -> HotelSummary:
         return cls(year=m.year, booking_count=m.booking_count, nights_sold=m.nights_sold,
-                   total_revenue_dkk=m.total_revenue_dkk)
+                   total_revenue_dkk=m.total_revenue_dkk,
+                   available_room_nights=m.available_room_nights, occupancy_rate_pct=m.occupancy_rate_pct,
+                   review_count=m.review_count, average_satisfaction=m.average_satisfaction,
+                   satisfied_share_pct=m.satisfied_share_pct)
 
 
 class RoomTypeKpi(BaseModel):
@@ -49,12 +56,20 @@ class RoomTypeKpi(BaseModel):
     nights_sold: int
     revenue_dkk: AmountDkk
     revenue_share_pct: Percent
+    available_room_nights: int
+    occupancy_rate_pct: Percent
+    review_count: int
+    average_satisfaction: AmountDkk
+    satisfied_share_pct: Percent
 
     @classmethod
     def from_model(cls, m: RoomTypeRevenue) -> RoomTypeKpi:
         return cls(year=m.year, revenue_rank=m.revenue_rank, room_type=m.room_type, room_count=m.room_count,
                    booking_count=m.booking_count, nights_sold=m.nights_sold, revenue_dkk=m.revenue_dkk,
-                   revenue_share_pct=m.revenue_share_pct)
+                   revenue_share_pct=m.revenue_share_pct,
+                   available_room_nights=m.available_room_nights, occupancy_rate_pct=m.occupancy_rate_pct,
+                   review_count=m.review_count, average_satisfaction=m.average_satisfaction,
+                   satisfied_share_pct=m.satisfied_share_pct)
 
 
 class RoomTypeKpiList(BaseModel):
@@ -73,11 +88,19 @@ class SeasonKpi(BaseModel):
     nights_sold: int
     revenue_dkk: AmountDkk
     revenue_share_pct: Percent
+    available_room_nights: int
+    occupancy_rate_pct: Percent
+    review_count: int
+    average_satisfaction: AmountDkk
+    satisfied_share_pct: Percent
 
     @classmethod
     def from_model(cls, m: SeasonRevenue) -> SeasonKpi:
         return cls(year=m.year, season=m.season, season_days=m.season_days, booking_count=m.booking_count,
-                   nights_sold=m.nights_sold, revenue_dkk=m.revenue_dkk, revenue_share_pct=m.revenue_share_pct)
+                   nights_sold=m.nights_sold, revenue_dkk=m.revenue_dkk, revenue_share_pct=m.revenue_share_pct,
+                   available_room_nights=m.available_room_nights, occupancy_rate_pct=m.occupancy_rate_pct,
+                   review_count=m.review_count, average_satisfaction=m.average_satisfaction,
+                   satisfied_share_pct=m.satisfied_share_pct)
 
 
 class SeasonKpiList(BaseModel):

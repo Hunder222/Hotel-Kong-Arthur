@@ -1,7 +1,4 @@
-"""Contract tests for the review operations (T065), every response validated with openapi-core.
-
-Skipped until the reviews router is registered (T072); remove the skip then and mark T065 done.
-"""
+"""Contract tests for the review operations (T065), every response validated with openapi-core."""
 
 from __future__ import annotations
 
@@ -10,12 +7,8 @@ from fastapi.testclient import TestClient
 
 from hotel_api.config import Settings
 from hotel_api.main import create_app
-from tests.contract.test_contract_validity import app_operations
 
-pytestmark = [
-    pytest.mark.contract,
-    pytest.mark.skipif(("POST", "/api/v1/reviews") not in app_operations(), reason="reviews router not registered yet (T072)"),
-]
+pytestmark = pytest.mark.contract
 
 BOOKING = {"first_name": "Elena", "family_name": "Müller", "country": "Germany", "room_type": "Superior Double",
            "check_in_date": "2026-07-14", "days_rented": 3}
@@ -58,13 +51,19 @@ def test_malformed_json_is_400(client, check_contract):
     ({"booking_id": 999, "rating": 4}, {"booking_id"}),
     ({"rating": 6, "room_type": "Suite", "stay_date": "2026-01-10"}, {"rating"}),
     ({"rating": 3}, {"room_type", "stay_date"}),
-    ({"booking_id": 1, "room_type": "Suite", "rating": 3}, {"room_type"}),
 ])
 def test_rule_violations_are_422_naming_the_fields(client, check_contract, body, fields):
     response = client.post("/api/v1/reviews", json=body)
     assert response.status_code == 422
     check_contract(response)
     assert {e["field"] for e in response.json()["errors"]} == fields
+
+
+def test_booking_id_together_with_room_type_is_422(client, check_contract, booking_id):
+    response = client.post("/api/v1/reviews", json={"booking_id": booking_id, "room_type": "Suite", "rating": 3})
+    assert response.status_code == 422
+    check_contract(response)
+    assert {e["field"] for e in response.json()["errors"]} == {"room_type"}
 
 
 def test_list_and_filters(client, check_contract, created):

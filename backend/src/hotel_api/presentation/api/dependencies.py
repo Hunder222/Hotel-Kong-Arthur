@@ -16,6 +16,7 @@ from fastapi import Depends, Query
 from hotel_api.business.services.booking_service import BookingService
 from hotel_api.business.services.health_service import HealthService
 from hotel_api.business.services.kpi_service import KpiService
+from hotel_api.business.services.review_service import ReviewService
 from hotel_api.business.services.room_type_service import RoomTypeService
 
 REPORTING_TIME_ZONE = "Europe/Copenhagen"
@@ -30,6 +31,10 @@ def get_room_type_service() -> RoomTypeService:
 
 
 def get_booking_service() -> BookingService:
+    raise NotImplementedError("bound by the composition root (main.py)")
+
+
+def get_review_service() -> ReviewService:
     raise NotImplementedError("bound by the composition root (main.py)")
 
 

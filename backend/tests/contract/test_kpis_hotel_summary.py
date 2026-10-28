@@ -3,21 +3,15 @@
 They are checked here for the shape produced so far (revenue, occupancy, satisfaction). They are
 validated against the complete contract schemas, including ALOS / ADR, in T086; until then openapi-core
 cannot be used on them because `required` lists fields that do not exist yet.
-
-Skipped until the DTOs carry the US3 fields (T071); remove the skip then and mark T067 done.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from hotel_api.presentation.api.schemas.kpis_hotel import HotelSummary
 from hotel_api.presentation.cli.seed import main as seed_main
 
-pytestmark = [
-    pytest.mark.contract,
-    pytest.mark.skipif("occupancy_rate_pct" not in HotelSummary.model_fields, reason="US3 DTO fields not added yet (T071)"),
-]
+pytestmark = pytest.mark.contract
 
 SHARED = {"year", "booking_count", "nights_sold", "available_room_nights", "occupancy_rate_pct", "review_count",
           "average_satisfaction", "satisfied_share_pct"}

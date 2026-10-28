@@ -10,15 +10,12 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any, Literal
-from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from hotel_api.business.domain.models import Booking as BookingModel
 from hotel_api.business.domain.models import Season
-from hotel_api.presentation.api.schemas.common import AmountDkk
-
-REPORTING_TIME_ZONE = "Europe/Copenhagen"
+from hotel_api.presentation.api.schemas.common import AmountDkk, with_zone
 
 # Mirrors the contract's `RoomTypeName` enum; used to reject bad query parameters with 400.
 RoomTypeName = Literal[
@@ -43,13 +40,6 @@ class BookingInput(BaseModel):
     check_in_date: Any = Field(...)
     days_rented: Any = Field(...)
     price_dkk: Any = None
-
-
-def _with_zone(value: datetime | None) -> datetime | None:
-    """MySQL returns naive timestamps in the database's time zone (Europe/Copenhagen, set by TZ)."""
-    if value is not None and value.tzinfo is None:
-        return value.replace(tzinfo=ZoneInfo(REPORTING_TIME_ZONE))
-    return value
 
 
 class Booking(BaseModel):
@@ -81,8 +71,8 @@ class Booking(BaseModel):
             price_dkk=booking.price_dkk,
             season=booking.season,
             year=booking.year,
-            created_at=_with_zone(booking.created_at),
-            updated_at=_with_zone(booking.updated_at),
+            created_at=with_zone(booking.created_at),
+            updated_at=with_zone(booking.updated_at),
         )
 
 
