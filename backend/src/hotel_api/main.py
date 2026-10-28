@@ -9,6 +9,8 @@ is committed before the response is sent when the request succeeds, and rolled b
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import contextmanager
+
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pymysql.connections import Connection
@@ -16,13 +18,29 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from hotel_api.business.services.health_service import HealthService
 from hotel_api.business.services.room_type_service import RoomTypeService
+from hotel_api.business.services.sample_data_service import SampleDataService
 from hotel_api.config import Settings, get_settings
 from hotel_api.data.connection import connection_scope
+from hotel_api.data.repositories.bar_sales import MySqlBarSalesRepository
+from hotel_api.data.repositories.bookings import MySqlBookingRepository
 from hotel_api.data.repositories.health import MySqlHealthRepository
+from hotel_api.data.repositories.reviews import MySqlReviewRepository
 from hotel_api.data.repositories.room_types import MySqlRoomTypeRepository
 from hotel_api.presentation.api import dependencies as deps
 from hotel_api.presentation.api.errors import register_error_handlers
 from hotel_api.presentation.api.routers import health, room_types
+
+
+@contextmanager
+def sample_data_service_scope(settings: Settings | None = None) -> Iterator[SampleDataService]:
+    """Open one transactional database connection and yield a wired `SampleDataService` (R3, R13)."""
+    with connection_scope(settings) as conn:
+        yield SampleDataService(
+            room_types=MySqlRoomTypeRepository(conn),
+            bookings=MySqlBookingRepository(conn),
+            reviews=MySqlReviewRepository(conn),
+            bar_sales=MySqlBarSalesRepository(conn),
+        )
 
 
 class NoStoreMiddleware:
