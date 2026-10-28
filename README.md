@@ -187,6 +187,33 @@ connect to `kpis/hotel/by-room-type?year=2026` after seeding, confirm the 8 rows
 that the figures change. When the dashboard is built, compare every figure with the golden values in quickstart §4–§7
 (within 0.01 DKK / 0.01 %).
 
+## Performance (spot check)
+
+Measured on 2026-10-28 with 10,000 bookings (plus 5,000 reviews and the 30 bar drinks) in the separate `hotel_test`
+database, through a second API container started on it. One laptop (Apple M1 Pro, 16 GB, Docker Desktop with 10 CPUs and
+8 GB), one Uvicorn worker, MySQL 8.4 in a container, requests one after another over `localhost`, 100 samples per
+endpoint after 5 warm-up requests. The plan's targets were p95 < 200 ms for booking CRUD and p95 < 500 ms for each KPI endpoint.
+
+| Endpoint | p50 | p95 | Target |
+|----------|----:|----:|--------|
+| `POST /bookings` | 10.8 ms | 11.8 ms | < 200 ms |
+| `GET /bookings/{id}` | 9.2 ms | 10.3 ms | < 200 ms |
+| `PUT /bookings/{id}` | 10.7 ms | 12.0 ms | < 200 ms |
+| `DELETE /bookings/{id}` | 9.7 ms | 10.4 ms | < 200 ms |
+| `GET /kpis/hotel/summary` | 140 ms | 158 ms | < 500 ms |
+| `GET /kpis/hotel/by-room-type` | 143 ms | 160 ms | < 500 ms |
+| `GET /kpis/hotel/by-season` | 146 ms | 162 ms | < 500 ms |
+| `GET /kpis/hotel/by-room-type-and-season` | 111 ms | 123 ms | < 500 ms |
+| `GET /kpis/hotel/by-country` | 108 ms | 120 ms | < 500 ms |
+| `GET /kpis/bar/summary`, `by-category`, `by-price-tier`, `GET /bar/drink-sales` | about 10 ms | about 12 ms | < 500 ms |
+
+All targets are met. Two more figures, for information: `GET /reviews?year=2026` (5,000 rows) has p95 80 ms, and
+`GET /bookings` (all 10,000 rows, which is what the booking page loads) has p95 212 ms.
+
+The hotel KPIs cost about 100 to 160 ms because every request loads one year of bookings and reviews and calculates in
+the business layer (research R6). At about a million bookings a year, the answer is pre-aggregated tables kept by the
+business layer, not moving the formulas into SQL or Tableau.
+
 ## Repository layout
 
 ```text
