@@ -1,0 +1,95 @@
+# Hotel Kong Arthur: `docker compose up` starts db, api and swagger-ui (the frontend service is added with the frontend tasks).
+# All values below are development defaults, not secrets.
+
+x-db-env: &db-env
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_NAME: hotel
+  DB_USER: hotel
+  DB_PASSWORD: hotel
+  CORS_ORIGINS: http://localhost:8080,http://localhost:8081
+  TZ: Europe/Copenhagen
+
+services:
+  db:
+    image: mysql:8.4
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    environment:
+      MYSQL_ROOT_PASSWORD: root-dev
+      MYSQL_DATABASE: hotel
+      MYSQL_USER: hotel
+      MYSQL_PASSWORD: hotel
+      TZ: Europe/Copenhagen
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    # No published port: clients reach the data only through the REST API (Constitution IV).
+    healthcheck:
+      # Over TCP: during initialisation MySQL only listens on its socket, so this cannot pass
+      # before the init scripts have created the schema and reference data.
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -uhotel -photel hotel -N -e 'SELECT COUNT(*) FROM room_types' | grep -qx 8"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  api:
+    build:
+      context: ./backend
+      target: runtime
+    environment: *db-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.33.3
+    environment:
+      SWAGGER_JSON: /spec/openapi.yaml
+    volumes:
+      # The one authoritative contract, never copied (research R4).
+      - ./specs/001-hotel-analytics-platform/contracts/openapi.yaml:/spec/openapi.yaml:ro
+    ports:
+      - "8081:8080"
+
+  # `docker compose run --rm seed`: idempotent reset/replace with the sample data (R13).
+  seed:
+    profiles: ["tools"]
+    build:
+      context: ./backend
+      target: runtime
+    command: ["python", "-m", "hotel_api.presentation.cli.seed"]
+    environment:
+      <<: *db-env
+      SAMPLE_DATA_DIR: /repo/context/teacher
+    volumes:
+      - ./context/teacher:/repo/context/teacher:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # `docker compose run --rm tests`: every suite against the separate hotel_test database (R16).
+  tests:
+    profiles: ["test"]
+    build:
+      context: ./backend
+      target: test
+    command: ["pytest"]
+    working_dir: /repo/backend
+    environment: *db-env
+    volumes:
+      - .:/repo
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql-data:
