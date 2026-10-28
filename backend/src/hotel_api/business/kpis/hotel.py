@@ -1,4 +1,5 @@
-"""Hotel KPIs: revenue (K2, A2-A6), occupancy (K1) and satisfaction (K3). FR-006-FR-011, data-model §7.
+"""Hotel KPIs: revenue (K2, A2-A6), occupancy (K1), satisfaction (K3), ALOS / ADR / revenue per booking (A7).
+FR-006-FR-011, FR-015, data-model §7.
 
 Pure functions, no I/O. Each function takes the reporting `year` and counts only bookings whose
 `check_in_date` lies in that year and reviews whose `stay_date` lies in it: a booking (with its revenue
@@ -17,12 +18,12 @@ from hotel_api.business.domain.models import (
     Booking,
     CountryKpi,
     GuestReview,
-    HotelRevenueSummary,
+    HotelSummary,
     RoomType,
-    RoomTypeRevenue,
+    RoomTypeKpi,
     RoomTypeSeasonKpi,
     Season,
-    SeasonRevenue,
+    SeasonKpi,
 )
 from hotel_api.business.rules.numbers import round_half_up, safe_average, safe_pct, shares_pct
 from hotel_api.business.rules.ranking import rank_descending
@@ -39,6 +40,23 @@ def _totals(bookings: Sequence[Booking]) -> tuple[int, int, Decimal]:
     """(booking count, nights sold, revenue) of a set of bookings."""
     revenue = round_half_up(sum((b.price_dkk for b in bookings), _ZERO))
     return len(bookings), sum(b.days_rented for b in bookings), revenue
+
+
+def stay_figures(booking_count: int, nights_sold: int, revenue: Decimal) -> tuple[Decimal, Decimal, Decimal]:
+    """A7: (ALOS = nights / bookings, ADR = revenue / nights, revenue per booking = revenue / bookings).
+
+    Each rounded half-up to 2 decimals; 0.00 for an empty scope.
+    """
+    return (
+        safe_average(nights_sold, booking_count),
+        safe_average(revenue, nights_sold),
+        safe_average(revenue, booking_count),
+    )
+
+
+def _stay_named(booking_count: int, nights_sold: int, revenue: Decimal) -> dict[str, Decimal]:
+    keys = ("average_length_of_stay_nights", "average_daily_rate_dkk", "average_revenue_per_booking_dkk")
+    return dict(zip(keys, stay_figures(booking_count, nights_sold, revenue)))
 
 
 def reviews_of_year(reviews: Iterable[GuestReview], year: int) -> list[GuestReview]:
@@ -70,24 +88,28 @@ def _named(figures: tuple[int, Decimal, int, Decimal, Decimal]) -> dict[str, obj
     return dict(zip(keys, figures))
 
 
-def hotel_revenue_summary(
+def hotel_summary(
     bookings: Iterable[Booking], reviews: Iterable[GuestReview], room_types: Sequence[RoomType], year: int
-) -> HotelRevenueSummary:
-    """Year totals: revenue (A6, K2), booking count, nights, occupancy over all rooms (K1), satisfaction (K3)."""
+) -> HotelSummary:
+    """Year totals: revenue (A6, K2), nights, occupancy over all rooms (K1), satisfaction (K3), ALOS / ADR (A7)."""
     count, nights, revenue = _totals(bookings_of_year(bookings, year))
     available = available_room_nights(sum(r.room_count for r in room_types), days_in_year(year))
-    return HotelRevenueSummary(
-        year, count, nights, revenue,
-        *_capacity_and_satisfaction(nights, available, reviews_of_year(reviews, year)),
+    return HotelSummary(
+        year=year,
+        booking_count=count,
+        nights_sold=nights,
+        total_revenue_dkk=revenue,
+        **_named(_capacity_and_satisfaction(nights, available, reviews_of_year(reviews, year))),
+        **_stay_named(count, nights, revenue),
     )
 
 
-def revenue_by_room_type(
+def kpis_by_room_type(
     bookings: Iterable[Booking], reviews: Iterable[GuestReview], room_types: Sequence[RoomType], year: int
-) -> list[RoomTypeRevenue]:
+) -> list[RoomTypeKpi]:
     """One row per room type (always all of them), ranked by revenue (A4), revenue shares sum to 100.
 
-    Occupancy uses the room type's own rooms x days in the year; satisfaction uses the reviews of that room type.
+    Also ALOS / ADR (A7). Occupancy uses the room type's own rooms x days in the year; satisfaction uses the reviews of that room type.
     """
     groups: dict[str, list[Booking]] = defaultdict(list)
     for booking in bookings_of_year(bookings, year):
@@ -100,7 +122,7 @@ def revenue_by_room_type(
     ranked = rank_descending(rows, value=lambda r: r[3], name=lambda r: r[0].name)
     shares = shares_pct([row[3] for _, row in ranked])
     return [
-        RoomTypeRevenue(
+        RoomTypeKpi(
             year=year,
             revenue_rank=rank,
             room_type=room_type.name,
@@ -116,17 +138,18 @@ def revenue_by_room_type(
                     review_groups.get(room_type.name, []),
                 )
             ),
+            **_stay_named(count, nights, revenue),
         )
         for (rank, (room_type, count, nights, revenue)), share in zip(ranked, shares)
     ]
 
 
-def revenue_by_season(
+def kpis_by_season(
     bookings: Iterable[Booking], reviews: Iterable[GuestReview], room_types: Sequence[RoomType], year: int
-) -> list[SeasonRevenue]:
+) -> list[SeasonKpi]:
     """Three rows in the order low, mid, high; revenue shares sum to 100.
 
-    Occupancy uses all rooms x the season's days; a review belongs to the season of its stay date.
+    Also ALOS / ADR (A7). Occupancy uses all rooms x the season's days; a review belongs to the season of its stay date.
     """
     groups: dict[Season, list[Booking]] = defaultdict(list)
     for booking in bookings_of_year(bookings, year):
@@ -140,7 +163,7 @@ def revenue_by_season(
     totals = [_totals(groups.get(season, [])) for season in SEASON_ORDER]
     shares = shares_pct([revenue for _, _, revenue in totals])
     return [
-        SeasonRevenue(
+        SeasonKpi(
             year=year,
             season=season,
             season_days=days[season],
@@ -153,6 +176,7 @@ def revenue_by_season(
                     nights, available_room_nights(total_rooms, days[season]), review_groups.get(season, [])
                 )
             ),
+            **_stay_named(count, nights, revenue),
         )
         for season, (count, nights, revenue), share in zip(SEASON_ORDER, totals, shares)
     ]

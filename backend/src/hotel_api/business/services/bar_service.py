@@ -1,9 +1,15 @@
-"""Use case: bar sales and bar KPIs (B1-B3). Loads one year through the port and calls the pure functions
+"""Use case: bar sales and bar KPIs (B1-B3, price-tier demand). Loads one year through the port and calls the pure functions
 in `business/kpis/bar.py`; it contains no formulas itself (Constitution VII). Bar data is read-only here."""
 
 from __future__ import annotations
 
-from hotel_api.business.domain.models import BarCategoryKpi, BarSummary, DrinkCategory, RankedDrinkSale
+from hotel_api.business.domain.models import (
+    BarCategoryKpi,
+    BarPriceTierKpi,
+    BarSummary,
+    DrinkCategory,
+    RankedDrinkSale,
+)
 from hotel_api.business.kpis import bar
 from hotel_api.business.ports import BarSalesRepository
 
@@ -24,3 +30,6 @@ class BarService:
 
     def by_category(self, year: int) -> list[BarCategoryKpi]:
         return bar.bar_by_category(self._bar_sales.list(year), year)
+
+    def by_price_tier(self, year: int) -> list[BarPriceTierKpi]:
+        return bar.bar_by_price_tier(self._bar_sales.list(year), year)

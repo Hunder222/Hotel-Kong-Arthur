@@ -12,11 +12,13 @@ from decimal import Decimal
 from hotel_api.business.domain.models import (
     BarCategoryKpi,
     BarDrinkSale,
+    BarPriceTierKpi,
     BarSummary,
     DrinkCategory,
     RankedDrinkSale,
 )
 from hotel_api.business.rules.numbers import round_half_up, shares_pct
+from hotel_api.business.rules.price_tiers import TIER_ORDER, tier_bounds, tier_for_price
 from hotel_api.business.rules.ranking import rank_descending
 
 CATEGORY_ORDER: tuple[DrinkCategory, ...] = (DrinkCategory.COCKTAIL, DrinkCategory.COFFEE)
@@ -64,3 +66,31 @@ def bar_by_category(sales: Iterable[BarDrinkSale], year: int) -> list[BarCategor
         )
         for i, (category, group) in enumerate(zip(CATEGORY_ORDER, groups))
     ]
+
+
+def bar_by_price_tier(sales: Iterable[BarDrinkSale], year: int) -> list[BarPriceTierKpi]:
+    """Demand per price tier (FR-016, US4/A7): always budget, standard, premium, with units, revenue and shares
+    (each share column = 100.00), so the CFO can see whether guests buy cheaper or dearer drinks."""
+    in_year = bar_sales_of_year(sales, year)
+    groups = [[s for s in in_year if tier_for_price(s.unit_price_dkk) is tier] for tier in TIER_ORDER]
+    revenues = [round_half_up(sum((s.revenue_dkk for s in g), Decimal("0.00"))) for g in groups]
+    units = [sum(s.units_sold for s in g) for g in groups]
+    revenue_shares = shares_pct(revenues)
+    unit_shares = shares_pct(units)
+    rows = []
+    for i, (tier, group) in enumerate(zip(TIER_ORDER, groups)):
+        price_from, price_to = tier_bounds(tier)
+        rows.append(
+            BarPriceTierKpi(
+                year=year,
+                price_tier=tier,
+                price_from_dkk=price_from,
+                price_to_dkk=price_to,
+                drink_count=len(group),
+                units_sold=units[i],
+                unit_share_pct=unit_shares[i],
+                revenue_dkk=revenues[i],
+                revenue_share_pct=revenue_shares[i],
+            )
+        )
+    return rows

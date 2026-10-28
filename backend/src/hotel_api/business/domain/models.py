@@ -156,57 +156,6 @@ class HotelSummary:
     average_revenue_per_booking_dkk: Decimal
 
 
-# Hotel KPIs built so far: revenue (US2) plus occupancy and satisfaction (US3). US5 adds ALOS / ADR /
-# revenue per booking, and these three are then replaced by the complete HotelSummary, RoomTypeKpi and
-# SeasonKpi defined further down.
-
-
-@dataclass(frozen=True)
-class HotelRevenueSummary:
-    year: int
-    booking_count: int
-    nights_sold: int
-    total_revenue_dkk: Decimal
-    available_room_nights: int
-    occupancy_rate_pct: Decimal
-    review_count: int
-    average_satisfaction: Decimal
-    satisfied_share_pct: Decimal
-
-
-@dataclass(frozen=True)
-class RoomTypeRevenue:
-    year: int
-    revenue_rank: int
-    room_type: str
-    room_count: int
-    booking_count: int
-    nights_sold: int
-    revenue_dkk: Decimal
-    revenue_share_pct: Decimal
-    available_room_nights: int
-    occupancy_rate_pct: Decimal
-    review_count: int
-    average_satisfaction: Decimal
-    satisfied_share_pct: Decimal
-
-
-@dataclass(frozen=True)
-class SeasonRevenue:
-    year: int
-    season: Season
-    season_days: int
-    booking_count: int
-    nights_sold: int
-    revenue_dkk: Decimal
-    revenue_share_pct: Decimal
-    available_room_nights: int
-    occupancy_rate_pct: Decimal
-    review_count: int
-    average_satisfaction: Decimal
-    satisfied_share_pct: Decimal
-
-
 @dataclass(frozen=True)
 class RoomTypeKpi:
     year: int

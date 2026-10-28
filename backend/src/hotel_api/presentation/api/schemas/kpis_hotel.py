@@ -14,11 +14,19 @@ from hotel_api.business.domain.models import (
     CountryKpi as CountryKpiModel,
 )
 from hotel_api.business.domain.models import (
-    HotelRevenueSummary,
-    RoomTypeRevenue,
+    HotelSummary as HotelSummaryModel,
+)
+from hotel_api.business.domain.models import (
+    RoomTypeKpi as RoomTypeKpiModel,
+)
+from hotel_api.business.domain.models import (
     RoomTypeSeasonKpi as RoomTypeSeasonKpiModel,
+)
+from hotel_api.business.domain.models import (
     Season,
-    SeasonRevenue,
+)
+from hotel_api.business.domain.models import (
+    SeasonKpi as SeasonKpiModel,
 )
 from hotel_api.presentation.api.schemas.common import AmountDkk, Percent
 
@@ -37,7 +45,7 @@ class HotelSummary(BaseModel):
     satisfied_share_pct: Percent
 
     @classmethod
-    def from_model(cls, m: HotelRevenueSummary) -> HotelSummary:
+    def from_model(cls, m: HotelSummaryModel) -> HotelSummary:
         return cls(year=m.year, booking_count=m.booking_count, nights_sold=m.nights_sold,
                    total_revenue_dkk=m.total_revenue_dkk,
                    available_room_nights=m.available_room_nights, occupancy_rate_pct=m.occupancy_rate_pct,
@@ -63,7 +71,7 @@ class RoomTypeKpi(BaseModel):
     satisfied_share_pct: Percent
 
     @classmethod
-    def from_model(cls, m: RoomTypeRevenue) -> RoomTypeKpi:
+    def from_model(cls, m: RoomTypeKpiModel) -> RoomTypeKpi:
         return cls(year=m.year, revenue_rank=m.revenue_rank, room_type=m.room_type, room_count=m.room_count,
                    booking_count=m.booking_count, nights_sold=m.nights_sold, revenue_dkk=m.revenue_dkk,
                    revenue_share_pct=m.revenue_share_pct,
@@ -95,7 +103,7 @@ class SeasonKpi(BaseModel):
     satisfied_share_pct: Percent
 
     @classmethod
-    def from_model(cls, m: SeasonRevenue) -> SeasonKpi:
+    def from_model(cls, m: SeasonKpiModel) -> SeasonKpi:
         return cls(year=m.year, season=m.season, season_days=m.season_days, booking_count=m.booking_count,
                    nights_sold=m.nights_sold, revenue_dkk=m.revenue_dkk, revenue_share_pct=m.revenue_share_pct,
                    available_room_nights=m.available_room_nights, occupancy_rate_pct=m.occupancy_rate_pct,

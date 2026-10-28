@@ -58,22 +58,22 @@ def test_occupancy_with_no_capacity_is_zero_not_an_error():
 
 
 def test_summary_occupancy_uses_all_rooms_for_the_whole_year(room_types):
-    s = hotel.hotel_revenue_summary(BOOKINGS, REVIEWS, room_types, 2026)
+    s = hotel.hotel_summary(BOOKINGS, REVIEWS, room_types, 2026)
     assert (s.available_room_nights, s.nights_sold, s.occupancy_rate_pct) == (78110, 5, D("0.01"))
 
 
 def test_a_leap_year_has_more_available_room_nights(room_types):
-    assert hotel.hotel_revenue_summary([], [], room_types, 2028).available_room_nights == 214 * 366
+    assert hotel.hotel_summary([], [], room_types, 2028).available_room_nights == 214 * 366
 
 
 def test_season_occupancy_uses_the_days_of_the_season(room_types):
-    low, mid, high = hotel.revenue_by_season(BOOKINGS, REVIEWS, room_types, 2026)
+    low, mid, high = hotel.kpis_by_season(BOOKINGS, REVIEWS, room_types, 2026)
     assert [r.available_room_nights for r in (low, mid, high)] == [19046, 32742, 26322]
     assert [r.occupancy_rate_pct for r in (low, mid, high)] == [D("0.02"), D("0.00"), D("0.01")]
 
 
 def test_room_type_occupancy_uses_the_rooms_of_that_type(room_types):
-    rows = {r.room_type: r for r in hotel.revenue_by_room_type(BOOKINGS, REVIEWS, room_types, 2026)}
+    rows = {r.room_type: r for r in hotel.kpis_by_room_type(BOOKINGS, REVIEWS, room_types, 2026)}
     assert (rows["Suite"].available_room_nights, rows["Suite"].occupancy_rate_pct) == (9490, D("0.03"))
     assert (rows["Standard Single"].available_room_nights, rows["Standard Single"].occupancy_rate_pct) == (
         9855, D("0.02"))
@@ -104,20 +104,20 @@ def test_no_reviews_gives_zero_not_an_error():
 
 
 def test_summary_satisfaction_counts_only_the_reporting_year(room_types):
-    s = hotel.hotel_revenue_summary(BOOKINGS, REVIEWS, room_types, 2026)
+    s = hotel.hotel_summary(BOOKINGS, REVIEWS, room_types, 2026)
     assert (s.review_count, s.average_satisfaction, s.satisfied_share_pct) == (4, D("3.25"), D("50.00"))
-    assert hotel.hotel_revenue_summary(BOOKINGS, REVIEWS, room_types, 2025).review_count == 1
+    assert hotel.hotel_summary(BOOKINGS, REVIEWS, room_types, 2025).review_count == 1
 
 
 def test_a_review_belongs_to_the_season_and_year_of_its_stay_date(room_types):
-    low, mid, high = hotel.revenue_by_season(BOOKINGS, REVIEWS, room_types, 2026)
+    low, mid, high = hotel.kpis_by_season(BOOKINGS, REVIEWS, room_types, 2026)
     assert [(r.review_count, r.average_satisfaction, r.satisfied_share_pct) for r in (low, mid, high)] == [
         (2, D("3.00"), D("50.00")), (1, D("3.00"), D("0.00")), (1, D("4.00"), D("100.00"))]
     assert REVIEWS[3].season is Season.LOW  # stay 2026-11-30
 
 
 def test_by_room_type_uses_the_reviews_own_room_type(room_types):
-    rows = {r.room_type: r for r in hotel.revenue_by_room_type(BOOKINGS, REVIEWS, room_types, 2026)}
+    rows = {r.room_type: r for r in hotel.kpis_by_room_type(BOOKINGS, REVIEWS, room_types, 2026)}
     assert (rows["Suite"].review_count, rows["Suite"].average_satisfaction, rows["Suite"].satisfied_share_pct) == (
         2, D("4.50"), D("100.00"))
     assert (rows["Grand Lit"].review_count, rows["Grand Lit"].average_satisfaction) == (1, D("3.00"))
@@ -128,7 +128,7 @@ def test_by_room_type_uses_the_reviews_own_room_type(room_types):
 
 
 def test_an_empty_dataset_has_zero_rates_but_keeps_the_capacity(room_types):
-    s = hotel.hotel_revenue_summary([], [], room_types, 2026)
+    s = hotel.hotel_summary([], [], room_types, 2026)
     assert (s.occupancy_rate_pct, s.review_count, s.average_satisfaction, s.satisfied_share_pct) == (
         D("0.00"), 0, D("0.00"), D("0.00"))
     assert s.available_room_nights == 78110

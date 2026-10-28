@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+from hotel_api.presentation.api.schemas.kpis_hotel import HotelSummary
 from hotel_api.presentation.cli.seed import main as seed_main
 
 pytestmark = pytest.mark.contract
@@ -58,3 +59,37 @@ def test_an_empty_year_has_zero_rates_and_full_capacity(client):
 
 def test_a_bad_year_is_400(client):
     assert client.get("/api/v1/kpis/hotel/summary?year=abc").status_code == 400
+
+
+# ---- T086: the same endpoints against the COMPLETE contract schemas (incl. ALOS / ADR / revenue per booking) ----
+
+complete_only = pytest.mark.skipif(
+    "average_length_of_stay_nights" not in HotelSummary.model_fields,
+    reason="A7 DTO fields not added yet (T091)",
+)
+
+
+@complete_only
+@pytest.mark.parametrize("path", ["summary", "by-room-type", "by-season"])
+@pytest.mark.parametrize("year", ["2026", "2030"])
+def test_complete_contract_schemas(client, check_contract, seeded, path, year):
+    response = client.get(f"/api/v1/kpis/hotel/{path}?year={year}")
+    assert response.status_code == 200
+    check_contract(response)
+
+
+@complete_only
+def test_a7_values_in_the_responses(client, check_contract, seeded):
+    body = client.get("/api/v1/kpis/hotel/summary?year=2026").json()
+    assert (body["average_length_of_stay_nights"], body["average_daily_rate_dkk"],
+            body["average_revenue_per_booking_dkk"]) == (5.38, 2088.5, 11234.03)
+    seasons = client.get("/api/v1/kpis/hotel/by-season?year=2026").json()["items"]
+    assert [(i["average_length_of_stay_nights"], i["average_daily_rate_dkk"], i["average_revenue_per_booking_dkk"])
+            for i in seasons] == [(5.36, 1885.37, 10102.64), (5.48, 2073.7, 11371.3), (5.29, 2308.89, 12223.93)]
+
+
+@complete_only
+def test_bad_year_is_400_with_the_contract_error_shape(client, check_contract):
+    response = client.get("/api/v1/kpis/hotel/summary?year=abc")
+    assert response.status_code == 400
+    check_contract(response)
