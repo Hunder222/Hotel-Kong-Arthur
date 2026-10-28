@@ -121,13 +121,13 @@
 
 ### Tests for User Story 1
 
-- [ ] T042 [P] [US1] Unit tests for `BookingService` with fake ports in `backend/tests/unit/test_booking_service.py`: price derived when omitted or `null`, recalculated on update when omitted, manual price outside band rejected, unknown id → `NotFound`, a failed validation does not call the repository (US1 scenarios 1–4)
+- [X] T042 [P] [US1] Unit tests for `BookingService` with fake ports in `backend/tests/unit/test_booking_service.py`: price derived when omitted or `null`, recalculated on update when omitted, manual price outside band rejected, unknown id → `NotFound`, a failed validation does not call the repository (US1 scenarios 1–4)
 - [ ] T043 [P] [US1] Contract tests for the 5 booking operations in `backend/tests/contract/test_bookings.py`, each response validated with openapi-core: `GET /bookings` (`200`, filters, `400` bad `year`), `POST` (`201` + `Location` header + `season` `high`, `year` 2026, `price_dkk` 6000.00 for the quickstart example; `400` malformed JSON; `422` with `errors` for `room_type` and `days_rented`; `422` price band), `GET /bookings/{id}` (`200`, `400` id 0, `404`), `PUT` (`200` price 10000.00 after nights 3 → 5; `404`; `422`), `DELETE` (`204`, then `404`); `503` on a failed connection
-- [ ] T044 [P] [US1] Integration test in `backend/tests/integration/test_booking_crud.py`: a created booking is visible on the next request, an invalid create leaves the table unchanged, deleting a booking sets `reviews.booking_id` to NULL while the review remains
+- [X] T044 [P] [US1] Integration test in `backend/tests/integration/test_booking_crud.py`: a created booking is visible on the next request, an invalid create leaves the table unchanged, deleting a booking sets `reviews.booking_id` to NULL while the review remains
 
 ### Implementation for User Story 1
 
-- [ ] T045 [US1] Implement `SRC/business/services/booking_service.py` (depends on T011, T015, T016): `create`, `get`, `list`, `replace`, `delete`; loads room types through the port, validates (`booking_validation`), derives season, prices (`pricing`), raises `ValidationFailed` listing every broken field, `NotFound` for unknown ids
+- [X] T045 [US1] Implement `SRC/business/services/booking_service.py` (depends on T011, T015, T016): `create`, `get`, `list`, `replace`, `delete`; loads room types through the port, validates (`booking_validation`), derives season, prices (`pricing`), raises `ValidationFailed` listing every broken field, `NotFound` for unknown ids
 - [ ] T046 [P] [US1] Create `SRC/presentation/api/schemas/bookings.py`: `BookingInput` (required `first_name`, `family_name`, `country`, `room_type`, `check_in_date`, `days_rented`; optional nullable `price_dkk`), `Booking` (adds `id`, `season`, `year`, `created_at`, `updated_at`), `BookingList` (`{"items": [...]}`) exactly as the contract (`additionalProperties: false`)
 - [ ] T047 [US1] Create `SRC/presentation/api/routers/bookings.py` (depends on T045, T046): `GET/POST /api/v1/bookings`, `GET/PUT/DELETE /api/v1/bookings/{booking_id}`; `201` with `Location: /api/v1/bookings/{id}`; `204` with no body; path ids ≥ 1 else `400`; each handler only calls the service and maps to DTOs
 - [ ] T048 [US1] Register the bookings router and the `BookingService` provider in `SRC/main.py`, and add `BookingService` to `SRC/presentation/api/dependencies.py`
