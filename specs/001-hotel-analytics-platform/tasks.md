@@ -251,9 +251,9 @@
 
 **Purpose**: Documentation required by the constitution, contract and requirement sync, and whole-system checks.
 
-- [ ] T094 [P] Write `README.md`: the mermaid architecture diagram from plan.md "System and containers" (Q1), the three-layer table (Q3), how to run and seed, data persistence (named volume `mysql-data`; `docker compose down -v` wipes it; the seed removes user-created bookings and reviews), the seed command, ports 8080 / 8000 / 8081
-- [ ] T095 [P] Complete `CONTRIBUTE.md` (T005): dev setup, running `unit`, `contract`, `integration`, `architecture` suites in Docker (`docker compose run --rm tests`) and locally on Python ≥ 3.13, schema reset, commit flow to `main`
-- [ ] T096 [P] Add the Tableau handover section to `README.md` (text only): REST API Connector, JSONPath `$.items[*]` for tables and `$` for summaries, extract refresh, dummy credentials accepted, and the early-check step (quickstart §8). **No Tableau files** (FR-017)
+- [X] T094 [P] Write `README.md`: the mermaid architecture diagram from plan.md "System and containers" (Q1), the three-layer table (Q3), how to run and seed, data persistence (named volume `mysql-data`; `docker compose down -v` wipes it; the seed removes user-created bookings and reviews), the seed command, ports 8080 / 8000 / 8081
+- [X] T095 [P] Complete `CONTRIBUTE.md` (T005): dev setup, running `unit`, `contract`, `integration`, `architecture` suites in Docker (`docker compose run --rm tests`) and locally on Python ≥ 3.13, schema reset, commit flow to `main`
+- [X] T096 [P] Add the Tableau handover section to `README.md` (text only): REST API Connector, JSONPath `$.items[*]` for tables and `$` for summaries, extract refresh, dummy credentials accepted, and the early-check step (quickstart §8). **No Tableau files** (FR-017)
 - [ ] T097 [P] Record the architecture decision log outcome in `SPEC/research.md`: mark each "Pending team review" row Kept or Changed after the team review
 - [ ] T098 Run `docker compose down -v && docker compose up --build -d` from a fresh clone and confirm `db`, `api`, `frontend` healthy and `swagger-ui` running within 60 seconds (SC-005); then walk quickstart §1 and confirm an empty state (`{"items": []}`, `available_room_nights` 78110, occupancy 0)
 - [ ] T099 Run `docker compose run --rm seed` twice and walk quickstart §2 (idempotent, same counts and ids)

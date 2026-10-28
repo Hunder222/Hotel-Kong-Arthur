@@ -164,7 +164,7 @@ flowchart LR
     end
 
     BROWSER -->|"HTTP :8080"| FE
-    FE -->|"/api/* → http://api:8000"| P
+    FE -->|"proxies /api to api:8000"| P
     TABLEAU -->|"GET JSON :8000<br/>REST API Connector"| P
     HOTELSYS -->|"POST/PUT/DELETE JSON :8000"| P
     DEV -->|"HTTP :8081"| SW
