@@ -31,11 +31,11 @@
 
 **Purpose**: Repository skeleton, dependency pins and container images.
 
-- [ ] T001 Create the directory tree from plan.md "Source Code": `backend/src/hotel_api/{presentation/api/{routers,schemas},presentation/cli,business/{domain,rules,kpis,services},data/repositories}`, `backend/tests/{unit,contract,integration,architecture}`, `db/init/`, `frontend/public/`, each Python package with an `__init__.py`
-- [ ] T002 Create `backend/pyproject.toml`: Python `>=3.13`; pinned runtime deps FastAPI 0.16x, Uvicorn 0.5x, Pydantic 2.14, `PyMySQL[rsa]` 1.2; dev deps pytest 9, httpx 0.28, openapi-core 0.23, openapi-spec-validator 0.9; `[tool.pytest.ini_options]` with `testpaths = ["tests"]`, `pythonpath = ["src"]` and markers `unit`, `contract`, `integration`, `architecture`
-- [ ] T003 [P] Create `backend/Dockerfile` (base `python:3.13-slim`) with stage `runtime` (installs runtime deps, runs `uvicorn hotel_api.main:app --host 0.0.0.0 --port 8000`) and stage `test` (adds dev deps; default command `pytest`)
-- [ ] T004 [P] Create `.dockerignore` and a `.gitignore` for Python caches (`__pycache__/`, `.pytest_cache/`, `*.pyc`), `.venv/`, `.env`
-- [ ] T005 [P] Create `CONTRIBUTE.md` skeleton: dev setup, `docker compose run --rm tests`, schema reset (`docker compose down -v`), commit conventions (finished in T104)
+- [X] T001 Create the directory tree from plan.md "Source Code": `backend/src/hotel_api/{presentation/api/{routers,schemas},presentation/cli,business/{domain,rules,kpis,services},data/repositories}`, `backend/tests/{unit,contract,integration,architecture}`, `db/init/`, `frontend/public/`, each Python package with an `__init__.py`
+- [X] T002 Create `backend/pyproject.toml`: Python `>=3.13`; pinned runtime deps FastAPI 0.16x, Uvicorn 0.5x, Pydantic 2.14, `PyMySQL[rsa]` 1.2; dev deps pytest 9, httpx 0.28, openapi-core 0.23, openapi-spec-validator 0.9; `[tool.pytest.ini_options]` with `testpaths = ["tests"]`, `pythonpath = ["src"]` and markers `unit`, `contract`, `integration`, `architecture`
+- [X] T003 [P] Create `backend/Dockerfile` (base `python:3.13-slim`) with stage `runtime` (installs runtime deps, runs `uvicorn hotel_api.main:app --host 0.0.0.0 --port 8000`) and stage `test` (adds dev deps; default command `pytest`)
+- [X] T004 [P] Create `.dockerignore` and a `.gitignore` for Python caches (`__pycache__/`, `.pytest_cache/`, `*.pyc`), `.venv/`, `.env`
+- [X] T005 [P] Create `CONTRIBUTE.md` skeleton: dev setup, `docker compose run --rm tests`, schema reset (`docker compose down -v`), commit conventions (finished in T104)
 
 ---
 

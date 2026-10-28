@@ -1,0 +1,25 @@
+# Git
+.git/
+.gitignore
+
+# Python caches and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+.pytest_cache/
+
+# Docker & local data
+mysql-data/
+*.log
+
+# Documentation and temporary files
+.specify/
+specs/
+context/
+.DS_Store
+Thumbs.db
+
