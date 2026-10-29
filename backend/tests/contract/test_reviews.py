@@ -66,22 +66,13 @@ def test_booking_id_together_with_room_type_is_422(client, check_contract, booki
     assert {e["field"] for e in response.json()["errors"]} == {"room_type"}
 
 
-def test_list_and_filters(client, check_contract, created):
+def test_list_returns_all_reviews(client, check_contract, created):
     response = client.get("/api/v1/reviews")
     assert response.status_code == 200
     check_contract(response)
     assert len(response.json()["items"]) == 1
-    for query, count in (("?year=2026&season=high&room_type=Superior Double", 1), ("?year=2025", 0), ("?season=low", 0)):
-        filtered = client.get("/api/v1/reviews" + query)
-        check_contract(filtered)
-        assert len(filtered.json()["items"]) == count
+    assert response.json()["items"][0] == created.json()
 
-
-@pytest.mark.parametrize("query", ["?year=abc", "?year=1999", "?season=winter", "?room_type=Penthouse"])
-def test_list_with_a_bad_filter_is_400(client, check_contract, query):
-    response = client.get("/api/v1/reviews" + query)
-    assert response.status_code == 400
-    check_contract(response)
 
 
 def test_get_one(client, check_contract, created):

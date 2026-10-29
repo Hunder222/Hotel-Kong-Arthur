@@ -170,17 +170,15 @@ Derived in the business layer, never stored:
 | Column | Type | Constraints |
 |--------|------|-------------|
 | `id` | `INT UNSIGNED AUTO_INCREMENT` | PK. Seeded rows use IDs 1 to 30 (CSV row order) |
-| `sales_year` | `SMALLINT UNSIGNED` | NOT NULL. The reporting year of the sales (2026 for the sample) |
+| `sales_year` | `SMALLINT UNSIGNED` | NOT NULL. The reporting year of the sales (2026 for the sample), serialized as `year` in `GET /api/v1/bar/drink-sales` |
 | `drink_name` | `VARCHAR(100)` | NOT NULL. `UNIQUE (sales_year, drink_name)` |
 | `category` | `ENUM('Cocktail','Coffee')` | NOT NULL |
 | `unit_price_dkk` | `DECIMAL(10,2)` | NOT NULL, `CHECK (unit_price_dkk > 0)` |
 | `units_sold` | `INT UNSIGNED` | NOT NULL |
 
-Derived in the business layer, never stored:
-
-- `revenue_dkk`: unit price × units sold.
-- `price_tier`: from the unit price (§4.4).
-- `revenue_rank` and `units_rank`: rankings within the year.
+`GET /api/v1/bar/drink-sales` returns the raw fields (`id`, `year`, `drink_name`, `category`,
+`unit_price_dkk`, `units_sold`). Per-drink revenue (`unit_price_dkk × units_sold`), rankings,
+category splits, and price tiers are computed in Tableau (§7).
 
 ## 4. Domain model (business layer)
 
@@ -191,14 +189,13 @@ code.
 |-------|--------|----------------------------------|
 | `Season` (enum) | `low`, `mid`, `high` | |
 | `DrinkCategory` (enum) | `Cocktail`, `Coffee` | |
-| `PriceTier` (enum) | `budget`, `standard`, `premium` | |
 | `SeasonRate` | `season`, `min_nightly_dkk`, `max_nightly_dkk`, `standard_nightly_dkk` | |
 | `RoomType` | `id`, `name`, `name_da`, `room_count`, `max_guests`, `rates: dict[Season, SeasonRate]` | |
 | `Booking` | `id`, `first_name`, `family_name`, `country`, `room_type` (name), `check_in_date`, `days_rented`, `price_dkk`, `created_at`, `updated_at` | `season`, `year` |
-| `NewBooking` | the client-editable fields of `Booking`, with `price_dkk` optional | validated and priced into a `Booking` by `BookingService` |
+| `NewBooking` | the client-editable fields of `Booking`, with `price_dkk` resolved | validated and priced into a `Booking` by `BookingService` |
 | `GuestReview` | `id`, `booking_id` (optional), `room_type`, `stay_date`, `rating`, `created_at` | `season`, `year` |
-| `BarDrinkSale` | `id`, `sales_year`, `drink_name`, `category`, `unit_price_dkk`, `units_sold` | `revenue_dkk`, `price_tier` |
-| KPI value objects | `HotelSummary`, `RoomTypeKpi`, `SeasonKpi`, `RoomTypeSeasonKpi`, `CountryKpi`, `BarSummary`, `BarCategoryKpi`, `BarPriceTierKpi`, `RankedDrinkSale` | built by `business/kpis/*` (§7) |
+| `NewReview` | `booking_id` (optional), `room_type`, `stay_date`, `rating` | validated by `ReviewService` |
+| `BarDrinkSale` | `id`, `sales_year`, `drink_name`, `category`, `unit_price_dkk`, `units_sold` | |
 
 ### 4.1 Season mapping (`business/rules/seasons.py`)
 
@@ -209,9 +206,8 @@ code.
 | `high` | Jun, Jul, Aug, Dec | 123 | 26,322 |
 | **year** | | **365** | **78,110** |
 
-- Day counts come from the calendar of the reporting year, so a leap year gives `low` 90 days and
-  366 in total (research R8).
 - A booking belongs entirely to the season and year of its `check_in_date`.
+- A review belongs to the season and year of its `stay_date`.
 
 ### 4.2 Standard price (`business/rules/pricing.py`)
 
@@ -221,26 +217,9 @@ code.
   `min_nightly_dkk ≤ price_per_night_dkk ≤ max_nightly_dkk`. It is the same verdict as for the
   matching total, and it is exclusive with a manual `price_dkk`. Only the total is stored.
 
-### 4.3 Ranking (`business/rules/ranking.py`)
+### 4.3 Number rules (`business/rules/numbers.py`, research R10)
 
-- Competition ranking ("1224"): equal values share a rank, and the next rank skips.
-- Rows with equal values are ordered by name.
-
-### 4.4 Price tiers (`business/rules/price_tiers.py`, FR-016)
-
-| Tier | Unit price (DKK) | Sample drinks (2026) |
-|------|------------------|----------------------|
-| `budget` | `< 70` | 10 (all coffees) |
-| `standard` | `70 ≤ price < 110` | 10 cocktails |
-| `premium` | `≥ 110` | 10 cocktails |
-
-### 4.5 Number rules (`business/rules/numbers.py`, research R10)
-
-- Money stays as exact `Decimal`.
-- Averages and rates are rounded half-up to 2 decimals.
-- Shares within one breakdown use largest-remainder rounding to 2 decimals, so they add up to
-  exactly 100.00.
-- When a denominator is 0, the result is 0.
+- Money stays as exact `Decimal` and is rounded half-up to 2 decimals (`round_half_up`).
 
 ## 5. Validation rules (business layer)
 
@@ -271,12 +250,11 @@ with one `{field, message}` per broken rule, so every client gets the same rules
 | `booking_id` | optional; when given, the booking must exist (otherwise `422`, field `booking_id`), and `room_type`/`stay_date` must be omitted (they are copied from the booking) |
 | `room_type`, `stay_date` | required together when `booking_id` is omitted; same rules as the booking's `room_type` and `check_in_date` |
 
-### 5.3 Query and path parameters
+### 5.3 Path parameters (no query parameters)
 
-- `year` is a whole number from 2000 to 2100.
-- `season`, `room_type` and `category` must be values from their enumerations.
-- IDs are whole numbers ≥ 1.
-- Any violation gives `400`.
+- All collection `GET` endpoints (`room-types`, `bookings`, `reviews`, `bar/drink-sales`) take
+  **no query parameters**.
+- Path IDs (`booking_id`, `review_id`) are whole numbers ≥ 1. Any violation gives `400`.
 
 ## 6. Lifecycles
 
@@ -287,42 +265,32 @@ with one `{field, message}` per broken rule, so every client gets the same rules
 | BarDrinkSale | **seeded** (`seed`). Read-only through the API |
 | Operational data as a whole | `docker compose up` on an empty volume gives **empty** (0 bookings, 0 reviews, 0 drink sales). `seed` (any state) gives **sample state** (1,000 / 500 / 30). `docker compose down -v` deletes everything; the next `up` gives empty again |
 
-## 7. KPI catalog: the single authoritative definitions (Principle VII)
+## 7. KPI reference catalog for Tableau (Principle VII)
 
-Scope: all rows are filtered to one reporting **year**, using the booking's `check_in_date`, the
-review's `stay_date` and the drink sale's `sales_year`. Segment rows apply the segment's filter
-(room type, season, room type and season, country, category, tier) on top.
+Following the 2026-10-29 architectural correction, the backend exposes the raw operational and
+reference datasets (`GET /api/v1/bookings`, `GET /api/v1/room-types`, `GET /api/v1/reviews`,
+`GET /api/v1/bar/drink-sales`), including per-record derived `season` and `year` fields. The team
+builds dashboards and calculates all analytical KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) manually in
+Tableau using the reference definitions below:
 
-All-time (FR-021): with `year=all`, or no `year`, there is no year filter and every row reports
-`year` `"all"`. Available room-nights (and `season_days`) then cover every calendar year from the
-first to the last booking, a year without bookings in between included; without bookings there
-is no period, so they are 0 and the occupancy rate is 0.00. A drink on the menu in several years
-counts once in `drink_count`.
-
-| KPI | Scope ID | Definition | When empty | Code (only place) | Exposed as |
-|-----|----------|------------|------------|-------------------|------------|
-| Room revenue (indtjening) | K2, A6, A2, A3 | Σ `price_dkk` | 0.00 | `business/kpis/hotel.py` | `total_revenue_dkk` (summary), `revenue_dkk` (by-* tables) |
-| Booking count, nights sold | A1, A2, FR-008, FR-009 | count of bookings; Σ `days_rented` | 0 | `business/kpis/hotel.py` | `booking_count`, `nights_sold` |
-| Guest origin share | A1 | country bookings ÷ all bookings × 100 (largest remainder) | 0.00 | `business/kpis/hotel.py` | `kpis/hotel/by-country.booking_share_pct` |
-| Revenue share | A4, A5 | segment revenue ÷ total revenue × 100 (largest remainder) | 0.00 | `business/kpis/hotel.py` | `revenue_share_pct` |
-| Revenue rank | A4, A5 | competition rank by `revenue_dkk`, descending | n/a | `business/rules/ranking.py` | `revenue_rank` (by-room-type, by-country) |
-| Available room-nights | K1 | `room_count` × days in the segment's period (§4.1). Overall: 214 × days in the year | n/a | `business/rules/seasons.py` | `available_room_nights` |
-| Occupancy rate (belægningsgrad) | K1 | `nights_sold` ÷ `available_room_nights` × 100 | 0.00 | `business/kpis/hotel.py` | `occupancy_rate_pct` |
-| Average satisfaction (kundetilfredshed) | K3 | mean `rating` of the reviews in scope | 0.00 | `business/kpis/hotel.py` | `average_satisfaction` |
-| Satisfied share | K3 | reviews with `rating ≥ 4` ÷ reviews × 100 | 0.00 | `business/kpis/hotel.py` | `satisfied_share_pct` |
-| Average length of stay (ALOS) | A7 | Σ `days_rented` ÷ booking count | 0.00 | `business/kpis/hotel.py` | `average_length_of_stay_nights` |
-| Average daily rate (ADR) | A7 | Σ `price_dkk` ÷ Σ `days_rented` | 0.00 | `business/kpis/hotel.py` | `average_daily_rate_dkk` |
-| Average revenue per booking | A7 | Σ `price_dkk` ÷ booking count | 0.00 | `business/kpis/hotel.py` | `average_revenue_per_booking_dkk` |
-| Revenue per drink | B2 | `unit_price_dkk` × `units_sold` | n/a | `business/kpis/bar.py` | `bar/drink-sales.revenue_dkk` |
-| Drink ranks | B2, FR-016 | competition rank by `revenue_dkk` and by `units_sold`, descending | n/a | `business/rules/ranking.py` | `revenue_rank`, `units_rank` |
-| Bar sales for the year | B1 | Σ revenue per drink; Σ `units_sold`; count of drinks | 0.00 / 0 | `business/kpis/bar.py` | `kpis/bar/summary` |
-| Cocktail vs coffee split | B3 | category revenue ÷ total × 100 and category units ÷ total × 100 (largest remainder) | 0.00 | `business/kpis/bar.py` | `kpis/bar/by-category` |
-| Price-tier demand | A7 (US4), FR-016 | units and revenue per tier (§4.4), with shares (largest remainder) | 0.00 | `business/kpis/bar.py` | `kpis/bar/by-price-tier` |
-| Season of a stay | rule | month mapping (§4.1) | n/a | `business/rules/seasons.py` | `season` on bookings, reviews and KPI rows |
-| Standard price | rule | §4.2 | n/a | `business/rules/pricing.py` | `price_dkk` when the client omits it |
-
-**Per-segment satisfaction**: by room type, the review's room type is used. By season, the season
-of the review's `stay_date` is used. The summary uses all reviews in the year.
+| KPI / Rule | Scope ID | Definition | Raw API source |
+|------------|----------|------------|----------------|
+| Room revenue (indtjening) | K2, A6, A2, A3 | Σ `price_dkk` (overall, by `room_type` × `season`, or by `country`) | `GET /api/v1/bookings` |
+| Booking count, nights sold | A1, A2, FR-008, FR-009 | count of bookings; Σ `days_rented` | `GET /api/v1/bookings` |
+| Guest origin share | A1 | country bookings ÷ all bookings × 100 | `GET /api/v1/bookings` (`country`) |
+| Revenue share & rank | A4, A5 | segment revenue ÷ total revenue × 100; rank by `revenue_dkk` descending | `GET /api/v1/bookings` (`room_type`, `country`, `price_dkk`) |
+| Available room-nights | K1 | `room_count` × days in the segment's period (§4.1: 89 `low`, 153 `mid`, 123 `high`, 365 full year; 214 rooms → 78,110 room-nights in 2026) | `GET /api/v1/room-types` (`room_count`) |
+| Occupancy rate (belægningsgrad) | K1 | `nights_sold` ÷ `available_room_nights` × 100 | `GET /api/v1/bookings` + `GET /api/v1/room-types` |
+| Average satisfaction & satisfied share (kundetilfredshed) | K3 | mean `rating` of reviews; reviews with `rating ≥ 4` ÷ reviews × 100 (overall, by `room_type`, by `season`) | `GET /api/v1/reviews` |
+| Average length of stay (ALOS) | A7 | Σ `days_rented` ÷ booking count | `GET /api/v1/bookings` |
+| Average daily rate (ADR) | A7 | Σ `price_dkk` ÷ Σ `days_rented` | `GET /api/v1/bookings` |
+| Average revenue per booking | A7 | Σ `price_dkk` ÷ booking count | `GET /api/v1/bookings` |
+| Revenue per drink & drink ranks | B2, FR-016 | `unit_price_dkk × units_sold`; rank by revenue and by `units_sold` descending | `GET /api/v1/bar/drink-sales` |
+| Bar sales for the year | B1 | Σ (`unit_price_dkk × units_sold`); Σ `units_sold`; count of drinks | `GET /api/v1/bar/drink-sales` |
+| Cocktail vs coffee split | B3 | category revenue ÷ total × 100 and category units ÷ total × 100 | `GET /api/v1/bar/drink-sales` (`category`) |
+| Price-tier demand | A7 (US4), FR-016 | units and revenue per tier (`budget` `< 70` DKK, `standard` `70 ≤ price < 110` DKK, `premium` `≥ 110` DKK) | `GET /api/v1/bar/drink-sales` (`unit_price_dkk`, `units_sold`) |
+| Season of a stay (backend rule) | rule | month mapping (§4.1) computed in `business/rules/seasons.py` | Exposed as `season` on every booking and review |
+| Standard price (backend rule) | rule | §4.2 computed in `business/rules/pricing.py` | Exposed as `price_dkk` on every booking |
 
 ## 8. Sample data mapping (`seed`, research R13)
 

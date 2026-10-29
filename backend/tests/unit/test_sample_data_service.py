@@ -69,13 +69,7 @@ class FakeBookingRepository:
     def __init__(self, initial: Sequence[Booking] = ()) -> None:
         self.items: list[Booking] = list(initial)
 
-    def list(
-        self,
-        year: int | None = None,
-        season: Season | None = None,
-        room_type: str | None = None,
-        country: str | None = None,
-    ) -> list[Booking]:
+    def list(self) -> list[Booking]:
         return list(reversed(self.items))
 
     def get(self, booking_id: int) -> Booking | None:
@@ -101,12 +95,7 @@ class FakeReviewRepository:
     def __init__(self, initial: Sequence[GuestReview] = ()) -> None:
         self.items: list[GuestReview] = list(initial)
 
-    def list(
-        self,
-        year: int | None = None,
-        season: Season | None = None,
-        room_type: str | None = None,
-    ) -> list[GuestReview]:
+    def list(self) -> list[GuestReview]:
         return list(reversed(self.items))
 
     def get(self, review_id: int) -> GuestReview | None:
@@ -132,12 +121,8 @@ class FakeBarSalesRepository:
         self.items: list[BarDrinkSale] = list(initial)
         self.fail_on_insert = fail_on_insert
 
-    def list(self, sales_year: int, category: DrinkCategory | None = None) -> list[BarDrinkSale]:
-        return [
-            s
-            for s in self.items
-            if s.sales_year == sales_year and (category is None or s.category is category)
-        ]
+    def list(self) -> list[BarDrinkSale]:
+        return list(self.items)
 
     def delete_all(self) -> None:
         self.items.clear()

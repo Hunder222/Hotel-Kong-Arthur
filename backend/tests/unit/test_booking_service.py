@@ -43,9 +43,8 @@ class FakeBookings:
         self.calls: list[str] = []
         self._next_id = 1
 
-    def list(self, year=None, season=None, room_type=None, country=None):
+    def list(self):
         self.calls.append("list")
-        self.last_filters = (year, season, room_type, country)
         return sorted(self.rows.values(), key=lambda b: -b.id)
 
     def get(self, booking_id):
@@ -172,9 +171,9 @@ def test_delete_removes_the_booking(service, repo):
         service.get(created.id)
 
 
-def test_list_passes_the_filters_to_the_repository(service, repo):
+def test_list_returns_all_bookings(service, repo):
     service.create(QUICKSTART)
-    result = service.list(year=2026, season=Season.HIGH, room_type="Suite", country="Germany")
-    assert repo.last_filters == (2026, Season.HIGH, "Suite", "Germany")
+    result = service.list()
+    assert "list" in repo.calls
     assert len(result) == 1
-    assert service.list() and repo.last_filters == (None, None, None, None)
+

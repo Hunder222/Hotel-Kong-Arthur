@@ -20,17 +20,16 @@
 - Q: Should `docker compose up` automatically seed historical bookings and sales data on startup? (FR-004, SC-005) → A: No; `docker compose up` MUST start the system with the database schema and 8 static room types (`214` rooms) ready, but with zero booking history, bar sales, or reviews. A separate idempotent command MUST be used to seed (reset/replace) the database with the sample inspiration data.
 - Q: Should this repository produce the Tableau dashboard itself (workbooks, data sources, extracts or connector code), or only the data Tableau reads? (FR-006, FR-017) → A: Only the data. For KPI data in Tableau, the repository's scope is exclusively the REST/JSON API and its OpenAPI contract. The repository MUST NOT produce Tableau files such as `.twb`, `.twbx` or `.tbm`; the team builds the Tableau dashboard manually against the API.
 
-### Amendments after planning, 2026-10-28
+### Amendments after planning, 2026-10-28 & 2026-10-29
 
-- `FR-003` now lists the value limits the plan introduced (research R17): at most `365` nights, dates between `2000` and `2100`, text up to `100` characters, prices with at most `2` decimals.
-- `FR-010` now derives the available room-nights and the season day counts from the calendar of the reporting year instead of a fixed 365-day year. The figures for `2026` are unchanged (`78,110`; `89` / `153` / `123`); a leap year has `366` days.
-- **Revision Amendments (TODOS.md alignment)**:
-  - **Receptionist Frontend UX Enhancements**:
-    - `FR-018`: The booking interface MUST display a dynamic price breakdown preview (standard nightly rate, selected days rented, and calculated total standard price in DKK) before the user creates or saves a booking.
-    - `FR-019`: The booking interface form MUST allow setting a custom fixed price per night (`price_per_night_dkk`) alongside the total price field (`price_dkk`), enforcing mutual exclusivity (only one manual price field may be active at a time, automatically computing the corresponding other field for convenience).
-    - `FR-020`: The booking interface MUST provide a distinct, visually separated "Edit Mode" when modifying existing bookings (prominent styling, dedicated banner/status, clear cancel-edit action) to clearly distinguish editing from new booking creation.
-  - **All-Time vs. Reporting Year KPI Aggregation**:
-    - `FR-021`: KPI endpoints (`/kpis/hotel/summary`, `/kpis/hotel/by-room-type`, `/kpis/hotel/by-season`, `/kpis/hotel/by-room-type-and-season`, `/kpis/hotel/by-country`, `/kpis/bar/summary`, `/kpis/bar/by-category`, `/kpis/bar/by-price-tier`) MUST support querying all-time aggregates when the `year` parameter is explicitly omitted or passed as `all` (`year=all` or omitting `year`), in addition to filtering by a specific calendar year (e.g. `?year=2026`). In summary and breakdown responses for all-time queries, `year` is represented as `'all'` or `null`, and available room-nights for occupancy are scaled across all years spanned by bookings.
+- `FR-003` lists the value limits the plan introduced (research R17): at most `365` nights, dates between `2000` and `2100`, text up to `100` characters, prices with at most `2` decimals.
+- **Receptionist Frontend UX Enhancements (2026-10-29)**:
+  - `FR-018`: The booking interface MUST display a dynamic price breakdown preview (standard nightly rate, selected days rented, and calculated total standard price in DKK) before the user creates or saves a booking.
+  - `FR-019`: The booking interface form MUST allow setting a custom fixed price per night (`price_per_night_dkk`) alongside the total price field (`price_dkk`), enforcing mutual exclusivity (only one manual price field may be active at a time, automatically computing the corresponding other field for convenience).
+  - `FR-020`: The booking interface MUST provide a distinct, visually separated "Edit Mode" when modifying existing bookings (prominent styling, dedicated banner/status, clear cancel-edit action) to clearly distinguish editing from new booking creation.
+- **Tableau API Architectural Correction (2026-10-29)**:
+  - Pre-calculated KPI endpoints (`/api/v1/kpis/hotel/*` and `/api/v1/kpis/bar/*`) and all query filter parameters (`?year=`, `?season=`, `?room_type=`, `?country=`, `?category=`, including `FR-021`) were removed.
+  - Instead, the REST API provides a basic, parameterless connection exposing the raw operational and reference datasets (`GET /api/v1/bookings`, `GET /api/v1/room-types`, `GET /api/v1/reviews`, `GET /api/v1/bar/drink-sales`) with **no query parameters**. The team connects Tableau to those raw endpoints and manually builds the dashboards and calculates all KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) inside Tableau.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -185,41 +184,29 @@ Per Constitution Phase Gate 1 (*Specify*), the table below maps every mandatory 
 - **FR-004**: Starting the system via `docker compose up` MUST initialize the database schema and the 8 static hotel room types (`214` rooms) with **no booking history, bar sales, or guest review data** (`0` bookings, `0` bar sales, `0` reviews) so new bookings can be created immediately. The system MUST provide a separate explicit, idempotent command (which resets/replaces sample records without duplicates) to seed the database with the sample inspiration data: the baseline guest booking records (`1,000` bookings seeded with deterministic `2026` `Check-In Date` values within each row's corresponding season months), synthetic guest review records (`1`–`5` scale in the `reviews` table), and Helene Christine's lobby bar sales records (`30` drinks: `20` cocktails and `10` coffee types for reporting year `2026`).
 - **FR-005**: All changes to bookings (create, edit, delete) MUST be persisted immediately in the central MySQL data store so that subsequent on-demand REST API queries from the browser interface or the analytics dashboard return the updated live state within 5 seconds on load/refresh. Runtime CRUD is required for bookings (`F1`), whereas lobby bar sales are seeded into MySQL and queried dynamically through the REST API.
 
-#### Hotel Revenue & Geographic KPIs (`A1`–`A6`, `K2`)
+#### Raw Datasets for Hotel, Occupancy, Satisfaction & Bar KPIs in Tableau (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`)
 
-- **FR-006**: The system MUST expose both detailed booking records and pre-calculated KPI summaries through its central service interface so the analytics dashboard never reads static files or accesses storage directly.
-- **FR-007**: The system MUST calculate hotel room revenue (`indtjening`, `K2`) in the central business logic and expose:
-  - Total annual room revenue across all bookings (`A6`).
+- **FR-006**: The system MUST expose all detailed booking records via a parameterless `GET /api/v1/bookings` endpoint (ordered by `id` descending, with derived `season` and `year` on every row) and all room-type reference records via `GET /api/v1/room-types` (`name`, `name_da`, `room_count`, `max_guests`, and seasonal rate bands) so the analytics dashboard never reads static files or accesses storage directly.
+- **FR-007**: The `GET /api/v1/bookings` dataset MUST include `price_dkk`, `days_rented`, `room_type`, `country`, `check_in_date`, `season`, and `year` on every booking so the team can manually calculate hotel room revenue (`indtjening`, `K2`) in Tableau across all required dimensions:
+  - Total annual room revenue across bookings (`A6`).
   - Revenue grouped by `Room Type` and `Season` (`A2`).
   - Revenue grouped by guest `Country` (`A3`).
-- **FR-008**: The system MUST rank the 8 room types by total revenue generated (`A4`), showing total revenue, booking count, and total nights rented per room type.
-- **FR-009**: The system MUST calculate guest origin distribution (`A1`) and rank countries by total revenue generated (`A5`), showing for each country the booking count, share of total bookings (`%`), total nights rented, and total revenue in DKK.
+- **FR-008**: Using `GET /api/v1/bookings` and `GET /api/v1/room-types`, Tableau MUST be able to rank the 8 room types by total revenue generated (`A4`), showing total revenue, booking count, and total nights rented per room type.
+- **FR-009**: Using `GET /api/v1/bookings`, Tableau MUST be able to calculate guest origin distribution (`A1`) and rank countries by total revenue generated (`A5`), showing for each country the booking count, share of total bookings (`%`), total nights rented, and total revenue in DKK.
+- **FR-010**: Using `GET /api/v1/room-types` (which exposes each room type's `room_count` summing to **214 rooms**) and `GET /api/v1/bookings` (`days_rented`, `season`, `year`), Tableau MUST be able to calculate the hotel's occupancy rate (`belægningsgrad`, `K1`) overall, by `Season` (`low` = 89 days, `mid` = 153 days, `high` = 123 days in `2026`), and by `Room Type`.
+- **FR-011**: The system MUST store guest satisfaction ratings (`1` to `5` integer scale) in a dedicated `reviews` table and expose a parameterless `GET /api/v1/reviews` endpoint (returning `id`, `booking_id`, `room_type`, `stay_date`, derived `season`, derived `year`, `rating`, and `created_at`), plus `POST /api/v1/reviews` and `GET /api/v1/reviews/{review_id}`, so Tableau can calculate customer satisfaction (`kundetilfredshed`, `K3`) overall, per `Room Type`, and per `Season`.
+- **FR-012**: The system MUST store and expose Helene Christine's lobby bar catalogue of `20` cocktails and `10` coffee types via a parameterless `GET /api/v1/bar/drink-sales` endpoint returning each drink row's `id`, `year`, `drink_name`, `category` (`Cocktail` or `Coffee`), `unit_price_dkk`, and `units_sold`.
+- **FR-013**: Using `GET /api/v1/bar/drink-sales`, Tableau MUST be able to calculate revenue per drink (`B2`, `unit_price_dkk * units_sold`) and Helene Christine's total bar sales for the year (`B1`).
+- **FR-014**: Using `GET /api/v1/bar/drink-sales`, Tableau MUST be able to calculate the percentage split between `Cocktail` and `Coffee` (`B3`) both by revenue share and by unit volume share.
+- **FR-015**: Using `GET /api/v1/bookings`, Tableau MUST be able to calculate the team-selected hotel KPIs (`A7`): **Average Length of Stay (ALOS)**, **Average Daily Rate (ADR)**, and **Average Revenue per Booking** overall, per `Room Type`, and per `Season`.
+- **FR-016**: Using `GET /api/v1/bar/drink-sales`, Tableau MUST be able to rank drinks by `units_sold` and classify drinks into price tiers (`A7` / `US4`).
 
-#### Capacity, Occupancy Rate & Customer Satisfaction KPIs (`K1`, `K3`)
+#### Tableau Integration Boundary & Parameterless API
 
-- **FR-010**: The system MUST calculate the hotel's occupancy rate (`belægningsgrad`, `K1`) in the central business logic using Hotel Kong Arthur's binding capacity of **214 rooms** (available room-nights = rooms × the days of the reporting year, taken from the calendar: `78,110` for a 365-day year such as `2026`, `78,324` for a leap year):
-  - $\text{Occupancy Rate (\%)} = \left(\frac{\sum \text{Days Rented}}{\text{Available Room-Nights}}\right) \times 100$
-  - The system MUST provide overall annual occupancy rate as well as occupancy rate segmented by `Season` (for `2026`: `low` = 89 days / `19,046` room-nights; `mid` = 153 days / `32,742` room-nights; `high` = 123 days / `26,322` room-nights; in a leap year February has 29 days, so `low` has 90) and by `Room Type` (using the balanced 214-room inventory: `27` rooms each for `Standard Single`, `Grand Lit`, `Standard Double`, `Superior Double`, `Junior Suite`, and `Spa Executive`; `26` rooms each for `Suite` and `LOFT Suite`).
-- **FR-011**: The system MUST store guest satisfaction ratings (`1` to `5` integer scale) in a dedicated `reviews` table exposed via its own REST API endpoint (separate from the booking form) and calculate customer satisfaction (`kundetilfredshed`, `K3`) in the central business logic as the arithmetic mean of review scores overall, per `Room Type`, and per `Season`, along with the percentage of satisfied guests (score $\ge 4$).
-
-#### Cocktail Bar Operations & KPIs (`B1`–`B3`)
-
-- **FR-012**: The system MUST store and expose Helene Christine's lobby bar catalogue of `20` cocktails and `10` coffee types, including each drink's `Drink Name`, `Category` (`Cocktail` or `Coffee`), unit `Price (DKK)`, and `Units Sold`.
-- **FR-013**: The system MUST calculate in the central business logic:
-  - Revenue per drink (`B2`) as $\text{Unit Price (DKK)} \times \text{Units Sold}$.
-  - Helene Christine's total bar sales for the year (`B1`) as the sum of revenue (and sum of units sold) across all 30 drinks.
-- **FR-014**: The system MUST calculate the percentage split between `Cocktail` and `Coffee` for Helene Christine (`B3`) both by revenue share and by unit volume share:
-  - $\text{Category Revenue Share (\%)} = \left(\frac{\text{Category Revenue}}{\text{Total Bar Revenue}}\right) \times 100$
-  - $\text{Category Unit Share (\%)} = \left(\frac{\text{Category Units Sold}}{\text{Total Bar Units Sold}}\right) \times 100$
-
-#### Team-Selected KPIs (`A7`, `US4`)
-
-- **FR-015**: For the team-selected hotel KPI (`A7`), the system MUST calculate **Average Length of Stay (ALOS)** ($\frac{\sum \text{Days Rented}}{\text{Booking Count}}$), **Average Daily Rate (ADR)** ($\frac{\sum \text{Price}}{\sum \text{Days Rented}}$), and **Average Revenue per Booking** ($\frac{\sum \text{Price}}{\text{Booking Count}}$) overall, per `Room Type`, and per `Season`.
-- **FR-016**: For the lobby bar price-tier and popularity analysis (`US4` / `A7`), the system MUST rank drinks by `Units Sold` and classify drinks into price tiers so the Hotel CFO can compare demand for lower-priced versus higher-priced items.
-
-#### Tableau Integration Boundary
-
-- **FR-017**: The system's deliverable for the analytics dashboard MUST be limited to the REST/JSON API and its OpenAPI contract, which together expose every record and KPI the dashboard needs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`). The repository MUST NOT contain or generate Tableau files (e.g. `.twb`, `.twbx`, `.tbm`, `.tds`, `.tdsx`, `.hyper`) or Tableau-specific connector code such as a Web Data Connector. The team builds the Tableau dashboard manually against the API.
+- **FR-017**: The system's deliverable for the analytics dashboard MUST be limited to the basic REST/JSON API (11 operations across 6 paths: `health`, `room-types`, `bookings`, `bookings/{booking_id}`, `reviews`, `reviews/{review_id}`, `bar/drink-sales`, with **no query parameters** and **no `/api/v1/kpis/*` endpoints**) and its OpenAPI contract. The repository MUST NOT contain or generate Tableau files (e.g. `.twb`, `.twbx`, `.tbm`, `.tds`, `.tdsx`, `.hyper`) or Tableau-specific connector code such as a Web Data Connector. The team connects Tableau to the raw REST endpoints and builds all KPIs and dashboards manually inside Tableau.
+- **FR-018**: The receptionist booking form (`frontend/`) MUST display a live price breakdown preview (derived season, standard nightly rate, number of nights, standard total price, allowed seasonal nightly band, and—when a manual price is entered—the manual per-night and total price) before the receptionist submits the form.
+- **FR-019**: Next to `Total Price (DKK)` (`price_dkk`), the receptionist booking form MUST provide a `Price per Night (DKK)` (`price_per_night_dkk`) input field. Only one of the two fields may be filled at a time in the UI (typing in one locks the other and shows the computed counterpart). `POST /api/v1/bookings` and `PUT /api/v1/bookings/{booking_id}` MUST accept either `price_dkk` or `price_per_night_dkk` (storing `round_half_up(price_per_night_dkk * days_rented)` when `price_per_night_dkk` is supplied and lies within the seasonal nightly band) or neither (using the standard seasonal rate), and MUST return `422 Unprocessable Entity` on `price_per_night_dkk` if both are supplied.
+- **FR-020**: When a receptionist clicks `Edit` on an existing booking, the web UI MUST switch into a visually unmistakable **Edit mode** (distinct colour scheme across page header and form card, prominent banner naming the booking ID and guest being edited, and an explicit cancel/exit button in both the banner and form actions) so editing can never be mistaken for creating a new booking.
 
 ### Key Entities *(include if feature involves data)*
 

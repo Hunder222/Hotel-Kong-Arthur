@@ -15,9 +15,6 @@ AmountDkk = Annotated[
     PlainSerializer(lambda value: float(value), return_type=float, when_used="json"),
 ]
 
-# Percentages (0-100, 2 decimals) are also JSON numbers.
-Percent = AmountDkk
-
 
 REPORTING_TIME_ZONE = "Europe/Copenhagen"
 

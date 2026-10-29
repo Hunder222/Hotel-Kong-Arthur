@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from hotel_api.business.domain.models import GuestReview, Season
+from hotel_api.business.domain.models import GuestReview
 from hotel_api.business.errors import NotFound, ValidationFailed
 from hotel_api.business.ports import BookingRepository, ReviewRepository, RoomTypeRepository
 from hotel_api.business.rules.review_validation import validate_review
@@ -18,10 +18,8 @@ class ReviewService:
         self._bookings = bookings
         self._room_types = room_types
 
-    def list(
-        self, year: int | None = None, season: Season | None = None, room_type: str | None = None
-    ) -> list[GuestReview]:
-        return self._reviews.list(year=year, season=season, room_type=room_type)
+    def list(self) -> list[GuestReview]:
+        return self._reviews.list()
 
     def get(self, review_id: int) -> GuestReview:
         review = self._reviews.get(review_id)

@@ -204,23 +204,6 @@ def test_booking_repository_crud_utf8_and_filters(db_conn: Connection[Any]) -> N
     all_bookings = repo.list()
     assert [b.id for b in all_bookings] == [created_3.id, created_2.id, created_1.id]
 
-    # Filter by year, season, room_type, country
-    assert [b.id for b in repo.list(year=2026)] == [created_2.id, created_1.id]
-    assert [b.id for b in repo.list(year=2025)] == [created_3.id]
-    assert [b.id for b in repo.list(season=Season.HIGH)] == [created_1.id]
-    assert [b.id for b in repo.list(season=Season.LOW)] == [created_3.id, created_2.id]
-    assert [b.id for b in repo.list(room_type="Superior Double")] == [created_3.id, created_1.id]
-    assert [b.id for b in repo.list(country="Germany")] == [created_1.id]
-    assert [
-        b.id
-        for b in repo.list(
-            year=2026,
-            season=Season.LOW,
-            room_type="Spa Executive",
-            country="China",
-        )
-    ] == [created_2.id]
-
     # Replace existing booking (including idempotent replace with identical values)
     replaced = repo.replace(
         created_1.id,
@@ -346,10 +329,8 @@ def test_review_repository_and_on_delete_set_null(db_conn: Connection[Any]) -> N
     assert standalone_review.booking_id is None
     assert standalone_review.season is Season.LOW
 
-    # Filters and ordering (newest first)
-    assert [r.id for r in review_repo.list(year=2026)] == [standalone_review.id, linked_review.id]
-    assert [r.id for r in review_repo.list(season=Season.HIGH)] == [linked_review.id]
-    assert [r.id for r in review_repo.list(room_type="Suite")] == [standalone_review.id]
+    # Ordering (newest first)
+    assert [r.id for r in review_repo.list()] == [standalone_review.id, linked_review.id]
 
     # Deleting the booking sets reviews.booking_id to NULL while preserving the review snapshot
     assert booking_repo.delete(booking.id) is True
@@ -380,7 +361,7 @@ def test_review_repository_and_on_delete_set_null(db_conn: Connection[Any]) -> N
     assert inserted.rating == 3
 
 
-def test_bar_sales_repository_round_trip_and_category_filter(db_conn: Connection[Any]) -> None:
+def test_bar_sales_repository_round_trip(db_conn: Connection[Any]) -> None:
     repo = MySqlBarSalesRepository(db_conn)
 
     sales = [
@@ -411,20 +392,11 @@ def test_bar_sales_repository_round_trip_and_category_filter(db_conn: Connection
     ]
     repo.insert_many(sales)
 
-    year_2026 = repo.list(sales_year=2026)
-    assert [s.id for s in year_2026] == [1, 2]
-    assert year_2026[0].revenue_dkk == Decimal("114.66") * 4573
-
-    cocktails = repo.list(sales_year=2026, category=DrinkCategory.COCKTAIL)
-    assert len(cocktails) == 1
-    assert cocktails[0].drink_name == "Mint Julep"
-
-    coffees = repo.list(sales_year=2026, category=DrinkCategory.COFFEE)
-    assert len(coffees) == 1
-    assert coffees[0].drink_name == "Espresso"
-
-    assert repo.list(sales_year=2030) == []
+    all_sales = repo.list()
+    assert [s.id for s in all_sales] == [1, 2, 3]
+    assert all_sales[0].unit_price_dkk * all_sales[0].units_sold == Decimal("114.66") * 4573
 
     repo.delete_all()
-    assert repo.list(sales_year=2026) == []
+    assert repo.list() == []
+
 

@@ -9,25 +9,13 @@ all at once instead of stopping at the first type error.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from hotel_api.business.domain.models import Booking as BookingModel
 from hotel_api.business.domain.models import Season
 from hotel_api.presentation.api.schemas.common import AmountDkk, with_zone
-
-# Mirrors the contract's `RoomTypeName` enum; used to reject bad query parameters with 400.
-RoomTypeName = Literal[
-    "Standard Single",
-    "Grand Lit",
-    "Standard Double",
-    "Superior Double",
-    "Junior Suite",
-    "Spa Executive",
-    "Suite",
-    "LOFT Suite",
-]
 
 
 class BookingInput(BaseModel):

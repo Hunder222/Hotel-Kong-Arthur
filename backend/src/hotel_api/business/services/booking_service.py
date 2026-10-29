@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any, Mapping
 
-from hotel_api.business.domain.models import Booking, NewBooking, Season
+from hotel_api.business.domain.models import Booking, NewBooking
 from hotel_api.business.errors import NotFound, ValidationFailed
 from hotel_api.business.ports import BookingRepository, RoomTypeRepository
 from hotel_api.business.rules import pricing
@@ -22,14 +22,8 @@ class BookingService:
         self._bookings = bookings
         self._room_types = room_types
 
-    def list(
-        self,
-        year: int | None = None,
-        season: Season | None = None,
-        room_type: str | None = None,
-        country: str | None = None,
-    ) -> list[Booking]:
-        return self._bookings.list(year=year, season=season, room_type=room_type, country=country)
+    def list(self) -> list[Booking]:
+        return self._bookings.list()
 
     def get(self, booking_id: int) -> Booking:
         booking = self._bookings.get(booking_id)

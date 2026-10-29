@@ -3,20 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
 from decimal import Decimal
 from typing import Any
 
 from pymysql.connections import Connection
 
-from hotel_api.business.domain.models import Booking, NewBooking, Season
-from hotel_api.business.rules.seasons import season_of_month
+from hotel_api.business.domain.models import Booking, NewBooking
 from hotel_api.data.connection import db_cursor
-
-_SEASON_MONTHS: dict[Season, tuple[int, ...]] = {
-    season: tuple(month for month in range(1, 13) if season_of_month(month) is season)
-    for season in Season
-}
 
 
 def _row_to_booking(row: dict[str, Any]) -> Booking:
@@ -54,37 +47,9 @@ class MySqlBookingRepository:
         cursor.execute("SELECT id, name FROM room_types")
         return {str(row["name"]): int(row["id"]) for row in cursor.fetchall()}
 
-    def list(
-        self,
-        year: int | None = None,
-        season: Season | None = None,
-        room_type: str | None = None,
-        country: str | None = None,
-    ) -> list[Booking]:
-        """Return matching bookings ordered by `id DESC` (newest first)."""
-        clauses: list[str] = []
-        params: list[Any] = []
-
-        if year is not None:
-            clauses.append("b.check_in_date >= %s AND b.check_in_date < %s")
-            params.extend([date(year, 1, 1), date(year + 1, 1, 1)])
-
-        if season is not None:
-            months = _SEASON_MONTHS[Season(season)]
-            placeholders = ", ".join(["%s"] * len(months))
-            clauses.append(f"MONTH(b.check_in_date) IN ({placeholders})")
-            params.extend(months)
-
-        if room_type is not None:
-            clauses.append("rt.name = %s")
-            params.append(room_type)
-
-        if country is not None:
-            clauses.append("b.country = %s")
-            params.append(country)
-
-        where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        sql = f"""
+    def list(self) -> list[Booking]:
+        """Return all bookings ordered by `id DESC` (newest first)."""
+        sql = """
             SELECT
                 b.id,
                 b.first_name,
@@ -98,11 +63,10 @@ class MySqlBookingRepository:
                 b.updated_at
             FROM bookings b
             JOIN room_types rt ON rt.id = b.room_type_id
-            {where_sql}
             ORDER BY b.id DESC
         """
         with db_cursor(self._conn) as cursor:
-            cursor.execute(sql, tuple(params))
+            cursor.execute(sql)
             rows = cursor.fetchall()
         return [_row_to_booking(row) for row in rows]
 

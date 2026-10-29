@@ -3,19 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
 from typing import Any
 
 from pymysql.connections import Connection
 
-from hotel_api.business.domain.models import GuestReview, NewReview, Season
-from hotel_api.business.rules.seasons import season_of_month
+from hotel_api.business.domain.models import GuestReview, NewReview
 from hotel_api.data.connection import db_cursor
-
-_SEASON_MONTHS: dict[Season, tuple[int, ...]] = {
-    season: tuple(month for month in range(1, 13) if season_of_month(month) is season)
-    for season in Season
-}
 
 
 def _row_to_review(row: dict[str, Any]) -> GuestReview:
@@ -49,32 +42,9 @@ class MySqlReviewRepository:
         cursor.execute("SELECT id, name FROM room_types")
         return {str(row["name"]): int(row["id"]) for row in cursor.fetchall()}
 
-    def list(
-        self,
-        year: int | None = None,
-        season: Season | None = None,
-        room_type: str | None = None,
-    ) -> list[GuestReview]:
-        """Return matching reviews ordered newest first (`id DESC`)."""
-        clauses: list[str] = []
-        params: list[Any] = []
-
-        if year is not None:
-            clauses.append("r.stay_date >= %s AND r.stay_date < %s")
-            params.extend([date(year, 1, 1), date(year + 1, 1, 1)])
-
-        if season is not None:
-            months = _SEASON_MONTHS[Season(season)]
-            placeholders = ", ".join(["%s"] * len(months))
-            clauses.append(f"MONTH(r.stay_date) IN ({placeholders})")
-            params.extend(months)
-
-        if room_type is not None:
-            clauses.append("rt.name = %s")
-            params.append(room_type)
-
-        where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        sql = f"""
+    def list(self) -> list[GuestReview]:
+        """Return all reviews ordered newest first (`id DESC`)."""
+        sql = """
             SELECT
                 r.id,
                 r.booking_id,
@@ -84,11 +54,10 @@ class MySqlReviewRepository:
                 r.created_at
             FROM reviews r
             JOIN room_types rt ON rt.id = r.room_type_id
-            {where_sql}
             ORDER BY r.id DESC
         """
         with db_cursor(self._conn) as cursor:
-            cursor.execute(sql, tuple(params))
+            cursor.execute(sql)
             rows = cursor.fetchall()
         return [_row_to_review(row) for row in rows]
 

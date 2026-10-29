@@ -19,7 +19,6 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from hotel_api.business.services.bar_service import BarService
 from hotel_api.business.services.booking_service import BookingService
 from hotel_api.business.services.health_service import HealthService
-from hotel_api.business.services.kpi_service import KpiService
 from hotel_api.business.services.review_service import ReviewService
 from hotel_api.business.services.room_type_service import RoomTypeService
 from hotel_api.business.services.sample_data_service import SampleDataService
@@ -32,7 +31,7 @@ from hotel_api.data.repositories.reviews import MySqlReviewRepository
 from hotel_api.data.repositories.room_types import MySqlRoomTypeRepository
 from hotel_api.presentation.api import dependencies as deps
 from hotel_api.presentation.api.errors import register_error_handlers
-from hotel_api.presentation.api.routers import bar, bookings, health, kpis_bar, kpis_hotel, reviews, room_types
+from hotel_api.presentation.api.routers import bar, bookings, health, reviews, room_types
 
 
 @contextmanager
@@ -102,9 +101,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def booking_service(conn: Connection = connection) -> BookingService:
         return BookingService(MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn))
 
-    def kpi_service(conn: Connection = connection) -> KpiService:
-        return KpiService(MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn), MySqlReviewRepository(conn))
-
     def review_service(conn: Connection = connection) -> ReviewService:
         return ReviewService(MySqlReviewRepository(conn), MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn))
 
@@ -114,17 +110,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.dependency_overrides[deps.get_health_service] = health_service
     app.dependency_overrides[deps.get_bar_service] = bar_service
     app.dependency_overrides[deps.get_review_service] = review_service
-    app.dependency_overrides[deps.get_kpi_service] = kpi_service
     app.dependency_overrides[deps.get_booking_service] = booking_service
     app.dependency_overrides[deps.get_room_type_service] = room_type_service
 
     app.include_router(health.router)
     app.include_router(room_types.router)
     app.include_router(bookings.router)
-    app.include_router(kpis_hotel.router)
     app.include_router(reviews.router)
     app.include_router(bar.router)
-    app.include_router(kpis_bar.router)
     return app
 
 

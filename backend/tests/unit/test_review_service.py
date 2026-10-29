@@ -34,9 +34,8 @@ class FakeReviews:
     def __init__(self):
         self.rows, self.calls, self.next_id = {}, [], 1
 
-    def list(self, year=None, season=None, room_type=None):
+    def list(self):
         self.calls.append("list")
-        self.last_filters = (year, season, room_type)
         return list(self.rows.values())
 
     def get(self, review_id):
@@ -102,8 +101,8 @@ def test_get_returns_the_review_or_not_found(service):
     assert caught.value.message == "Review 42 does not exist."
 
 
-def test_list_passes_the_filters_to_the_repository(service, repo):
-    service.list(year=2026, season=Season.LOW, room_type="Suite")
-    assert repo.last_filters == (2026, Season.LOW, "Suite")
-    service.list()
-    assert repo.last_filters == (None, None, None)
+def test_list_returns_all_reviews(service, repo):
+    created = service.create({"booking_id": 2, "rating": 5})
+    assert service.list() == [created]
+    assert "list" in repo.calls
+

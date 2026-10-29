@@ -10,12 +10,10 @@ from typing import Protocol, Sequence
 from hotel_api.business.domain.models import (
     BarDrinkSale,
     Booking,
-    DrinkCategory,
     GuestReview,
     NewBooking,
     NewReview,
     RoomType,
-    Season,
 )
 
 
@@ -27,14 +25,8 @@ class RoomTypeRepository(Protocol):
 
 
 class BookingRepository(Protocol):
-    def list(
-        self,
-        year: int | None = None,
-        season: Season | None = None,
-        room_type: str | None = None,
-        country: str | None = None,
-    ) -> list[Booking]:
-        """Matching bookings ordered by id, newest (highest id) first."""
+    def list(self) -> list[Booking]:
+        """All bookings ordered by id, newest (highest id) first."""
 
     def get(self, booking_id: int) -> Booking | None: ...
 
@@ -54,13 +46,8 @@ class BookingRepository(Protocol):
 
 
 class ReviewRepository(Protocol):
-    def list(
-        self,
-        year: int | None = None,
-        season: Season | None = None,
-        room_type: str | None = None,
-    ) -> list[GuestReview]:
-        """Matching reviews, newest first."""
+    def list(self) -> list[GuestReview]:
+        """All reviews, newest first."""
 
     def get(self, review_id: int) -> GuestReview | None: ...
 
@@ -73,8 +60,8 @@ class ReviewRepository(Protocol):
 
 
 class BarSalesRepository(Protocol):
-    def list(self, sales_year: int | None, category: DrinkCategory | None = None) -> list[BarDrinkSale]:
-        """Drink sales of one year, or of every year when `sales_year` is None (all-time, FR-021)."""
+    def list(self) -> list[BarDrinkSale]:
+        """All drink sales ordered by id ascending."""
 
     def delete_all(self) -> None: ...
 
@@ -94,3 +81,4 @@ __all__ = [
     "ReviewRepository",
     "RoomTypeRepository",
 ]
+

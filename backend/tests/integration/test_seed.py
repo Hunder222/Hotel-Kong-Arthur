@@ -36,9 +36,9 @@ pytestmark = pytest.mark.integration
 def _snapshot(settings: Settings) -> dict[str, Any]:
     conn = open_connection(settings)
     try:
-        bookings = MySqlBookingRepository(conn).list(year=2026)
-        reviews = MySqlReviewRepository(conn).list(year=2026)
-        drinks = MySqlBarSalesRepository(conn).list(sales_year=2026)
+        bookings = MySqlBookingRepository(conn).list()
+        reviews = MySqlReviewRepository(conn).list()
+        drinks = MySqlBarSalesRepository(conn).list()
     finally:
         conn.close()
 
@@ -53,7 +53,7 @@ def _snapshot(settings: Settings) -> dict[str, Any]:
         "drink_count": len(drinks),
         "drink_ids": [d.id for d in drinks],
         "drink_units": sum(d.units_sold for d in drinks),
-        "drink_revenue": sum((d.revenue_dkk for d in drinks), Decimal("0.00")),
+        "drink_revenue": sum((d.unit_price_dkk * d.units_sold for d in drinks), Decimal("0.00")),
     }
 
 
@@ -165,7 +165,7 @@ def test_failing_seed_leaves_existing_rows_intact(
     conn = open_connection(test_settings)
     try:
         b21 = MySqlBookingRepository(conn).get(21)
-        drinks = MySqlBarSalesRepository(conn).list(sales_year=2026, category=DrinkCategory.COFFEE)
+        drinks = [d for d in MySqlBarSalesRepository(conn).list() if d.category is DrinkCategory.COFFEE]
     finally:
         conn.close()
     assert b21 is not None and b21.family_name == "Müller"

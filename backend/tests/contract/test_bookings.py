@@ -27,26 +27,20 @@ def created(client, check_contract):
     return response
 
 
-def test_list_empty_and_filtered(client, check_contract, created):
+def test_list_returns_all_bookings(client, check_contract):
+    empty = client.get("/api/v1/bookings")
+    assert empty.status_code == 200
+    check_contract(empty)
+    assert empty.json() == {"items": []}
+
+    created = client.post("/api/v1/bookings", json=QUICKSTART)
+    assert created.status_code == 201
     response = client.get("/api/v1/bookings")
     assert response.status_code == 200
     check_contract(response)
     assert len(response.json()["items"]) == 1
-    for query, expected in (
-        ("?year=2026&season=high&room_type=Superior Double&country=Germany", 1),
-        ("?year=2025", 0),
-        ("?season=low", 0),
-    ):
-        filtered = client.get("/api/v1/bookings" + query)
-        check_contract(filtered)
-        assert len(filtered.json()["items"]) == expected
+    assert response.json()["items"][0]["id"] == created.json()["id"]
 
-
-@pytest.mark.parametrize("query", ["?year=abc", "?year=1999", "?season=winter", "?room_type=Penthouse"])
-def test_list_with_a_bad_filter_is_400(client, check_contract, query):
-    response = client.get("/api/v1/bookings" + query)
-    assert response.status_code == 400
-    check_contract(response)
 
 
 def test_create_returns_201_with_location_and_derived_fields(created, check_contract):

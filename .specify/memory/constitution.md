@@ -1,19 +1,13 @@
 <!--
-Sync Impact Report (temporary review aid; delete this comment before committing)
-- Version change: 1.0.0 → 1.1.0 (MINOR: materially expanded guidance in Principle VII)
-- Modified principles: VII. KPIs Are Business Logic (title unchanged). Adds one display-only
-  exception: the browser frontend may mirror the month → season table and the standard-price
-  arithmetic, in frontend/public/price-preview.js only; the server re-derives and validates on
-  save; a drift test is required; no other rule or KPI formula in the frontend or Tableau.
-- Modified gates: Constitution Check gate VII (question widened accordingly)
-- Other principles, sections and Open Questions: unchanged
-- Added/removed sections: none
-- Sources added: team decision 2026-10-29 (spec.md FR-018, FR-019; tasks.md T114, T115;
-  research.md R15 amended)
-- Dependent artefacts not modified here (command scope guard): plan.md gate VII evidence
-  ("the frontend computes nothing") and its frontend table rows are now stale; tasks.md T105 should
-  list this amendment as done
-- Deferred placeholders: none
+Sync Impact Report
+- Version change: 1.1.0 → 1.2.0 (MINOR: updated Principle VII and Gate VII to reflect the 2026-10-29 architectural correction for Tableau)
+- Modified principles: VII. Business Rules & Tableau Data Handover (formerly KPIs Are Business Logic).
+  The backend business layer owns operational domain rules (season derivation, seasonal price bands,
+  standard pricing, booking/review validation), while the REST API exposes the raw operational and
+  reference datasets (`GET /api/v1/bookings`, `GET /api/v1/room-types`, `GET /api/v1/reviews`,
+  `GET /api/v1/bar/drink-sales`) with no query parameters so the team can manually build dashboards
+  and calculate KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) in Tableau.
+- Modified gates: Constitution Check gate VII updated accordingly.
 -->
 # Hotel Kong Arthur Constitution
 
@@ -158,15 +152,18 @@ Q8 asks what happens to the data when the containers shut down.
 **Sources:** T1 › Systemkrav; Datagrundlag; Krav: Softwarearkitektur; Krav: Systemudvikling ›
 Workflowet (Clarify) · T2 › Q8, Q9 · T3 · TM › Overordnet arkitektur · **Binding:** teacher
 
-### VII. KPIs Are Business Logic
+### VII. Business Rules & Tableau Data Handover
 
-- KPI formulas and business rules MUST live in the business layer and be exposed through the API.
-  This covers occupancy rate (belægningsgrad), revenue (indtjening), customer satisfaction
-  (kundetilfredshed), every figure in *Mandatory Scope*, seasonal pricing and booking validation.
-- Each KPI MUST have exactly one authoritative definition: written in the spec and implemented in
-  one place. Tableau MAY filter, group and aggregate API data (sums, counts, shares) for
-  interactivity, but MUST NOT re-implement a business rule such as the season mapping, the
-  occupancy formula or pricing.
+- Operational business rules MUST live in the business layer (`business/`) and be enforced on every
+  API write and read. This covers season derivation (`low`, `mid`, `high`), seasonal pricing bands,
+  default standard pricing, and booking and review validation.
+- **Tableau calculates KPIs over raw API datasets (2026-10-29 correction).** The REST API exposes
+  a basic, parameterless connection to the raw operational and reference datasets
+  (`GET /api/v1/bookings`, `GET /api/v1/room-types`, `GET /api/v1/reviews`,
+  `GET /api/v1/bar/drink-sales`, with no query parameters). Each booking and review includes its
+  derived `season` and `year`. Pre-aggregated `/api/v1/kpis/*` endpoints are not exposed; instead,
+  the team connects Tableau to the raw REST endpoints and manually builds the dashboards and KPI
+  calculations (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) in Tableau.
 - **One display-only exception in the browser frontend.** For the live price preview and the
   price-per-night/total convenience fields (FR-018, FR-019), the frontend MAY mirror exactly two
   things: the month → season table and the standard-price arithmetic (standard nightly rate ×
@@ -177,19 +174,14 @@ Workflowet (Clarify) · T2 › Q8, Q9 · T3 · TM › Overordnet arkitektur · *
   decide whether a price is allowed.
 - An automated test MUST fail if the mirrored season table differs from
   `business/rules/seasons.py` (`backend/tests/architecture/test_frontend_price_mirror.py`).
-- No other business rule or KPI formula MAY be implemented in the frontend or in Tableau. A new
-  mirror requires a further amendment of this principle.
-- The plan MUST record why KPIs are calculated in the business layer rather than in MySQL or
-  Tableau, and what moving them would cost.
 - The hotel facts in T1 are binding inputs to the spec: 214 rooms; 1–4 guests per room and about
   428 guests at most (see the Clarify list); 8 room types with seasonal price ranges; low, mid and
   high season; a lobby bar where Helene Christine makes 20 cocktails and 10 coffee types.
 
-**Rationale:** The team placed KPI calculation in the service layer. One definition per KPI keeps
-the API and the dashboard consistent and answers Q4. The receptionist needs to see the price
-before saving (FR-018) and the other price field filled in (FR-019), which cannot wait for a
-round trip per keystroke; the exception is therefore small, isolated in one file, guarded by a
-test, and never authoritative.
+**Rationale:** Centralising operational rules (season mapping, pricing, validation) in the backend
+business layer ensures every booking and review is validated and priced identically regardless of
+client, while serving clean, parameterless raw tables lets the team build and customise all KPIs
+directly in Tableau.
 
 **Sources:** T1 › Systemkrav › Beregninger; Data om Hotel Kong Arthur; Krav: Forretningsdesign og
 Analytics · T2 › Q4 · TM › Overordnet arkitektur (Service Layer) · team decision of 2026-10-29
@@ -349,7 +341,7 @@ Tracking. Violations of teacher-bound rules are not allowed.
 | IV | Do all clients, Tableau included, use only the REST/JSON API? |
 | V | Is the OpenAPI contract updated, and is the sync mechanism named? |
 | VI | Is all runtime data in MySQL and seeded automatically, with persistence decided? |
-| VII | Is each KPI and business rule defined once, in the business layer, with the browser limited to the one display-only price mirror (guarded by a drift test, server re-validates on save) and Tableau computing no rule? |
+| VII | Are operational business rules defined once in the business layer (with the browser limited to the one display-only price mirror guarded by a drift test), and does the REST API expose the raw datasets without query parameters so Tableau can build the KPIs? |
 | VIII | Does the whole system start from a fresh clone with `docker-compose up`? |
 | IX | Are unit tests for business rules and contract tests for endpoints planned? |
 | X | Are architecture decisions recorded with rationale, including one the AI proposed? |
@@ -396,7 +388,7 @@ VIII, IX and X)
   sources stay in Danish. Day-to-day developer guidance (setup, tests, commit conventions) belongs
   in `CONTRIBUTE.md`.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-27 | **Last Amended**: 2026-10-29
+**Version**: 1.2.0 | **Ratified**: 2026-10-27 | **Last Amended**: 2026-10-29
 
 ## Open Questions
 

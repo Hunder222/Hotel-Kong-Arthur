@@ -29,29 +29,15 @@ class MySqlBarSalesRepository:
     def __init__(self, conn: Connection[Any]) -> None:
         self._conn = conn
 
-    def list(self, sales_year: int | None, category: DrinkCategory | None = None) -> list[BarDrinkSale]:
-        """Return drink sales for `sales_year` (every year when None) and optional `category`, ordered by `id ASC`."""
-        clauses: list[str] = []
-        params: list[Any] = []
-
-        if sales_year is not None:
-            clauses.append("sales_year = %s")
-            params.append(sales_year)
-
-        if category is not None:
-            cat_val = category.value if isinstance(category, DrinkCategory) else str(category)
-            clauses.append("category = %s")
-            params.append(cat_val)
-
-        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        sql = f"""
+    def list(self) -> list[BarDrinkSale]:
+        """Return all drink sales ordered by `id ASC`."""
+        sql = """
             SELECT id, sales_year, drink_name, category, unit_price_dkk, units_sold
             FROM bar_drink_sales
-            {where}
             ORDER BY id ASC
         """
         with db_cursor(self._conn) as cursor:
-            cursor.execute(sql, tuple(params))
+            cursor.execute(sql)
             rows = cursor.fetchall()
         return [_row_to_bar_sale(row) for row in rows]
 

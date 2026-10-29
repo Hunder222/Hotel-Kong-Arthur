@@ -55,8 +55,8 @@ def test_contract_is_valid_openapi_3_0_3(spec: dict) -> None:
     validate(spec)
 
 
-def test_contract_has_19_operations(spec: dict) -> None:
-    assert len(contract_operations(spec)) == 19
+def test_contract_has_11_operations(spec: dict) -> None:
+    assert len(contract_operations(spec)) == 11
 
 
 def test_the_route_scan_is_not_vacuous() -> None:

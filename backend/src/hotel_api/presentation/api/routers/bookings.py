@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query, Response
+from fastapi import APIRouter, Depends, Path, Response
 
-from hotel_api.business.domain.models import Season
 from hotel_api.business.services.booking_service import BookingService
 from hotel_api.presentation.api.dependencies import get_booking_service
-from hotel_api.presentation.api.schemas.bookings import Booking, BookingInput, BookingList, RoomTypeName
+from hotel_api.presentation.api.schemas.bookings import Booking, BookingInput, BookingList
 
 router = APIRouter(prefix="/api/v1/bookings", tags=["Bookings"])
 
@@ -18,14 +17,9 @@ BookingId = Annotated[int, Path(ge=1)]
 
 @router.get("", response_model=BookingList, operation_id="listBookings")
 def list_bookings(
-    year: Annotated[int | None, Query(ge=2000, le=2100)] = None,
-    season: Season | None = None,
-    room_type: RoomTypeName | None = None,
-    country: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
     service: BookingService = Depends(get_booking_service),
 ) -> BookingList:
-    bookings = service.list(year=year, season=season, room_type=room_type, country=country)
-    return BookingList(items=[Booking.from_model(b) for b in bookings])
+    return BookingList(items=[Booking.from_model(b) for b in service.list()])
 
 
 @router.post("", response_model=Booking, status_code=201, operation_id="createBooking")

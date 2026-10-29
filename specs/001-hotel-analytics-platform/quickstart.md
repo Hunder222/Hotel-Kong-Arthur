@@ -36,18 +36,15 @@ docker compose ps
 curl -s http://localhost:8000/api/v1/health
 curl -s http://localhost:8000/api/v1/room-types
 curl -s http://localhost:8000/api/v1/bookings
-curl -s "http://localhost:8000/api/v1/kpis/hotel/summary?year=2026"
+curl -s http://localhost:8000/api/v1/reviews
+curl -s http://localhost:8000/api/v1/bar/drink-sales
 ```
 
 **Expected on a fresh volume**:
 
 - `{"status": "ok", "database": "ok"}`.
 - 8 room types whose `room_count` adds up to **214**, each with 3 rate bands.
-- `{"items": []}`.
-- A summary with every count and amount at 0, `available_room_nights` = **78110** and
-  `occupancy_rate_pct` = 0 (zero-division rule).
-- The same call without `?year=` is all-time (FR-021): `year` is `"all"` and, with no bookings
-  yet, there is no period, so `available_room_nights` is **0** and `occupancy_rate_pct` 0.
+- `{"items": []}` for `bookings`, `reviews` and `bar/drink-sales`.
 
 ## 2. Load the sample data (idempotent reset/replace)
 
@@ -60,11 +57,11 @@ docker compose run --rm seed   # run it twice: the result must be identical
 
 | Check | Expected |
 |-------|----------|
-| `GET /api/v1/bookings?year=2026` | 1,000 items |
+| `GET /api/v1/bookings` | 1,000 items (no query parameters) |
 | `GET /api/v1/bookings/1` | Liam Nguyen, China, Spa Executive, `check_in_date` 2026-03-01, `season` `mid`, 1 night, `price_dkk` 2577.00 |
 | `GET /api/v1/bookings/21` | `family_name` **`Müller`** (repaired from the CSV's U+FFFD), `check_in_date` 2026-01-08, `season` `low` |
-| `GET /api/v1/reviews?year=2026` | 500 items, every `rating` from 1 to 5 |
-| `GET /api/v1/bar/drink-sales?year=2026` | 30 items (20 `Cocktail`, 10 `Coffee`) |
+| `GET /api/v1/reviews` | 500 items, every `rating` from 1 to 5 |
+| `GET /api/v1/bar/drink-sales` | 30 items (20 `Cocktail`, 10 `Coffee`) with `id`, `year`, `drink_name`, `category`, `unit_price_dkk`, `units_sold` |
 
 The seed **removes user-created bookings and reviews**. That is the documented reset behaviour.
 
@@ -84,8 +81,7 @@ curl -s -i -X POST http://localhost:8000/api/v1/bookings \
 - `201 Created` with header `Location: /api/v1/bookings/<id>`.
 - The body has `season` `high`, `year` 2026 and `price_dkk` **6000.00** (high-season standard
   rate 2000 × 3).
-- `GET /api/v1/kpis/hotel/summary?year=2026` now shows `booking_count` 1001, `nights_sold` 5382 and
-  `total_revenue_dkk` **11240034.00**.
+- `GET /api/v1/bookings` now returns 1,001 items whose `price_dkk` sums to **11240034.00**.
 
 ```bash
 # Scenario 2: edit Days Rented 3 → 5 without a price, so the price is recalculated
@@ -97,7 +93,7 @@ curl -s -X PUT http://localhost:8000/api/v1/bookings/<id> \
 **Expected**:
 
 - `200` with `price_dkk` **10000.00**.
-- The summary now shows `nights_sold` 5384 and `total_revenue_dkk` **11244034.00**.
+- `GET /api/v1/bookings` now has total `days_rented` 5384 and total `price_dkk` **11244034.00**.
 
 ```bash
 # Scenario 4: invalid input is rejected and nothing changes
@@ -117,7 +113,7 @@ curl -s -i -X POST http://localhost:8000/api/v1/bookings \
 - Second call: `422`, with a `price_dkk` error naming 900.00–1,200.00 DKK per night for Standard
   Single in low season.
 - Third call: `400` (malformed JSON).
-- The booking count in the summary is unchanged.
+- The booking count in `GET /api/v1/bookings` is unchanged.
 
 ```bash
 # Scenario 3: delete
@@ -128,7 +124,7 @@ curl -s -i http://localhost:8000/api/v1/bookings/<id>
 **Expected**:
 
 - `204`, then `404` with Problem Details.
-- The summary is back to 1000 bookings and **11234034.00** DKK.
+- `GET /api/v1/bookings` is back to 1000 bookings and **11234034.00** DKK.
 - Each change shows up on the very next request (SC-004 allows up to 5 seconds).
 
 ```bash
@@ -144,7 +140,7 @@ curl -s -i -X POST http://localhost:8000/api/v1/bookings \
 - The same body with `"price_dkk": 6301.50` added gives `422` with an error on `price_per_night_dkk`
   (both prices given); a `price_per_night_dkk` of 1000 gives `422` naming 1,800.00–2,200.00 DKK per
   night for Superior Double in high season.
-- Delete the booking afterwards (Scenario 3) so the summary is back to 1000 bookings.
+- Delete the booking afterwards (Scenario 3) so `GET /api/v1/bookings` is back to 1000 bookings.
 
 **In the browser** (http://localhost:8080):
 
@@ -158,29 +154,31 @@ curl -s -i -X POST http://localhost:8000/api/v1/bookings \
 - **Edit** switches the page into Edit Mode: an "EDIT MODE" banner, other colours and **Cancel edit**
   (FR-020). Saving or cancelling returns to the normal look.
 
-## 4. US2: Revenue by room type, season and country (A2–A6, K2, FR-006–FR-009)
+## 4. US2: Revenue by room type, season and country — Tableau Golden Reference (A2–A6, K2, FR-006–FR-009)
 
-| Request (`?year=2026`) | Expected |
-|------------------------|----------|
-| `GET /api/v1/kpis/hotel/summary` | `total_revenue_dkk` **11234034.00** (A6), `booking_count` 1000, `nights_sold` 5379 |
-| `GET /api/v1/kpis/hotel/by-room-type` | 8 rows. Rank 1 **Suite** 2119671.00 (18.87%); rank 2 Spa Executive 1722396.00; rank 8 Standard Single 730444.00 (6.50%). `revenue_share_pct` adds up to 100.00 |
-| `GET /api/v1/kpis/hotel/by-country` | 20 rows. Rank 1 **South Korea** 767699.00 (63 bookings, 6.30%); rank 2 China 722928.00; rank 20 Egypt 335786.00. Both share columns add up to 100.00 |
-| `GET /api/v1/kpis/hotel/by-room-type-and-season` | 24 rows. LOFT Suite / `high` = 683198.00; Standard Single / `low` = 239940.00. All rows add up to 11234034.00 |
-| `GET /api/v1/kpis/hotel/by-season` | revenue `low` 3354077.00 (29.86%), `mid` 3809387.00 (33.91%), `high` 4070570.00 (36.23%) |
+The team connects Tableau to `GET /api/v1/bookings` (JSONPath `$.items[*]`) and builds the revenue
+views manually. Against the seeded 2026 dataset, the Tableau views must match these golden values:
 
-## 5. US3: Guest origin, occupancy and satisfaction (A1, K1, K3, FR-010, FR-011)
+| Tableau View / Grain | Expected Golden Figures (2026 sample data) |
+|----------------------|--------------------------------------------|
+| **Overall summary (A6, K2)** | Total revenue **11,234,034.00 DKK**, booking count **1,000**, nights sold **5,379** |
+| **By room type (A4)** | 8 rows. Rank 1 **Suite** 2,119,671.00 (18.87%); rank 2 Spa Executive 1,722,396.00; rank 8 Standard Single 730,444.00 (6.50%) |
+| **By country (A1, A3, A5)** | 20 rows. Rank 1 **South Korea** 767,699.00 (63 bookings, 6.30%); rank 2 China 722,928.00; rank 20 Egypt 335,786.00 |
+| **By room type × season (A2)** | 24 cells. LOFT Suite / `high` = 683,198.00; Standard Single / `low` = 239,940.00. All 24 cells sum to 11,234,034.00 |
+| **By season** | Revenue `low` 3,354,077.00 (29.86%), `mid` 3,809,387.00 (33.91%), `high` 4,070,570.00 (36.23%) |
 
-| Request (`?year=2026`) | Expected |
-|------------------------|----------|
-| `GET /api/v1/kpis/hotel/summary` | `available_room_nights` 78110; `occupancy_rate_pct` **6.89**; `review_count` 500 |
-| `GET /api/v1/kpis/hotel/by-season` | `season_days` 89 / 153 / 123. Occupancy `low` **9.34** (1779 / 19046), `mid` **5.61** (1837 / 32742), `high` **6.70** (1763 / 26322) |
-| `GET /api/v1/kpis/hotel/by-room-type` | Occupancy Suite 7.44 (706 / 9490), Standard Single 6.37 (628 / 9855), LOFT Suite 5.13 (487 / 9490) |
-| `GET /api/v1/kpis/hotel/by-country` | A1: booking count and `booking_share_pct` per country (see §4) |
-| K3 | `average_satisfaction` lies from 1 to 5 and equals the mean `rating` of `GET /api/v1/reviews?year=2026`. `satisfied_share_pct` equals the share of those ratings ≥ 4. Per room type and per season, the same holds for the matching review subsets |
+## 5. US3: Guest origin, occupancy and satisfaction — Tableau Golden Reference (A1, K1, K3, FR-010, FR-011)
 
-The satisfaction values are **synthetic** (fixed-seed generator, research R13). The example in the
-contract is only illustrative. The integration test pins the exact seeded values once
-implemented.
+The team connects Tableau to `GET /api/v1/bookings`, `GET /api/v1/room-types`, and
+`GET /api/v1/reviews`:
+
+| Tableau View / Grain | Expected Golden Figures (2026 sample data) |
+|----------------------|--------------------------------------------|
+| **Overall occupancy (K1)** | Available room-nights **78,110** (214 rooms × 365 days); occupancy rate **6.89%** (5,379 / 78,110) |
+| **Occupancy by season (K1)** | Season days 89 / 153 / 123. Occupancy `low` **9.34%** (1,779 / 19,046), `mid` **5.61%** (1,837 / 32,742), `high` **6.70%** (1,763 / 26,322) |
+| **Occupancy by room type (K1)** | Suite **7.44%** (706 / 9,490), Standard Single **6.37%** (628 / 9,855), LOFT Suite **5.13%** (487 / 9,490) |
+| **Guest origin (A1)** | Booking count and % share per country from `GET /api/v1/bookings` (see §4) |
+| **Guest satisfaction (K3)** | 500 seeded reviews in `GET /api/v1/reviews`. Mean `rating` (1–5) and satisfied share (`rating ≥ 4`) overall, by `room_type`, and by `season` |
 
 ```bash
 # K3 is live too: record a review for booking 2 (Grand Lit, low season)
@@ -191,34 +189,27 @@ curl -s -i -X POST http://localhost:8000/api/v1/reviews \
 **Expected**:
 
 - `201` with `room_type` `Grand Lit`, `stay_date` 2026-01-01 and `season` `low`.
-- `review_count` in the summary becomes 501.
+- `GET /api/v1/reviews` now returns 501 items.
 
-## 6. US4: Cocktail bar (B1–B3, FR-012–FR-014)
+## 6. US4: Cocktail bar — Tableau Golden Reference (B1–B3, FR-012–FR-014)
 
-| Request (`?year=2026`) | Expected |
-|------------------------|----------|
-| `GET /api/v1/kpis/bar/summary` | `drink_count` 30, `units_sold` **179958**, `total_revenue_dkk` **13448640.34** (B1) |
-| `GET /api/v1/bar/drink-sales` | 30 rows (B2). Rank 1 **Espresso** 1012729.60 DKK, which also has the most units (14656, `units_rank` 1). Rank 30 Margarita 171101.67. Top cocktail: Mint Julep 524351.62 |
-| `GET /api/v1/kpis/bar/by-category` | `Cocktail`: 20 drinks, 62077 units (**34.50%**), 7104755.43 DKK (**52.83%**). `Coffee`: 10 drinks, 117881 units (**65.50%**), 6343884.91 DKK (**47.17%**). Each share column adds up to 100.00 |
+The team connects Tableau to `GET /api/v1/bar/drink-sales` (30 rows) and computes `revenue_dkk = unit_price_dkk * units_sold`:
 
-## 7. US5: Self-chosen KPIs (A7, FR-015, FR-016)
+| Tableau View / Grain | Expected Golden Figures (2026 sample data) |
+|----------------------|--------------------------------------------|
+| **Bar total (B1)** | 30 drinks, `units_sold` **179,958**, total revenue **13,448,640.34 DKK** |
+| **Per drink (B2)** | 30 rows. Rank 1 **Espresso** 1,012,729.60 DKK (14,656 units, rank 1 in units). Rank 30 Margarita 171,101.67 DKK. Top cocktail: Mint Julep 524,351.62 DKK |
+| **By category (B3)** | `Cocktail`: 20 drinks, 62,077 units (**34.50%**), 7,104,755.43 DKK (**52.83%**). `Coffee`: 10 drinks, 117,881 units (**65.50%**), 6,343,884.91 DKK (**47.17%**) |
 
-| Request (`?year=2026`) | Expected |
-|------------------------|----------|
-| `GET /api/v1/kpis/hotel/summary` | ALOS **5.38** nights, ADR **2088.50** DKK, revenue per booking **11234.03** DKK |
-| `GET /api/v1/kpis/hotel/by-season` | ALOS / ADR / revenue per booking: `low` 5.36 / 1885.37 / 10102.64; `mid` 5.48 / 2073.70 / 11371.30; `high` 5.29 / 2308.89 / 12223.93 |
-| `GET /api/v1/kpis/bar/by-price-tier` | `budget` (< 70): 10 drinks, 117881 units (65.50%), 6343884.91 DKK (47.17%). `standard` (70 to < 110): 10 drinks, 29306 units (16.29%), 2739242.59 DKK (20.37%). `premium` (≥ 110, `price_to_dkk` null): 10 drinks, 32771 units (18.21%), 4365512.84 DKK (32.46%) |
+## 7. US5: Self-chosen KPIs — Tableau Golden Reference (A7, FR-015, FR-016)
 
-Edge cases (spec):
+Calculated in Tableau from `GET /api/v1/bookings` and `GET /api/v1/bar/drink-sales`:
 
-- `GET /api/v1/kpis/hotel/summary?year=2030` returns 0 for every count, amount, average and rate,
-  and `available_room_nights` = 78110. There is no error.
-- `?year=abc` returns `400`, and so does `?year=ALL` (only lowercase `all` is accepted).
-- `GET /api/v1/kpis/bar/by-category?year=2030` returns both categories with 0 values.
-- `GET /api/v1/kpis/hotel/summary?year=all`, or without `year`, is all-time (FR-021). After `seed`
-  every row has `year` `"all"` and the same figures as 2026, because all sample data is in 2026
-  (`total_revenue_dkk` 11234034.00, `available_room_nights` 78110). A booking in 2027 widens the
-  period to 2026–2027, so `available_room_nights` becomes 156220.
+| Tableau View / Grain | Expected Golden Figures (2026 sample data) |
+|----------------------|--------------------------------------------|
+| **Hotel overall (A7)** | ALOS **5.38** nights, ADR **2,088.50 DKK**, revenue per booking **11,234.03 DKK** |
+| **Hotel by season (A7)** | ALOS / ADR / revenue per booking: `low` 5.36 / 1,885.37 / 10,102.64; `mid` 5.48 / 2,073.70 / 11,371.30; `high` 5.29 / 2,308.89 / 12,223.93 |
+| **Bar by price tier (A7)** | `budget` (`< 70` DKK): 10 drinks, 117,881 units (65.50%), 6,343,884.91 DKK (47.17%). `standard` (`70 ≤ price < 110`): 10 drinks, 29,306 units (16.29%), 2,739,242.59 DKK (20.37%). `premium` (`≥ 110`): 10 drinks, 32,771 units (18.21%), 4,365,512.84 DKK (32.46%) |
 
 ## 8. Tableau route check (team, manual, outside this repository; FR-017)
 
@@ -235,15 +226,18 @@ Do this early, the first day the API runs (research R14 risk):
 
 1. Install Tableau's **REST API Connector** from Tableau Exchange (Tableau Desktop 2023.3+), and
    put the JDBC REST driver in Tableau's `Drivers` folder.
-2. Connect to a server, choose **REST API**, use the URL
-   `http://localhost:8000/api/v1/kpis/hotel/by-room-type?year=2026` and the JSONPath to records
-   `$.items[*]`. If an authentication mode is mandatory, any Basic or Bearer value works, because
-   the API ignores it.
-3. Create the extract. The 8 rows must match §4.
-4. Create a booking (§3), then choose *Data → Refresh All Extracts*. The Suite or Superior Double
-   figures change within 5 seconds (SC-004).
-5. Build the dashboard views from the endpoints in §4–§7. Compare every figure with the tables
-   above (SC-003: within 0.01 DKK / 0.01%).
+2. Connect to a server, choose **REST API**, and connect to the four parameterless `GET` endpoints
+   with JSONPath `$.items[*]`:
+   - `http://localhost:8000/api/v1/bookings`
+   - `http://localhost:8000/api/v1/room-types`
+   - `http://localhost:8000/api/v1/reviews`
+   - `http://localhost:8000/api/v1/bar/drink-sales`
+   If an authentication mode is mandatory, any Basic or Bearer value works, because the API ignores it.
+3. Create the extracts. Confirm 1,000 bookings, 8 room types, 500 reviews, and 30 drink sales.
+4. Create a booking (§3), then choose *Data → Refresh All Extracts*. The new booking appears within
+   5 seconds (SC-004).
+5. Build the dashboard views and KPI calculated fields from the raw data. Compare every figure with
+   the golden reference tables in §4–§7 (SC-003: within 0.01 DKK / 0.01%).
 
 ## 9. Automated tests (Principle IX)
 
@@ -256,7 +250,7 @@ docker compose run --rm tests pytest tests/contract      # every endpoint vs ope
 **Expected**:
 
 - All suites pass.
-- The contract suite includes the route-parity test: the app's routes equal the contract's 19
+- The contract suite includes the route-parity test: the app's routes equal the contract's 11
   operations.
 - Tests use the separate `hotel_test` database, so your data in `hotel` is untouched.
 

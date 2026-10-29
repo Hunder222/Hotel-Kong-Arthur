@@ -76,7 +76,7 @@ v5.4 are available.
 
 - **Decision**: The backend package `hotel_api` has exactly three layer packages:
   `presentation` (REST routers, DTOs, error mapping and the seed CLI adapter), `business` (domain
-  models, rules, KPI calculators, services, repository protocols) and `data` (connection handling
+  models, rules, services, repository protocols) and `data` (connection handling
   and repositories).
   - Two root modules sit outside the layers: `main.py` is the **composition root** that wires the
     layers together, and `config.py` reads settings.
@@ -125,67 +125,74 @@ v5.4 are available.
 
 ## R5. REST resource design, status codes and error format
 
-- **Decision**: All endpoints sit under `/api/v1`. Domain resources are `room-types`, `bookings`,
-  `reviews` and `bar/drink-sales`. KPI reports are read-only resources under `kpis/hotel/*` and
-  `kpis/bar/*`, with **one table per grain**: summary, by room type, by season, by room type and
-  season, by country, by category and by price tier.
-  - Collections and KPI tables return `{"items": [...]}`. Summaries are single objects.
+- **Decision (corrected 2026-10-29)**: All endpoints sit under `/api/v1`. Domain resources are
+  `room-types`, `bookings`, `reviews` and `bar/drink-sales`, plus `health` (11 operations total).
+  - Pre-aggregated KPI endpoints (`/api/v1/kpis/hotel/*` and `/api/v1/kpis/bar/*`) and all query
+    parameters (`?year=`, `?season=`, `?room_type=`, `?country=`, `?category=`) were removed on
+    2026-10-29. Instead, the API serves the full, unfiltered raw operational and reference
+    collections (`GET /api/v1/bookings`, `GET /api/v1/room-types`, `GET /api/v1/reviews`,
+    `GET /api/v1/bar/drink-sales`) with **no query parameters**, and the team builds dashboards
+    and computes KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) manually in Tableau.
+  - Collections return `{"items": [...]}`.
   - Methods: `GET` reads. `POST` creates and returns `201` with a `Location` header. `PUT` replaces
     a booking and returns `200`. `DELETE` returns `204`.
   - Error status codes:
-    - `400`: malformed JSON, or an invalid query/path parameter.
+    - `400`: malformed JSON, or an invalid path parameter.
     - `404`: unknown id in the path.
     - `422`: well-formed body that breaks a field or business rule.
     - `503`: database unavailable.
   - Errors are **RFC 9457 Problem Details** (`application/problem+json`) with an `errors` list of
     `{field, message}`. The frontend uses it to show the message next to the field (US1 scenario 4).
-  - Resources carry per-record derived fields: a booking's `season` and `year`, and a drink's
-    `revenue_dkk`, `price_tier` and ranks. Aggregates live only under `kpis/`.
-- **Rationale**: Resources mirror the domain (Principle IV). One table per grain is what Tableau
-  reads best: flat rows, each row has all KPIs of its grain, and Tableau needs no joins. The
-  `items` envelope leaves room for metadata later without breaking clients. The 400/422 split
-  follows HTTP semantics and is easy to defend on a concrete endpoint (Q6).
+  - Resources carry per-record derived fields: a booking's `season` and `year`, and a review's
+    `season` and `year`. `bar/drink-sales` returns the raw sales fields (`id`, `year`,
+    `drink_name`, `category`, `unit_price_dkk`, `units_sold`).
+- **Rationale**: Resources mirror the domain (Principle IV). Returning flat, complete raw tables
+  with no query parameters lets Tableau ingest each dataset once via `$.items[*]` and perform
+  all filtering, grouping, ranking and KPI calculations inside the workbook. The `items` envelope
+  leaves room for metadata later without breaking clients. The 400/422 split follows HTTP
+  semantics and is easy to defend on a concrete endpoint (Q6).
 - **Alternatives considered**:
-  - A generic `?group_by=` parameter: one path would need several response shapes, which weakens
-    the contract and the Tableau mapping.
+  - Pre-aggregated `/api/v1/kpis/*` endpoints and query parameters: originally built, then removed
+    on 2026-10-29 because the team wants a basic REST connection to raw data so KPIs and
+    dashboards are authored manually in Tableau.
   - Bare JSON arrays: cannot be extended without a breaking change.
   - FastAPI's default `{"detail": ...}` errors: not a standard, and they do not name fields
     consistently.
   - `PATCH`: the constitution names `PUT`, and the form always sends the whole booking.
 
-## R6. KPI placement (answers Q4)
+## R6. Business rules vs Tableau KPI calculations (answers Q4)
 
-- **Decision**: Every KPI and business rule (season mapping, pricing, validation, occupancy,
-  revenue, satisfaction, ALOS/ADR, shares, rankings and price tiers) is implemented **once**, as
-  pure functions in `business/rules/` and `business/kpis/`. Services load one reporting year of
-  domain objects through the repositories and pass them to those functions. SQL only filters
-  (`WHERE check_in_date >= ? AND check_in_date < ?`) and stores data. Tableau and the frontend
-  display API values and never recompute a rule. Tableau may still sum, count and filter for
-  interactivity (Principle VII).
-- **Rationale**: One definition per KPI, unit-testable without a database, and independent of the
-  database product (Q5). At 1,000 to 10,000 bookings per year, loading one year's rows and
-  aggregating in Python takes milliseconds.
-- **Cost of moving it** (what Q4 asks):
-  - **To MySQL** (GROUP BY queries, views): less data transferred at very large volumes. But the
-    season mapping and the occupancy denominator would have to be written in SQL, either as a
-    second definition or as the only one. Testing would need a database, and replacing MySQL would
-    mean rewriting the KPIs.
-  - **To Tableau** (calculated fields): the frontend and the hotel's booking system would lose the
-    figures. The formulas would live in a hand-built workbook outside the repository (FR-017), so
-    they would not be versioned or tested, which breaks "one definition".
-  - **Staying in the business layer**: costs a row transfer per request. Around a million rows a
-    year, the fix is pre-aggregated tables maintained by the business layer, not a move into SQL.
-- **Alternatives considered**: the two moves above; and caching KPI results, which was rejected
-  because it would make "live" depend on cache invalidation.
+- **Decision (corrected 2026-10-29)**: Operational business rules (month-to-season mapping,
+  seasonal nightly rate bands, standard price calculation, multi-field booking and review
+  validation, and deterministic seed data transformation) are implemented **once**, as pure
+  functions in `business/rules/`. The backend attaches derived `season` and `year` fields to each
+  booking and review record returned by the API. Analytical KPI aggregations (`A1`–`A7`, `B1`–`B3`,
+  `K1`–`K3`) are computed manually by the team in **Tableau** from the four parameterless raw REST
+  endpoints (`bookings`, `room-types`, `reviews`, `bar/drink-sales`), following the authoritative
+  formulas documented in [data-model.md](data-model.md) §7.
+- **Rationale**: Operational rules stay unit-testable without a database and independent of the
+  database product (Q5), ensuring every write client (`F1` web UI or the hotel's booking system)
+  is governed by the exact same validation and pricing rules, while Tableau receives clean,
+  complete raw datasets (including derived `season` and `year` per stay/review and `room_count` per
+  room type) to build interactive dashboards manually.
+- **Cost of moving logic** (what Q4 asks):
+  - **Moving operational rules to MySQL** (triggers/stored procedures): testing would require a
+    database, and replacing MySQL would mean rewriting season and pricing validation.
+  - **Computing analytical KPIs in Tableau** (chosen on 2026-10-29): keeps the REST API simple
+    (11 parameterless operations over 5 core resources) and lets the team design custom visual
+    analyses, rankings, price tiers and filters directly in Tableau without needing a new backend
+    endpoint for every chart grain.
+- **Alternatives considered**: pre-aggregating KPIs in Python (`business/kpis/*`), which was
+  replaced on 2026-10-29 per team direction.
 
 ## R7. What "live" means in the running system (answers Q9)
 
 - **Decision**: "Live" follows the Clarify answer: on-demand pull.
   - Every write is committed before its 2xx response.
-  - KPIs are computed on every request.
+  - Every `GET` endpoint reads the current committed rows from MySQL on every request.
   - Every API response carries `Cache-Control: no-store`.
   - The frontend reloads the list after each create, edit or delete.
-  - Tableau re-pulls the data when the CFO refreshes the extract (R14). The dashboard shows the
+  - Tableau re-pulls the raw data when the CFO refreshes the extract (R14). The dashboard shows the
     database state at that moment, well inside the 5-second limit (SC-004).
 - **Rationale**: This is the simplest mechanism that meets FR-005 and SC-004, and it is the only
   one Tableau's connector supports (GET plus extract refresh).
@@ -198,18 +205,19 @@ v5.4 are available.
 
 - **Decision**: `business/rules/seasons.py` maps months to seasons: `low` = Jan, Feb, Nov;
   `mid` = Mar, Apr, May, Sep, Oct; `high` = Jun, Jul, Aug, Dec.
-  - It also derives the number of days per season from the calendar of the reporting year. For
-    2026 that is 89 / 153 / 123 / 365, exactly the spec's figures.
+  - For 2026 the calendar gives 89 days in `low`, 153 in `mid`, and 123 in `high` (365 total),
+    which Tableau uses with `room_count` from `GET /api/v1/room-types` (214 total rooms) to compute
+    occupancy (`K1`).
   - A booking (and its revenue and nights) belongs entirely to the season and year of its
     `check_in_date`, even when the stay crosses into another season or year. A review belongs to
     the season and year of its `stay_date`.
-  - Season and year are not stored. They are derived when a domain object is built, so the date
-    is the only source of truth.
-- **Rationale**: Clarify fixed the month mapping. The day counts follow from it. Deriving instead
-  of storing means no stored value can disagree with the date.
+  - Season and year are not stored in MySQL. They are derived in the business layer when a domain
+    object is built and included in every `Booking` and `Review` JSON object, so the date is the
+    only source of truth and Tableau never has to re-implement the month-to-season rule.
+- **Rationale**: Clarify fixed the month mapping. Deriving instead of storing means no stored
+  value can disagree with the date.
 - **Alternatives considered**:
-  - Hard-coding 365 days: rejected. In a leap year February 29 would hold bookings but count no
-    available room-nights. This is a refinement of FR-010; see "Spec follow-ups" in the plan.
+  - Storing season in MySQL: risks inconsistency if `check_in_date` changes.
   - Splitting stays across seasons night by night: more precise, but the spec attributes by
     check-in date.
 
@@ -233,25 +241,20 @@ v5.4 are available.
   - T1's ranges as the only band: 1,000 sample rows exceed them in high season.
   - A strict single price per season: the sample shows real prices vary within a band.
 
-## R10. Numbers: money, rounding and percentages
+## R10. Numbers: money and rounding
 
 - **Decision**:
   - Money is `Decimal` in the business layer, `DECIMAL(10,2)` in MySQL and a **JSON number** in
-    responses (never a string).
-  - Sums of money are exact.
-  - Averages and rates are rounded **half-up to 2 decimals**.
-  - Percentages are in percent units (0 to 100).
-  - Shares inside one breakdown (category, country, room type, season, price tier) use
-    **largest-remainder rounding**, so they add up to exactly 100.00.
-  - Any ratio with a zero denominator returns `0` (the spec's edge case).
-  - Ranks use competition ranking: equal values share a rank, and the next rank skips. Ties are
-    listed by name.
-- **Rationale**: Exact revenue (spec edge case on decimal prices), numbers Tableau types as
-  measures, splits that visibly sum to 100% (US4 scenario 3) and deterministic rankings.
+    responses (never a string), rounded half-up to 2 decimals (`business/rules/numbers.py`).
+  - Raw counts (`days_rented`, `room_count`, `max_guests`, `rating`, `units_sold`, `year`) are
+    JSON integers.
+  - In Tableau, the team formats calculated KPI averages, occupancy rates and percentage shares
+    to 2 decimal places (within the ±0.01 DKK / ±0.01 percentage-point tolerance of SC-003).
+- **Rationale**: Exact monetary storage and validation in the backend, and native numeric JSON types
+  that Tableau reads directly as measures without string-to-float conversion.
 - **Alternatives considered**:
   - Floats in the business layer: rounding drift on drink prices such as 72.47.
   - Pydantic's default `Decimal`-as-string JSON: Tableau would read the values as text.
-  - Unrounded percentages: noisy, and SC-003 compares against a 0.01 tolerance anyway.
 
 ## R11. Containers, start-up order and schema creation (answers Q8)
 
@@ -341,18 +344,21 @@ v5.4 are available.
 
 ## R14. How Tableau gets current data (team-owned, outside this repository)
 
-- **Decision**: Per FR-017, this repository delivers only the REST API and its contract, with no
-  Tableau files and no connector code. The team builds the dashboard by hand. The intended route
-  is Tableau Desktop 2023.3+ with Tableau's **REST API Connector** (Tableau Exchange, JDBC REST
-  driver), pointed at the `GET` endpoints:
-  - JSONPath to records is `$.items[*]` for tables and `$` for summaries.
+- **Decision (corrected 2026-10-29)**: Per FR-017, this repository delivers only the REST API and its
+  contract, with no Tableau files and no connector code. The team builds the dashboard and calculates
+  all KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) by hand in Tableau from the four parameterless raw
+  `GET` collection endpoints:
+  - `GET /api/v1/bookings` (JSONPath `$.items[*]`)
+  - `GET /api/v1/room-types` (JSONPath `$.items[*]`)
+  - `GET /api/v1/reviews` (JSONPath `$.items[*]`)
+  - `GET /api/v1/bar/drink-sales` (JSONPath `$.items[*]`)
   - The CFO refreshes the extract (Data → Refresh All Extracts) to pull current data.
   - The connector offers Basic, Bearer or OAuth authentication. The API ignores `Authorization`,
     so any dummy credentials work if the connector insists on one.
 
   The API makes this route easy:
-  - flat rows;
-  - `year` repeated in every KPI row;
+  - flat rows with no query parameters required;
+  - `season` and `year` included on every booking and review row;
   - JSON numbers;
   - ISO dates;
   - stable field names fixed by the contract;
@@ -360,11 +366,15 @@ v5.4 are available.
   - no authentication;
   - `Cache-Control: no-store`.
 
-  **Risk**: the team should run the connector once against `GET /api/v1/kpis/hotel/summary` as
+  **Risk**: the team should run the connector once against `GET /api/v1/bookings` as
   early as possible (quickstart §8).
 - **Rationale**: Principle VI requires the plan to describe the route. WDC 3.0, which the
-  constitution's Clarify list suggested, is deprecated and excluded by FR-017.
+  constitution's Clarify list suggested, is deprecated and excluded by FR-017. Exposing raw
+  collections without query parameters gives the team full flexibility to build every chart and
+  KPI manually in Tableau.
 - **Alternatives considered**:
+  - Pre-aggregated `/api/v1/kpis/*` endpoints: removed on 2026-10-29 per team direction so KPIs
+    are built manually in Tableau from raw data.
   - Web Data Connector 3.0: deprecated, removed in Tableau 26.3, and code that FR-017 keeps out of
     the repository.
   - JSON file connector with downloaded files: not live.
@@ -393,12 +403,8 @@ v5.4 are available.
     `backend/tests/architecture/test_frontend_price_mirror.py` fails if the table drifts from
     `business/rules/seasons.py`. A change of room type or check-in date clears a typed price, a change
     of nights clears a typed total but keeps a fixed price per night.
-  - **Open for the team**: this departs from "JavaScript implements no business rule" above and from
-    the plan's Gate VII evidence ("the frontend computes nothing"), so Principle VII's wording needs
-    an amendment with `/speckit-constitution` (add it to T105), or the preview moves behind a new
-    read-only API operation.
 - **Rationale**: The smallest thing that satisfies F1 inside Docker (OQ-1 resolved toward the
-  compose container). No business logic in the client keeps Principle VII true for every client.
+  compose container).
 - **Alternatives considered**:
   - React or Vite: a build toolchain for one form.
   - GitHub Pages: violates Principle VIII (OQ-1), and would need a public backend URL and CORS.
@@ -411,10 +417,10 @@ v5.4 are available.
 
   | Suite | Purpose | Needs MySQL |
   |-------|---------|-------------|
-  | `tests/unit` | every rule and KPI function in `business/` (seasons, day counts, pricing bands and standard price, booking and review validation, revenue, occupancy, satisfaction, ALOS/ADR, shares that sum to 100, ranking, price tiers, zero-division rules, seed transformation) | no |
-  | `tests/contract` | every operation in the contract, success and error statuses, validated with openapi-core; route parity; contract file validity | yes (`hotel_test`) |
-  | `tests/integration` | repositories against MySQL; seed idempotency (run twice, same counts and totals); the sample data's KPIs match the golden values in [quickstart.md](quickstart.md) | yes (`hotel_test`) |
-  | `tests/architecture` | the import rules from R3, and a scan proving the repository contains no Tableau files (`.twb`, `.twbx`, `.tbm`, `.tds`, `.tdsx`, `.hyper`; FR-017) | no |
+  | `tests/unit` | every business rule and service in `business/` (seasons, pricing bands and standard price, booking and review validation, rounding, booking/review services, seed transformation) | no |
+  | `tests/contract` | every operation in the 11-operation contract, success and error statuses, validated with openapi-core; route parity; contract file validity | yes (`hotel_test`) |
+  | `tests/integration` | repositories against MySQL; booking CRUD lifecycle; seed idempotency (run twice, same counts and totals) | yes (`hotel_test`) |
+  | `tests/architecture` | the import rules from R3, frontend price-preview mirror parity (`test_frontend_price_mirror.py`), and a scan proving the repository contains no Tableau files (`.twb`, `.twbx`, `.tbm`, `.tds`, `.tdsx`, `.hyper`; FR-017) | no |
 
   - Tests run in Docker: `docker compose run --rm tests`. This uses the `test` image target, mounts
     the repository at `/repo` (backend sources, contract, `db/init`, sample CSVs and the whole tree
@@ -435,16 +441,15 @@ v5.4 are available.
 
 - **Decision**:
   - `days_rented` ≤ 365.
-  - `check_in_date`, `stay_date` and the `year` parameter lie between 2000 and 2100.
+  - `check_in_date` and `stay_date` lie between 2000 and 2100.
   - Name and country are trimmed, non-empty and at most 100 characters.
-  - `price_dkk` has at most 2 decimals.
+  - `price_dkk` and `price_per_night_dkk` have at most 2 decimals.
   - `rating` is a whole number from 1 to 5.
 - **Rationale**: These bounds keep values inside the database column types, so an extreme value
-  becomes a clear `422` instead of a `500`, and keep KPIs meaningful (one booking cannot cover more
+  becomes a clear `422` instead of a `500`, and keep stays meaningful (one booking cannot cover more
   than a reporting year).
 - **Alternatives considered**: no upper bounds, which lets values such as 70,000 nights reach the
-  database and fail with errors the user cannot understand. The team should confirm these bounds
-  and add them to FR-003 (see "Spec follow-ups" in the plan).
+  database and fail with errors the user cannot understand.
 
 ---
 
@@ -453,8 +458,8 @@ v5.4 are available.
 | # | Decision | Proposed by | Team status |
 |---|----------|-------------|-------------|
 | 1 | Python + FastAPI, synchronous endpoints (R1) | Team plan (TM), framework picked by AI | Kept |
-| 2 | KPIs as pure functions in the business layer (R6) | Team plan (TM: service layer) | Kept |
-| 3 | Design-first OpenAPI 3.0.3, FastAPI docs off, three-part sync check (R4) | AI (this plan) | Kept |
+| 2 | Operational rules in the business layer; KPIs calculated manually in Tableau from raw REST endpoints (R5, R6) | AI originally proposed pre-aggregated `/api/v1/kpis/*` endpoints with query parameters | **Changed by the team** on 2026-10-29: removed `/api/v1/kpis/*` and all query parameters; API serves raw collections (`bookings`, `room-types`, `reviews`, `bar/drink-sales`) for manual KPI creation in Tableau |
+| 3 | Design-first OpenAPI 3.0.3, FastAPI docs off, three-part sync check (R4) | AI (this plan) | Kept (11 parameterless operations) |
 | 4 | Named volume `mysql-data`; `down -v` resets (R12) | AI (this plan) | Kept |
 | 5 | Tableau via the REST API only; no Tableau files or connector code in the repository (R14, FR-017) | **AI proposed a Web Data Connector** (constitution, Clarify list) | **Changed by the team** on 2026-10-27: REST API only, dashboard built manually |
 | 6 | Sample data by explicit `seed` command, not on `up` (R13) | AI asked in Clarify | Decided by the team (Clarify Q5) |

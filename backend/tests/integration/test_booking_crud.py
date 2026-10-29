@@ -47,7 +47,7 @@ def test_a_created_booking_is_visible_on_the_next_request(test_settings, clean_d
 
     with connection_scope(test_settings) as conn:
         fetched = service(conn).get(created.id)
-        listed = service(conn).list(year=2026)
+        listed = service(conn).list()
     assert fetched.family_name == "Müller"
     assert (fetched.season.value, fetched.year) == ("high", 2026)
     assert [b.id for b in listed] == [created.id]

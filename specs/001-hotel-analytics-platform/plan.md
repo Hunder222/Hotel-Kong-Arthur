@@ -17,17 +17,22 @@ The platform replaces Hotel Kong Arthur's static CSV extracts with live operatio
 
 - **Receptionist**: creates, edits and deletes bookings in a browser page (F1).
 - **Hotel's booking system**: writes to the same REST API.
-- **Hotel CFO**: gets every mandatory KPI (A1–A7, B1–B3, K1–K3) from that API, through a Tableau
-  dashboard the team builds by hand (FR-017).
+- **Hotel CFO**: views every mandatory KPI (A1–A7, B1–B3, K1–K3) in a Tableau dashboard that the
+  team builds by hand (FR-017) on top of the REST API's parameterless raw collection endpoints
+  (`GET /api/v1/bookings`, `GET /api/v1/room-types`, `GET /api/v1/reviews`, `GET /api/v1/bar/drink-sales`).
 
 Technical approach:
 
 - **Backend**: Python 3.13, FastAPI, three packages
   (`presentation` → `business` → `data`) wired by a composition root. PyMySQL with hand-written
   SQL against MySQL 8.4.
-- **KPIs**: each KPI and business rule (season mapping, pricing bands, validation, occupancy,
-  revenue, satisfaction, ALOS/ADR, shares, ranks, price tiers) is one pure function in the
-  business layer. KPIs are computed on every request from one reporting year of data.
+- **Business rules & Tableau boundary (2026-10-29 correction)**: Operational domain rules (season
+  mapping from `check_in_date`/`stay_date`, seasonal pricing bands, standard pricing, and booking/review
+  validation) live as pure functions in `business/rules/`. The REST API exposes 11 operations across
+  6 paths with **no query parameters** and **no `/api/v1/kpis/*` endpoints**; Tableau extracts the
+  raw operational and reference tables via `GET /api/v1/bookings`, `GET /api/v1/room-types`,
+  `GET /api/v1/reviews`, and `GET /api/v1/bar/drink-sales`, and the team builds all KPI calculations
+  (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) manually in Tableau.
 - **Contract**: design-first OpenAPI 3.0.3, served by a Swagger UI container and enforced by
   contract tests that validate real responses with openapi-core.
 - **Containers**: `docker compose up` starts MySQL (schema and reference data created on first
@@ -58,11 +63,11 @@ vanilla JavaScript (ES2022 modules) + CSS for the frontend, with no build step.
 **Testing**: pytest suites, run in Docker with `docker compose run --rm tests` against the separate
 `hotel_test` database (research R16).
 
-- `unit`: every business rule and KPI formula, no database.
-- `contract`: every operation validated against `openapi.yaml`, plus route parity and contract
+- `unit`: every operational business rule and service (season mapping, pricing, validation, seeding), no database.
+- `contract`: every operation (11 operations) validated against `openapi.yaml`, plus route parity and contract
   validity.
-- `integration`: repositories, seed idempotency and golden KPI values.
-- `architecture`: layer import rules, plus no Tableau files in the repository (FR-017).
+- `integration`: repositories, booking CRUD transactions, and seed idempotency.
+- `architecture`: layer import rules, frontend price-preview mirror check, plus no Tableau files in the repository (FR-017).
 
 **Target Platform**: Docker Engine or Docker Desktop with Compose v2+ on the team's macOS, Windows
 and Linux laptops (Linux containers). Clients are an evergreen browser, Tableau Desktop 2023.3+
@@ -74,7 +79,7 @@ database, orchestrated by one compose file.
 **Performance Goals**:
 
 - Booking create, read, update and delete under 200 ms (p95) on a laptop.
-- Every KPI endpoint under 500 ms (p95) at 10,000 bookings per year.
+- Every collection `GET` endpoint (`bookings`, `room-types`, `reviews`, `bar/drink-sales`) under 500 ms (p95) at 10,000 bookings.
 - A change is visible on the next request; the spec's limit is 5 seconds (SC-004).
 - All healthchecks green within 60 seconds of `docker compose up` once images are built or pulled
   (SC-005).
@@ -83,6 +88,7 @@ database, orchestrated by one compose file.
 
 - Exactly three backend layers, with the import rules enforced by a test.
 - Every client uses only the REST/JSON API. MySQL's port is not published.
+- No endpoint takes query parameters; Tableau extracts the raw tables and computes KPIs in Tableau.
 - OpenAPI 3.0.3 is authoritative, and FastAPI's generated 3.1 is switched off.
 - **No Tableau artifacts or connector code** in the repository (FR-017).
 - Money is exact `Decimal`, sent as JSON numbers.
@@ -95,7 +101,7 @@ database, orchestrated by one compose file.
 - One hotel: 214 rooms, 8 room types, 3 seasons, one lobby bar (20 cocktails, 10 coffees).
 - Sample year 2026: 1,000 bookings, 500 reviews, 30 drink sales.
 - 2 human roles and 2 machine clients.
-- 19 API operations, 1 frontend page, 4 compose services plus 2 tool services.
+- 11 API operations across 6 paths (0 query parameters), 1 frontend page, 4 compose services plus 2 tool services.
 
 All Technical Context items are decided; no `NEEDS CLARIFICATION` remains (see
 [research.md](research.md)).
@@ -188,27 +194,26 @@ flowchart LR
 | Component | Path (under `backend/src/hotel_api/`) | Layer | Responsibility |
 |-----------|----------------------------------------|-------|----------------|
 | Composition root | `main.py` | none (wiring) | Builds the FastAPI app (generated docs off), adds CORS and error handlers, binds service providers to request-scoped services and repositories, one transaction per request |
-| Settings | `config.py` | none | Reads environment variables (DB host, name, user, password, CORS origins) with development defaults |
-| Routers | `presentation/api/routers/{health,room_types,bookings,reviews,bar,kpis_hotel,kpis_bar}.py` | Presentation | Paths, methods, status codes and `Location` headers. Call one service. Map results to DTOs |
-| DTOs | `presentation/api/schemas/*.py` | Presentation | Pydantic request and response shapes. `Decimal` goes out as a JSON number |
-| Error mapping | `presentation/api/errors.py` | Presentation | Maps errors to RFC 9457 Problem Details: malformed JSON or bad parameter → 400, `NotFound` → 404, `ValidationFailed` and body errors → 422, `StorageUnavailable` → 503 |
-| Service providers | `presentation/api/dependencies.py` | Presentation | Provider stubs typed with business services, bound by `main.py`. Default `year` from an injectable clock |
+| Settings | `config.py` | none | Reads environment variables (DB host, name, name, user, password, CORS origins) with development defaults |
+| Routers | `presentation/api/routers/{health,room_types,bookings,reviews,bar}.py` | Presentation | Paths, methods, status codes and `Location` headers. Call one service. Map results to DTOs. No query parameters |
+| DTOs | `presentation/api/schemas/{common,health,room_types,bookings,reviews,bar,problem}.py` | Presentation | Pydantic request and response shapes. `Decimal` goes out as a JSON number |
+| Error mapping | `presentation/api/errors.py` | Presentation | Maps errors to RFC 9457 Problem Details: malformed JSON or bad path parameter → 400, `NotFound` → 404, `ValidationFailed` and body errors → 422, `StorageUnavailable` → 503 |
+| Service providers | `presentation/api/dependencies.py` | Presentation | Provider stubs typed with business services, bound by `main.py` |
 | Seed CLI | `presentation/cli/seed.py` | Presentation | Parses the two CSV files (BOM, `;`, decimal comma) and calls `SampleDataService` |
-| Domain models | `business/domain/models.py` | Business | `RoomType`, `SeasonRate`, `Booking`, `NewBooking`, `GuestReview`, `BarDrinkSale`, enums and KPI value objects |
+| Domain models | `business/domain/models.py` | Business | `RoomType`, `SeasonRate`, `Booking`, `NewBooking`, `GuestReview`, `NewReview`, `BarDrinkSale`, `Season`, `DrinkCategory` |
 | Domain errors | `business/errors.py` | Business | `ValidationFailed(field_errors)`, `NotFound`, `StorageUnavailable` |
-| Rules | `business/rules/{seasons,pricing,booking_validation,review_validation,price_tiers,ranking,numbers}.py` | Business | The single definition of each business rule |
-| KPI calculators | `business/kpis/{hotel,bar}.py` | Business | Pure KPI functions (data-model §7) |
-| Services | `business/services/{room_type,booking,review,bar,kpi,health,sample_data}_service.py` | Business | Use cases that load through ports, apply rules and KPIs, and persist through ports |
+| Rules | `business/rules/{seasons,pricing,booking_validation,review_validation,numbers,_parsing}.py` | Business | The single definition of each operational business rule |
+| Services | `business/services/{room_type,booking,review,bar,health,sample_data}_service.py` | Business | Use cases that load through ports, apply operational rules, and persist through ports |
 | Ports | `business/ports.py` | Business | Repository `Protocol`s implemented by the data layer |
 | Connection | `data/connection.py` | Data | PyMySQL connection factory (`utf8mb4`, autocommit off); wraps driver errors as `StorageUnavailable` |
 | Repositories | `data/repositories/{room_types,bookings,reviews,bar_sales,health}.py` | Data | Parameterised SQL and mapping between rows and domain models; the only code that talks to MySQL |
 | Schema and reference data | `db/init/01_schema.sql`, `02_reference_data.sql`, `03_test_database.sql` | Data (deployment) | Tables and constraints; 8 room types and 24 rate bands; the `hotel_test` database and its grant |
-| Frontend | `frontend/public/{index.html,app.js,api.js,styles.css}` | Client | Booking list, form and delete. No business rules (R15) |
+| Frontend | `frontend/public/{index.html,app.js,api.js,price-preview.js,styles.css}` | Client | Booking list, form, live price preview (FR-018/FR-019), edit mode (FR-020), and delete |
 
 ### Replaceability (answers Q5)
 
 - **Replace MySQL with another database**: change `data/` (connection and SQL dialect),
-  `db/init/` and the `db` service in compose. Presentation, business, all KPI formulas and the
+  `db/init/` and the `db` service in compose. Presentation, business, all operational rules and the
   unit tests stay untouched, because they only see `business/ports.py`.
 - **Replace the web frontend with the hotel's booking system**: nothing in the backend changes.
   The booking system calls the same `POST`, `PUT` and `DELETE` endpoints, and the business layer
@@ -220,7 +225,7 @@ flowchart LR
 
 | Method and URL | Meaning | Success | Errors |
 |----------------|---------|---------|--------|
-| `GET /api/v1/bookings?year=2026&room_type=Suite` | List the collection, with optional filters | `200` with `{"items": [...]}` | `400` bad filter value |
+| `GET /api/v1/bookings` | List all bookings, newest first (no query parameters) | `200` with `{"items": [...]}` | `503` if DB down |
 | `POST /api/v1/bookings` | Create a booking (server assigns the id) | `201`, `Location: /api/v1/bookings/1001`, booking in the body | `400` malformed JSON; `422` rule broken |
 | `GET /api/v1/bookings/1001` | Read one booking | `200` | `400` id not a whole number ≥ 1; `404` unknown id |
 | `PUT /api/v1/bookings/1001` | Replace the client-editable fields | `200` with the updated booking | `400`; `404`; `422` |
@@ -231,8 +236,8 @@ Every operation can also return `503` when the database is down.
 Why this design:
 
 - The plural noun is the collection; the id is a sub-resource.
-- `GET` is safe. `PUT` and `DELETE` are idempotent. `POST` is not idempotent, so it returns `201`
-  with a `Location` header.
+- `GET` is safe and parameterless so Tableau can extract the entire collection from a single URL.
+  `PUT` and `DELETE` are idempotent. `POST` is not idempotent, so it returns `201` with a `Location` header.
 - The JSON fields are the domain model's fields. Derived `season` and `year` are read-only output.
 - The `/api/v1` prefix lets a breaking change ship as `/api/v2` without breaking Tableau or the
   hotel's booking system.
@@ -249,8 +254,8 @@ Why this design:
    - `BookingService` loads the room types through `RoomTypeRepository`.
    - It validates the fields (`booking_validation`) and derives the season from the check-in date
      (`seasons`).
-   - It either calculates the standard price or checks the given price against the band
-     (`pricing`).
+   - It either calculates the standard price or checks the given price (`price_dkk` or
+     `price_per_night_dkk`) against the band (`pricing`).
    - Any broken rule raises `ValidationFailed`, which becomes `422` listing every field.
 5. **Data**: `BookingRepository.add` runs a parameterised `INSERT` over PyMySQL against `db:3306`
    and reads the stored row back (id and timestamps).
@@ -258,15 +263,15 @@ Why this design:
    any response is sent.
 7. **Presentation** maps the `Booking` to the response DTO (with `season` and `year`) and returns
    `201` with a `Location` header.
-8. The frontend shows the result and reloads `GET /api/v1/bookings`. The next KPI request or
-   Tableau extract refresh includes the booking.
+8. The frontend shows the result and reloads `GET /api/v1/bookings`. The next Tableau extract
+   refresh includes the booking.
 
 ### API contract and its consumers (Principle V, answers Q7)
 
 | Consumer | Uses | Check when the contract changes |
 |----------|------|---------------------------------|
 | Browser frontend (Receptionist) | `room-types`, booking CRUD, Problem Details `errors[]` | Form fields, the enum list and error rendering still match |
-| Tableau dashboard (CFO, built by hand outside the repository) | Every `GET`: `bookings`, `reviews`, `bar/drink-sales`, `kpis/*` | Field names and types of the extracted tables are unchanged; JSONPath `$.items[*]` still works. Otherwise the team updates the workbook |
+| Tableau dashboard (CFO, built by hand outside the repository) | Parameterless `GET` endpoints: `/api/v1/bookings`, `/api/v1/room-types`, `/api/v1/reviews`, `/api/v1/bar/drink-sales` | Field names and types of the extracted tables are unchanged; JSONPath `$.items[*]` still works. Otherwise the team updates the workbook |
 | Hotel's booking system | `POST`, `PUT` and `DELETE /api/v1/bookings` | `BookingInput` required fields and the 400/404/422 meanings are unchanged |
 
 Change rule:
@@ -279,22 +284,15 @@ Change rule:
 
 ### Mandatory scope traceability
 
-| Scope ID | Endpoint → field(s) | Business code | Verified by |
-|----------|---------------------|---------------|-------------|
-| F1 | `bookings` (5 operations), frontend | `services/booking_service.py`, `rules/booking_validation.py`, `rules/pricing.py`, `rules/seasons.py` | Unit (validation, pricing, seasons); contract (5 operations); quickstart §3 |
-| A1 | `kpis/hotel/by-country` → `booking_count`, `booking_share_pct` | `kpis/hotel.py` | Unit; integration golden values; quickstart §5 |
-| A2 | `kpis/hotel/by-room-type-and-season` → `revenue_dkk` | `kpis/hotel.py` | Same, quickstart §4 |
-| A3 | `kpis/hotel/by-country` → `revenue_dkk` | `kpis/hotel.py` | Same, quickstart §4 |
-| A4 | `kpis/hotel/by-room-type` → `revenue_rank` | `kpis/hotel.py`, `rules/ranking.py` | Same, quickstart §4 |
-| A5 | `kpis/hotel/by-country` → `revenue_rank` | `kpis/hotel.py`, `rules/ranking.py` | Same, quickstart §4 |
-| A6 | `kpis/hotel/summary` → `total_revenue_dkk` | `kpis/hotel.py` | Same, quickstart §4 |
-| A7 | `summary`, `by-room-type`, `by-season` → ALOS, ADR, revenue per booking; `kpis/bar/by-price-tier`; `bar/drink-sales` → `units_rank`, `price_tier` | `kpis/hotel.py`, `kpis/bar.py`, `rules/price_tiers.py` | Same, quickstart §7 |
-| B1 | `kpis/bar/summary` | `kpis/bar.py` | Same, quickstart §6 |
-| B2 | `bar/drink-sales` → `revenue_dkk`, `revenue_rank` | `kpis/bar.py`, `rules/ranking.py` | Same, quickstart §6 |
-| B3 | `kpis/bar/by-category` | `kpis/bar.py`, `rules/numbers.py` | Same, quickstart §6 |
-| K1 | `summary`, `by-season`, `by-room-type` → `occupancy_rate_pct`, `available_room_nights` | `kpis/hotel.py`, `rules/seasons.py` | Same, quickstart §5 |
-| K2 | `summary` and `by-*` → revenue fields | `kpis/hotel.py` | Same, quickstart §4 |
-| K3 | `summary`, `by-season`, `by-room-type` → `average_satisfaction`, `satisfied_share_pct`; `reviews` | `kpis/hotel.py`, `services/review_service.py`, `rules/review_validation.py` | Same, quickstart §5 |
+| Scope ID | Raw API Endpoint(s) → field(s) consumed by Tableau / Frontend | Backend Business Code | Verified by |
+|----------|---------------------------------------------------------------|-----------------------|-------------|
+| F1 | `bookings` (5 operations), `room-types`, frontend | `services/booking_service.py`, `rules/booking_validation.py`, `rules/pricing.py`, `rules/seasons.py` | Unit (validation, pricing, seasons); contract (5 operations); quickstart §3 |
+| A1, A3, A5 | `GET /api/v1/bookings` → `country`, `days_rented`, `price_dkk`, `year` (aggregated in Tableau) | `services/booking_service.py`, `rules/seasons.py` | Contract (`test_bookings.py`), seed golden totals (`test_seed.py`); quickstart §4 |
+| A2, A4, A6, K2 | `GET /api/v1/bookings` → `room_type`, `season`, `year`, `days_rented`, `price_dkk` (aggregated in Tableau) | `services/booking_service.py`, `rules/seasons.py` | Same, quickstart §4 |
+| A7 | `GET /api/v1/bookings` (`days_rented`, `price_dkk`) and `GET /api/v1/bar/drink-sales` (`unit_price_dkk`, `units_sold`) (aggregated in Tableau) | `services/booking_service.py`, `services/bar_service.py` | Contract (`test_bookings.py`, `test_bar.py`), seed golden totals (`test_seed.py`) |
+| B1, B2, B3 | `GET /api/v1/bar/drink-sales` → `id`, `year`, `drink_name`, `category`, `unit_price_dkk`, `units_sold` (aggregated in Tableau) | `services/bar_service.py` | Contract (`test_bar.py`), seed golden totals (`test_seed.py`); quickstart §6 |
+| K1 | `GET /api/v1/room-types` (`room_count`) + `GET /api/v1/bookings` (`days_rented`, `room_type`, `season`, `year`) (calculated in Tableau) | `services/room_type_service.py`, `services/booking_service.py` | Contract (`test_health_and_room_types.py`, `test_bookings.py`); quickstart §5 |
+| K3 | `GET /api/v1/reviews` → `id`, `booking_id`, `room_type`, `stay_date`, `season`, `year`, `rating` (calculated in Tableau) | `services/review_service.py`, `rules/review_validation.py`, `rules/seasons.py` | Unit (`test_review_validation.py`, `test_review_service.py`), contract (`test_reviews.py`); quickstart §5 |
 | FR-017 | none: no Tableau files or connector code | none | Architecture test scans the repository for Tableau extensions; quickstart §8 |
 
 ### Answering the T2 questions from the repository (Principle X)
@@ -345,7 +343,7 @@ backend/
 │   ├── config.py                  # settings from environment variables
 │   ├── presentation/              # LAYER 1: HTTP and CLI adapters only
 │   │   ├── api/
-│   │   │   ├── routers/           # health, room_types, bookings, reviews, bar, kpis_hotel, kpis_bar
+│   │   │   ├── routers/           # health, room_types, bookings, reviews, bar
 │   │   │   ├── schemas/           # Pydantic DTOs + Problem Details
 │   │   │   ├── dependencies.py
 │   │   │   └── errors.py
@@ -355,19 +353,17 @@ backend/
 │   │   ├── domain/models.py
 │   │   ├── errors.py
 │   │   ├── ports.py
-│   │   ├── rules/                 # seasons, pricing, booking_validation, review_validation,
-│   │   │                          # price_tiers, ranking, numbers
-│   │   ├── kpis/                  # hotel.py, bar.py
-│   │   └── services/              # room_type, booking, review, bar, kpi, health, sample_data
+│   │   ├── rules/                 # seasons, pricing, booking_validation, review_validation, numbers
+│   │   └── services/              # room_type, booking, review, bar, health, sample_data
 │   └── data/                      # LAYER 3: the only code that talks to MySQL
 │       ├── connection.py
 │       └── repositories/          # room_types, bookings, reviews, bar_sales, health
 └── tests/
     ├── conftest.py                # hotel_test schema setup, TestClient, contract loader
-    ├── unit/                      # business rules and KPI formulas (no DB)
-    ├── contract/                  # every operation vs specs/.../contracts/openapi.yaml
-    ├── integration/               # repositories, seed idempotency, golden KPI values
-    └── architecture/              # layer import rules, no Tableau files (FR-017)
+    ├── unit/                      # operational business rules and services (no DB)
+    ├── contract/                  # every operation (11 operations) vs specs/.../contracts/openapi.yaml
+    ├── integration/               # repositories, booking CRUD, seed idempotency
+    └── architecture/              # layer import rules, frontend price mirror, no Tableau files (FR-017)
 
 db/
 └── init/
