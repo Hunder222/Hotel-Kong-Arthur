@@ -55,8 +55,67 @@ def test_an_empty_year_has_zero_rates_and_full_capacity(client):
         0.0, 0, 0.0, 78110)
 
 
-def test_a_bad_year_is_400(client):
-    assert client.get("/api/v1/kpis/hotel/summary?year=abc").status_code == 400
+@pytest.mark.parametrize("year", ["abc", "ALL", "All", "1999", "2101"])
+def test_a_bad_year_is_400(client, year):
+    assert client.get(f"/api/v1/kpis/hotel/summary?year={year}").status_code == 400
+
+
+# ---- FR-021: `year=all`, or no year at all, means all-time ----
+
+
+def test_summary_for_year_all_equals_the_sample_year(client, check_contract, seeded):
+    response = client.get("/api/v1/kpis/hotel/summary?year=all")
+    assert response.status_code == 200
+    check_contract(response)
+    body = response.json()
+    # the sample data is all in 2026: the same totals and the capacity of that one year, labelled "all"
+    assert body["year"] == "all"
+    assert (body["total_revenue_dkk"], body["booking_count"], body["available_room_nights"],
+            body["occupancy_rate_pct"]) == (11234034.0, 1000, 78110, 6.89)
+
+
+@pytest.mark.parametrize("path", ["summary", "by-room-type", "by-season"])
+@pytest.mark.parametrize("query", ["?year=all", ""])
+def test_all_time_responses_match_the_complete_contract(client, check_contract, seeded, path, query):
+    response = client.get(f"/api/v1/kpis/hotel/{path}{query}")
+    assert response.status_code == 200
+    check_contract(response)
+    rows = response.json().get("items", [response.json()])
+    assert {row["year"] for row in rows} == {"all"}
+
+
+def test_omitting_the_year_equals_year_all(client, seeded):
+    for path in ("summary", "by-room-type", "by-season"):
+        omitted = client.get(f"/api/v1/kpis/hotel/{path}")
+        assert omitted.json() == client.get(f"/api/v1/kpis/hotel/{path}?year=all").json()
+
+
+def test_all_time_by_season_uses_the_season_days_of_the_span(client, seeded):
+    items = client.get("/api/v1/kpis/hotel/by-season?year=all").json()["items"]
+    assert [i["season_days"] for i in items] == [89, 153, 123]
+    assert [i["occupancy_rate_pct"] for i in items] == [9.34, 5.61, 6.70]
+
+
+def test_all_time_without_any_booking_has_no_capacity(client, check_contract):
+    response = client.get("/api/v1/kpis/hotel/summary")  # empty database
+    check_contract(response)
+    body = response.json()
+    assert (body["year"], body["booking_count"], body["available_room_nights"], body["occupancy_rate_pct"]) == (
+        "all", 0, 0, 0.0)
+
+
+def test_all_time_capacity_spans_every_year_with_bookings(client, check_contract, seeded):
+    # a booking in 2027 widens the span from 2026 to 2026-2027: two years of room-nights
+    created = client.post("/api/v1/bookings", json={
+        "first_name": "Elena", "family_name": "Müller", "country": "Germany", "room_type": "Superior Double",
+        "check_in_date": "2027-03-01", "days_rented": 2})
+    assert created.status_code == 201
+    everything = client.get("/api/v1/kpis/hotel/summary?year=all")
+    check_contract(everything)
+    body = everything.json()
+    assert (body["booking_count"], body["nights_sold"], body["available_room_nights"]) == (1001, 5381, 156220)
+    assert client.get("/api/v1/kpis/hotel/summary?year=2026").json()["available_room_nights"] == 78110
+    assert client.get("/api/v1/kpis/hotel/summary?year=2027").json()["booking_count"] == 1
 
 
 # ---- T086: the same endpoints against the COMPLETE contract schemas (incl. ALOS / ADR / revenue per booking) ----

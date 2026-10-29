@@ -8,6 +8,9 @@
   --accent-text: #ffffff;
   --danger: #b42318;
   --ok: #1a6b3a;
+  --edit: #b45309;
+  --edit-dark: #7c2d12;
+  --edit-bg: #fff7ed;
   color-scheme: light;
 }
 
@@ -78,9 +81,51 @@ th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color
 .num { text-align: right; }
 td.row-actions { display: flex; gap: 0.35rem; }
 td.row-actions button { padding: 0.2rem 0.55rem; font-size: 0.85rem; }
-tr.editing { background: #eef5f8; }
+tr.editing { background: #ffe9cc; box-shadow: inset 4px 0 0 var(--edit); }
 
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* ---------- price fields and live preview (FR-018, FR-019) ---------- */
+
+.price-box { margin: 1rem 0 0; padding: 0.5rem 1rem 1rem; border: 1px solid var(--line); border-radius: 8px; }
+.price-box legend { padding: 0 0.4rem; font-weight: 600; font-size: 0.9rem; }
+.price-box > .hint { margin: 0.6rem 0 0; }
+input[readonly] { background: #f2f4f7; color: var(--muted); border-style: dashed; }
+button.link { padding: 0 0 0 0.5rem; border: 0; background: none; color: var(--accent); font-size: inherit; text-decoration: underline; }
+
+.price-preview { margin-top: 0.75rem; padding: 0.65rem 0.9rem; background: #f1f7f9; border: 1px solid #c9dde4; border-radius: 8px; }
+.price-preview .hint { margin: 0.5rem 0 0; }
+.preview-empty { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.preview-list { display: grid; gap: 0.25rem; margin: 0; }
+.preview-list > div { display: flex; justify-content: space-between; gap: 1rem; }
+.preview-list dt { color: var(--muted); }
+.preview-list dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.preview-list .total { padding-top: 0.3rem; border-top: 1px solid #c9dde4; font-size: 1.05rem; }
+.preview-list .total dt { color: var(--text); font-weight: 600; }
+
+/* ---------- edit mode (FR-020): clearly unlike creating a booking ---------- */
+
+.edit-banner {
+  display: none; align-items: center; flex-wrap: wrap; gap: 0.75rem;
+  margin: -1rem -1.25rem 1rem; padding: 0.7rem 1.25rem; border-radius: 5px 5px 0 0;
+  color: #fff; font-weight: 600;
+  background: repeating-linear-gradient(135deg, var(--edit) 0 16px, var(--edit-dark) 16px 32px);
+}
+.edit-badge {
+  padding: 0.15rem 0.65rem; border-radius: 999px; background: #fff; color: var(--edit-dark);
+  font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase;
+}
+#edit-banner-text { flex: 1 1 18rem; }
+.banner-cancel { border-color: #fff; background: #fff; color: var(--edit-dark); font-weight: 700; }
+
+body.edit-mode .edit-banner { display: flex; }
+body.edit-mode .page-header { background: var(--edit-dark); }
+body.edit-mode #booking-card {
+  border: 3px solid var(--edit); background: var(--edit-bg); box-shadow: 0 0 0 6px rgba(180, 83, 9, 0.16);
+}
+body.edit-mode #booking-card h2 { color: var(--edit-dark); }
+body.edit-mode #submit-button { background: var(--edit); border-color: var(--edit); }
+body.edit-mode #cancel-button { border-color: var(--edit); color: var(--edit-dark); font-weight: 600; }

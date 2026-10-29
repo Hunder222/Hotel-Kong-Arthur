@@ -110,6 +110,80 @@ def test_null_price_means_standard_price(room_types):
     assert errors == [] and booking.price_dkk is None
 
 
+# ---- FR-019: a fixed price per night instead of a total ----
+
+
+def test_price_per_night_inside_the_band_gives_the_total_price(room_types):
+    booking, errors = run(room_types, price_per_night_dkk=2000.0)  # Superior Double, high season 1800-2200, 3 nights
+    assert errors == [] and booking.price_dkk == Decimal("6000.00")
+
+
+def test_price_per_night_with_two_decimals_is_multiplied_exactly(room_types):
+    booking, errors = run(room_types, price_per_night_dkk=1999.99)
+    assert errors == [] and booking.price_dkk == Decimal("5999.97")
+
+
+def test_price_per_night_band_edges_are_inclusive(room_types):
+    assert run(room_types, price_per_night_dkk=1800)[1] == []
+    assert run(room_types, price_per_night_dkk=2200)[1] == []
+    assert fields(run(room_types, price_per_night_dkk=1799.99)[1]) == ["price_per_night_dkk"]
+    assert fields(run(room_types, price_per_night_dkk=2200.01)[1]) == ["price_per_night_dkk"]
+
+
+def test_price_per_night_outside_the_band_names_the_range(room_types):
+    _, errors = run(room_types, room_type="Standard Single", check_in_date="2026-01-10", price_per_night_dkk=1500)
+    assert fields(errors) == ["price_per_night_dkk"]
+    assert errors[0].message == (
+        "1,500.00 DKK per night is outside 900.00–1,200.00 DKK per night for Standard Single in low season."
+    )
+
+
+@pytest.mark.parametrize("value", [0, -5, 1500.555, "1500", True, float("nan")])
+def test_invalid_price_per_night(room_types, value):
+    _, errors = run(room_types, price_per_night_dkk=value)
+    assert fields(errors) == ["price_per_night_dkk"]
+    assert errors[0].message == "Price per night must be a positive amount in DKK with at most 2 decimals."
+
+
+def test_total_price_and_price_per_night_are_mutually_exclusive(room_types):
+    booking, errors = run(room_types, price_dkk=6000.0, price_per_night_dkk=2000.0)
+    assert booking is None
+    assert fields(errors) == ["price_per_night_dkk"]
+    assert errors[0].message == "Give either the total price or the price per night, not both."
+
+
+def test_both_prices_are_rejected_even_when_they_agree(room_types):
+    _, errors = run(room_types, price_dkk=6000.0, price_per_night_dkk=2000.0)  # 2000 x 3 = 6000
+    assert fields(errors) == ["price_per_night_dkk"]
+
+
+def test_a_null_price_field_does_not_count_as_given(room_types):
+    booking, errors = run(room_types, price_dkk=None, price_per_night_dkk=2000.0)
+    assert errors == [] and booking.price_dkk == Decimal("6000.00")
+    booking, errors = run(room_types, price_dkk=6000.0, price_per_night_dkk=None)
+    assert errors == [] and booking.price_dkk == Decimal("6000.00")
+    booking, errors = run(room_types, price_dkk=None, price_per_night_dkk=None)
+    assert errors == [] and booking.price_dkk is None
+
+
+def test_without_either_price_the_standard_price_applies_later(room_types):
+    booking, errors = run(room_types)  # neither key at all
+    assert errors == [] and booking.price_dkk is None
+
+
+def test_the_nightly_band_is_checked_even_when_days_rented_is_invalid(room_types):
+    # the band depends on room type and check-in date only, so both mistakes are reported at once
+    _, errors = run(room_types, days_rented=0, price_per_night_dkk=100)
+    assert fields(errors) == ["days_rented", "price_per_night_dkk"]
+
+
+def test_the_nightly_band_is_skipped_when_room_type_or_date_is_invalid(room_types):
+    _, errors = run(room_types, room_type="Penthouse", price_per_night_dkk=100)
+    assert fields(errors) == ["room_type"]
+    _, errors = run(room_types, check_in_date="nope", price_per_night_dkk=100)
+    assert fields(errors) == ["check_in_date"]
+
+
 def test_several_errors_are_reported_at_once(room_types):
     booking, errors = run(
         room_types, room_type="Penthouse", days_rented=0, first_name="", check_in_date="nope", price_dkk=-1

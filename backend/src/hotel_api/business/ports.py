@@ -73,7 +73,8 @@ class ReviewRepository(Protocol):
 
 
 class BarSalesRepository(Protocol):
-    def list(self, sales_year: int, category: DrinkCategory | None = None) -> list[BarDrinkSale]: ...
+    def list(self, sales_year: int | None, category: DrinkCategory | None = None) -> list[BarDrinkSale]:
+        """Drink sales of one year, or of every year when `sales_year` is None (all-time, FR-021)."""
 
     def delete_all(self) -> None: ...
 

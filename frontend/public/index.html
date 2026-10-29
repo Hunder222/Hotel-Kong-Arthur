@@ -16,7 +16,12 @@
   <main>
     <p id="status" class="status" role="status" aria-live="polite"></p>
 
-    <section class="card" aria-labelledby="form-title">
+    <section class="card" id="booking-card" aria-labelledby="form-title">
+      <div class="edit-banner" role="status" aria-live="polite">
+        <span class="edit-badge">Edit mode</span>
+        <span id="edit-banner-text"></span>
+        <button type="button" id="banner-cancel" class="banner-cancel">Cancel edit</button>
+      </div>
       <h2 id="form-title">New booking</h2>
       <form id="booking-form" novalidate>
         <div class="grid">
@@ -45,16 +50,28 @@
             <input name="days_rented" type="number" min="1" max="365" step="1" inputmode="numeric">
             <span class="field-error" data-error-for="days_rented"></span>
           </label>
-          <label>Total price (DKK)
-            <input name="price_dkk" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Standard price">
-            <span class="hint">Leave empty to use the standard price.</span>
-            <span class="field-error" data-error-for="price_dkk"></span>
-          </label>
         </div>
+
+        <fieldset class="price-box">
+          <legend>Price</legend>
+          <div class="grid">
+            <label>Total price (DKK)
+              <input name="price_dkk" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Standard price">
+              <span class="field-error" data-error-for="price_dkk"></span>
+            </label>
+            <label>Price per night (DKK)
+              <input name="price_per_night_dkk" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Standard rate">
+              <span class="field-error" data-error-for="price_per_night_dkk"></span>
+            </label>
+          </div>
+          <p class="hint">Leave both empty for the standard price. Fill in one of them and the other is calculated.
+            <button type="button" id="clear-price" class="link" hidden>Use standard price</button></p>
+          <div id="price-preview" class="price-preview" aria-live="polite"></div>
+        </fieldset>
         <p class="field-error form-error" data-error-for="_form"></p>
         <div class="actions">
           <button type="submit" id="submit-button" class="primary">Create booking</button>
-          <button type="button" id="cancel-button" hidden>Cancel</button>
+          <button type="button" id="cancel-button" hidden>Cancel edit</button>
         </div>
       </form>
     </section>

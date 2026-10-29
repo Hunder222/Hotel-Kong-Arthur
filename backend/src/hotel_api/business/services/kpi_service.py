@@ -1,5 +1,5 @@
-"""Use case: hotel KPIs. Loads one reporting year of data through the ports and calls the pure KPI
-functions in `business/kpis`; it contains no formulas itself (Constitution VII).
+"""Use case: hotel KPIs. Loads one reporting year of data through the ports (all of it when `year` is None,
+FR-021) and calls the pure KPI functions in `business/kpis`; it contains no formulas itself (Constitution VII).
 
 Revenue (US2), occupancy and satisfaction (US3), ALOS / ADR / revenue per booking (US5).
 """
@@ -25,25 +25,25 @@ class KpiService:
         self._room_types = room_types
         self._reviews = reviews
 
-    def summary(self, year: int) -> HotelSummary:
+    def summary(self, year: int | None) -> HotelSummary:
         return hotel.hotel_summary(
             self._bookings.list(year=year), self._reviews.list(year=year), self._room_types.list_all(), year
         )
 
-    def by_room_type(self, year: int) -> list[RoomTypeKpi]:
+    def by_room_type(self, year: int | None) -> list[RoomTypeKpi]:
         return hotel.kpis_by_room_type(
             self._bookings.list(year=year), self._reviews.list(year=year), self._room_types.list_all(), year
         )
 
-    def by_season(self, year: int) -> list[SeasonKpi]:
+    def by_season(self, year: int | None) -> list[SeasonKpi]:
         return hotel.kpis_by_season(
             self._bookings.list(year=year), self._reviews.list(year=year), self._room_types.list_all(), year
         )
 
-    def by_room_type_and_season(self, year: int) -> list[RoomTypeSeasonKpi]:
+    def by_room_type_and_season(self, year: int | None) -> list[RoomTypeSeasonKpi]:
         return hotel.revenue_by_room_type_and_season(
             self._bookings.list(year=year), self._room_types.list_all(), year
         )
 
-    def by_country(self, year: int) -> list[CountryKpi]:
+    def by_country(self, year: int | None) -> list[CountryKpi]:
         return hotel.revenue_by_country(self._bookings.list(year=year), year)

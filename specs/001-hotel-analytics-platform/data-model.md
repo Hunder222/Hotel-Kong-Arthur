@@ -217,6 +217,9 @@ code.
 
 - Omitted price: `price_dkk = standard_nightly_dkk(room_type, season(check_in_date)) × days_rented`.
 - Manual price: accepted only when `min_nightly_dkk ≤ price_dkk / days_rented ≤ max_nightly_dkk`.
+- Fixed price per night (FR-019): `price_dkk = price_per_night_dkk × days_rented`, accepted only when
+  `min_nightly_dkk ≤ price_per_night_dkk ≤ max_nightly_dkk`. It is the same verdict as for the
+  matching total, and it is exclusive with a manual `price_dkk`. Only the total is stored.
 
 ### 4.3 Ranking (`business/rules/ranking.py`)
 
@@ -254,8 +257,10 @@ with one `{field, message}` per broken rule, so every client gets the same rules
 | `check_in_date` | ISO `YYYY-MM-DD`; a real date; year 2000 to 2100 | "Check-in date must be a valid date (YYYY-MM-DD) between 2000-01-01 and 2100-12-31." |
 | `days_rented` | whole number, 1 to 365 | "Days rented must be a whole number from 1 to 365." |
 | `price_dkk` | optional; when given: > 0, at most 2 decimals, nightly rate inside the band | "4,500.00 DKK for 3 nights is 1,500.00 DKK per night, outside 900.00–1,200.00 DKK per night for Standard Single in low season." |
+| `price_per_night_dkk` | optional, exclusive with `price_dkk`; when given: > 0, at most 2 decimals, inside the band; the total is this × `days_rented` | "1,500.00 DKK per night is outside 900.00–1,200.00 DKK per night for Standard Single in low season." and, when both prices are given, "Give either the total price or the price per night, not both." (on `price_per_night_dkk`) |
 
-- On `PUT`, `price_dkk` omitted or `null` recalculates the standard price for the new values.
+- On `PUT`, `price_dkk` and `price_per_night_dkk` both omitted or `null` recalculates the standard
+  price for the new values.
 - Satisfaction is not part of a booking (FR-003, FR-011).
 
 ### 5.2 Review (create `POST`)
@@ -287,6 +292,12 @@ with one `{field, message}` per broken rule, so every client gets the same rules
 Scope: all rows are filtered to one reporting **year**, using the booking's `check_in_date`, the
 review's `stay_date` and the drink sale's `sales_year`. Segment rows apply the segment's filter
 (room type, season, room type and season, country, category, tier) on top.
+
+All-time (FR-021): with `year=all`, or no `year`, there is no year filter and every row reports
+`year` `"all"`. Available room-nights (and `season_days`) then cover every calendar year from the
+first to the last booking, a year without bookings in between included; without bookings there
+is no period, so they are 0 and the occupancy rate is 0.00. A drink on the menu in several years
+counts once in `drink_count`.
 
 | KPI | Scope ID | Definition | When empty | Code (only place) | Exposed as |
 |-----|----------|------------|------------|-------------------|------------|

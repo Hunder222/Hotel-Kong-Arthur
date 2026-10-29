@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/v1/bar", tags=["Bar"])
 @router.get("/drink-sales", response_model=DrinkSaleList, operation_id="listDrinkSales")
 def list_drink_sales(
     category: DrinkCategory | None = None,
-    year: int = Depends(report_year),
+    year: int | None = Depends(report_year),
     service: BarService = Depends(get_bar_service),
 ) -> DrinkSaleList:
     return DrinkSaleList(items=[DrinkSale.from_model(r) for r in service.drink_sales(year, category)])

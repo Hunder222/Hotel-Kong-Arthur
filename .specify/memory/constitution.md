@@ -1,25 +1,19 @@
 <!--
 Sync Impact Report (temporary review aid; delete this comment before committing)
-- Version change: unversioned template → 1.0.0 (initial ratification)
-- Bump rationale: first concrete constitution; every template placeholder replaced
-- Principles (template slot → new title):
-  - PRINCIPLE_1 → I. Spec-Driven Development with GitHub Spec Kit
-  - PRINCIPLE_2 → II. User Stories with Acceptance Criteria
-  - PRINCIPLE_3 → III. Three-Layer Backend
-  - PRINCIPLE_4 → IV. The REST/JSON API Is the Only Way In
-  - PRINCIPLE_5 → V. The OpenAPI Contract Matches the Code
-  - added       → VI. MySQL Holds the Data, and the Data Is Live
-  - added       → VII. KPIs Are Business Logic
-  - added       → VIII. One Command: docker-compose up
-  - added       → IX. Tested Business Rules and API Contract
-  - added       → X. Human Ownership and Visible Contribution
-- Sections: SECTION_2 → Mandatory Scope & Deliverables; SECTION_3 → Development Workflow &
-  Quality Gates; added: source key (preamble) and Open Questions (at the end, as requested)
-- Removed sections: none
-- Dependent templates: not modified (command scope guard)
-  - plan-template.md: Constitution Check is derived from this file at runtime; gates I–X apply
-  - tasks-template.md: tasks MUST now include unit and contract tests (Principle IX)
-- Deferred placeholders: none. Open Questions OQ-1 to OQ-5 and the Clarify list need answers.
+- Version change: 1.0.0 → 1.1.0 (MINOR: materially expanded guidance in Principle VII)
+- Modified principles: VII. KPIs Are Business Logic (title unchanged). Adds one display-only
+  exception: the browser frontend may mirror the month → season table and the standard-price
+  arithmetic, in frontend/public/price-preview.js only; the server re-derives and validates on
+  save; a drift test is required; no other rule or KPI formula in the frontend or Tableau.
+- Modified gates: Constitution Check gate VII (question widened accordingly)
+- Other principles, sections and Open Questions: unchanged
+- Added/removed sections: none
+- Sources added: team decision 2026-10-29 (spec.md FR-018, FR-019; tasks.md T114, T115;
+  research.md R15 amended)
+- Dependent artefacts not modified here (command scope guard): plan.md gate VII evidence
+  ("the frontend computes nothing") and its frontend table rows are now stale; tasks.md T105 should
+  list this amendment as done
+- Deferred placeholders: none
 -->
 # Hotel Kong Arthur Constitution
 
@@ -173,6 +167,18 @@ Workflowet (Clarify) · T2 › Q8, Q9 · T3 · TM › Overordnet arkitektur · *
   one place. Tableau MAY filter, group and aggregate API data (sums, counts, shares) for
   interactivity, but MUST NOT re-implement a business rule such as the season mapping, the
   occupancy formula or pricing.
+- **One display-only exception in the browser frontend.** For the live price preview and the
+  price-per-night/total convenience fields (FR-018, FR-019), the frontend MAY mirror exactly two
+  things: the month → season table and the standard-price arithmetic (standard nightly rate ×
+  nights, and nightly ↔ total conversion). The mirror MUST live in one file,
+  `frontend/public/price-preview.js`, and MUST be used for display only.
+- The server MUST re-derive the season and the price, and validate every value, whenever a
+  booking is saved. Nothing computed in the browser is ever a rule outcome: the frontend MUST NOT
+  decide whether a price is allowed.
+- An automated test MUST fail if the mirrored season table differs from
+  `business/rules/seasons.py` (`backend/tests/architecture/test_frontend_price_mirror.py`).
+- No other business rule or KPI formula MAY be implemented in the frontend or in Tableau. A new
+  mirror requires a further amendment of this principle.
 - The plan MUST record why KPIs are calculated in the business layer rather than in MySQL or
   Tableau, and what moving them would cost.
 - The hotel facts in T1 are binding inputs to the spec: 214 rooms; 1–4 guests per room and about
@@ -180,11 +186,16 @@ Workflowet (Clarify) · T2 › Q8, Q9 · T3 · TM › Overordnet arkitektur · *
   high season; a lobby bar where Helene Christine makes 20 cocktails and 10 coffee types.
 
 **Rationale:** The team placed KPI calculation in the service layer. One definition per KPI keeps
-the API and the dashboard consistent and answers Q4.
+the API and the dashboard consistent and answers Q4. The receptionist needs to see the price
+before saving (FR-018) and the other price field filled in (FR-019), which cannot wait for a
+round trip per keystroke; the exception is therefore small, isolated in one file, guarded by a
+test, and never authoritative.
 
 **Sources:** T1 › Systemkrav › Beregninger; Data om Hotel Kong Arthur; Krav: Forretningsdesign og
-Analytics · T2 › Q4 · TM › Overordnet arkitektur (Service Layer) · **Binding:** teacher (KPIs,
-hotel facts); team (placement in the business layer)
+Analytics · T2 › Q4 · TM › Overordnet arkitektur (Service Layer) · team decision of 2026-10-29
+(`specs/001-hotel-analytics-platform/spec.md` FR-018, FR-019; `tasks.md` T114, T115;
+`research.md` R15, amended) · **Binding:** teacher (KPIs, hotel facts); team (placement in the
+business layer, the display-only exception)
 
 ### VIII. One Command: `docker-compose up`
 
@@ -338,7 +349,7 @@ Tracking. Violations of teacher-bound rules are not allowed.
 | IV | Do all clients, Tableau included, use only the REST/JSON API? |
 | V | Is the OpenAPI contract updated, and is the sync mechanism named? |
 | VI | Is all runtime data in MySQL and seeded automatically, with persistence decided? |
-| VII | Is each KPI defined once, in the business layer? |
+| VII | Is each KPI and business rule defined once, in the business layer, with the browser limited to the one display-only price mirror (guarded by a drift test, server re-validates on save) and Tableau computing no rule? |
 | VIII | Does the whole system start from a fresh clone with `docker-compose up`? |
 | IX | Are unit tests for business rules and contract tests for endpoints planned? |
 | X | Are architecture decisions recorded with rationale, including one the AI proposed? |
@@ -385,7 +396,7 @@ VIII, IX and X)
   sources stay in Danish. Day-to-day developer guidance (setup, tests, commit conventions) belongs
   in `CONTRIBUTE.md`.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-27 | **Last Amended**: 2026-10-27
+**Version**: 1.1.0 | **Ratified**: 2026-10-27 | **Last Amended**: 2026-10-29
 
 ## Open Questions
 

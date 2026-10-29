@@ -16,6 +16,7 @@ import pytest
 from hotel_api.business.domain.models import BarDrinkSale, DrinkCategory
 
 from hotel_api.business.kpis import bar
+from hotel_api.business.services.bar_service import BarService
 
 pytestmark = pytest.mark.unit
 
@@ -117,3 +118,92 @@ def test_equal_values_share_a_rank_and_are_listed_by_name():
 def test_ranking_ignores_nothing_it_is_given():
     # filtering by year is the caller's job for ranking; the summary and split filter by `year` themselves
     assert len(bar.ranked_drink_sales(SALES)) == 5
+
+
+# ---- FR-021: all-time (`year=None`): every year counts, the row reports year "all" ----
+
+
+def test_all_time_summary_adds_up_every_year_and_reports_year_all():
+    s = bar.bar_summary(SALES, None)
+    assert (s.year, s.drink_count, s.units_sold, s.total_revenue_dkk) == ("all", 5, 134199, D("7225693.99"))
+    assert bar.bar_summary(SALES, 2026).year == 2026
+
+
+def test_a_drink_sold_in_several_years_is_one_drink_all_time():
+    two_years = [
+        sale(1, "Espresso", COFFEE, "70.00", 100, year=2025),
+        sale(2, "Espresso", COFFEE, "75.00", 100, year=2026),
+    ]
+    s = bar.bar_summary(two_years, None)
+    assert (s.drink_count, s.units_sold, s.total_revenue_dkk) == (1, 200, D("14500.00"))
+    assert bar.bar_by_category(two_years, None)[1].drink_count == 1
+
+
+def test_all_time_category_split_covers_every_year():
+    cocktail, coffee = bar.bar_by_category(SALES, None)
+    assert (cocktail.year, coffee.year) == ("all", "all")
+    assert (cocktail.drink_count, cocktail.units_sold, cocktail.revenue_dkk) == (2, 5711, D("648074.67"))
+    assert (coffee.drink_count, coffee.units_sold, coffee.revenue_dkk) == (3, 128488, D("6577619.32"))
+    assert (cocktail.revenue_share_pct, coffee.revenue_share_pct) == (D("8.97"), D("91.03"))
+    assert cocktail.unit_share_pct + coffee.unit_share_pct == D("100.00")
+
+
+def test_all_time_price_tiers_cover_every_year():
+    budget, standard, premium = bar.bar_by_price_tier(SALES, None)
+    assert {budget.year, standard.year, premium.year} == {"all"}
+    assert (budget.drink_count, budget.units_sold, budget.revenue_dkk) == (3, 128488, D("6577619.32"))
+    assert (standard.drink_count, standard.units_sold, standard.revenue_dkk) == (1, 2361, D("171101.67"))
+    assert (premium.drink_count, premium.units_sold, premium.revenue_dkk) == (1, 3350, D("476973.00"))
+    assert sum(r.revenue_share_pct for r in (budget, standard, premium)) == D("100.00")
+    assert sum(r.unit_share_pct for r in (budget, standard, premium)) == D("100.00")
+
+
+def test_all_time_zero_sales_return_zeros_not_an_error():
+    s = bar.bar_summary([], None)
+    assert (s.year, s.drink_count, s.units_sold, s.total_revenue_dkk) == ("all", 0, 0, D("0.00"))
+    assert [r.drink_count for r in bar.bar_by_category([], None)] == [0, 0]
+    assert [r.drink_count for r in bar.bar_by_price_tier([], None)] == [0, 0, 0]
+    assert bar.ranked_drink_sales_by_year([]) == []
+
+
+def test_all_time_drink_list_has_one_row_per_drink_and_year_each_year_ranked_on_its_own():
+    ranked = bar.ranked_drink_sales_by_year(SALES)
+    assert [(r.sale.sales_year, r.revenue_rank, r.units_rank, r.sale.drink_name) for r in ranked] == [
+        (2025, 1, 1, "Old row"),
+        (2026, 1, 1, "Espresso"),
+        (2026, 2, 2, "Americano"),
+        (2026, 3, 3, "Mojito"),
+        (2026, 4, 4, "Margarita"),
+    ]
+
+
+class FakeBarSales:
+    def __init__(self, rows):
+        self.rows, self.calls = rows, []
+
+    def list(self, sales_year, category=None):
+        self.calls.append(sales_year)
+        return [
+            s
+            for s in self.rows
+            if (sales_year is None or s.sales_year == sales_year) and (category is None or s.category is category)
+        ]
+
+
+def test_service_loads_one_year_or_everything():
+    repo = FakeBarSales(SALES)
+    service = BarService(repo)
+    assert service.summary(2026).drink_count == 4
+    assert service.summary(None).drink_count == 5
+    assert [r.year for r in service.by_category(None)] == ["all", "all"]
+    assert [r.year for r in service.by_price_tier(None)] == ["all"] * 3
+    assert repo.calls == [2026, None, None, None]
+
+
+def test_service_drink_sales_without_a_year_lists_every_year_and_filters_after_ranking():
+    service = BarService(FakeBarSales(SALES))
+    assert [(r.sale.sales_year, r.sale.drink_name) for r in service.drink_sales(None)] == [
+        (2025, "Old row"), (2026, "Espresso"), (2026, "Americano"), (2026, "Mojito"), (2026, "Margarita")]
+    cocktails = service.drink_sales(None, COCKTAIL)
+    assert [(r.revenue_rank, r.sale.drink_name) for r in cocktails] == [(3, "Mojito"), (4, "Margarita")]
+    assert [r.sale.drink_name for r in service.drink_sales(2026)] == ["Espresso", "Americano", "Mojito", "Margarita"]

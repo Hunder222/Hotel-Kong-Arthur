@@ -1,11 +1,16 @@
-// Booking page for reception. Renders what the API returns; it contains NO business rules:
-// no season mapping, no price calculation and no validation of values (research R15).
+// Booking page for reception. The API stays the only authority: it derives the season, prices the stay and
+// validates every field when a booking is saved (research R15). The live price preview and the two price
+// fields use price-preview.js, a display-only mirror of the season table and the standard price (FR-018, FR-019).
 import { ApiError, createBooking, deleteBooking, listBookings, listRoomTypes, replaceBooking } from "./api.js";
+import { nightlyFromTotal, standardPreview, totalFromNightly } from "./price-preview.js";
 
 const PAGE_SIZE = 50;
-const FIELDS = ["first_name", "family_name", "country", "room_type", "check_in_date", "days_rented", "price_dkk"];
+const FIELDS = [
+  "first_name", "family_name", "country", "room_type", "check_in_date", "days_rented", "price_dkk", "price_per_night_dkk",
+];
 
-const state = { roomTypes: [], bookings: [], editingId: null, visible: PAGE_SIZE };
+// priceMode: which manual price field is in use, only one at a time (FR-019): "total", "nightly" or null (standard price).
+const state = { roomTypes: [], bookings: [], editingId: null, visible: PAGE_SIZE, priceMode: null };
 
 const form = document.getElementById("booking-form");
 const rows = document.getElementById("booking-rows");
@@ -17,6 +22,12 @@ const moreButton = document.getElementById("more-button");
 const emptyNote = document.getElementById("empty");
 const countLabel = document.getElementById("count");
 const rateHint = document.getElementById("rate-hint");
+const totalInput = form.elements.price_dkk;
+const nightlyInput = form.elements.price_per_night_dkk;
+const clearPriceButton = document.getElementById("clear-price");
+const previewBox = document.getElementById("price-preview");
+const bannerText = document.getElementById("edit-banner-text");
+const bannerCancel = document.getElementById("banner-cancel");
 
 const money = new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK" });
 const number = new Intl.NumberFormat("da-DK");
@@ -66,6 +77,7 @@ function renderRoomTypes() {
     select.append(option);
   }
   showRateHint();
+  refreshPrice();
 }
 
 /** Shows the API's rate bands for the selected room type as information only. */
@@ -126,6 +138,104 @@ function renderBookings() {
   countLabel.textContent = state.bookings.length ? `(${state.bookings.length})` : "";
 }
 
+// ---------- price fields and live preview (FR-018, FR-019) ----------
+
+const amount = (input) => (input.value.trim() === "" ? null : Number(input.value));
+
+/** The number of nights as a whole number from 1, or null while the field is empty or not usable. */
+function nightsValue() {
+  const nights = amount(form.elements.days_rented);
+  return nights !== null && Number.isInteger(nights) && nights >= 1 ? nights : null;
+}
+
+/** Back to the standard price: both price fields empty and unlocked. */
+function clearManualPrice() {
+  state.priceMode = null;
+  totalInput.value = "";
+  nightlyInput.value = "";
+}
+
+/** Typing in one price field makes it the manual price (FR-019); the other then shows the calculated value. */
+function onPriceInput(kind) {
+  const typed = kind === "total" ? totalInput : nightlyInput;
+  if (typed.value.trim() === "" && !typed.validity.badInput) clearManualPrice();
+  else state.priceMode = kind;
+  refreshPrice();
+}
+
+/** Fills and locks the field that is not in use with the calculated counterpart of the one that is. */
+function syncPriceFields() {
+  const nights = nightsValue();
+  if (state.priceMode === "total") {
+    const total = amount(totalInput);
+    nightlyInput.value = nights && Number.isFinite(total) ? String(nightlyFromTotal(total, nights)) : "";
+  } else if (state.priceMode === "nightly") {
+    const nightly = amount(nightlyInput);
+    totalInput.value = nights && Number.isFinite(nightly) ? String(totalFromNightly(nightly, nights)) : "";
+  }
+  totalInput.readOnly = state.priceMode === "nightly";
+  nightlyInput.readOnly = state.priceMode === "total";
+  totalInput.classList.toggle("computed", state.priceMode === "nightly");
+  nightlyInput.classList.toggle("computed", state.priceMode === "total");
+  clearPriceButton.hidden = state.priceMode === null;
+}
+
+/** The price breakdown under the price fields: standard rate, nights and standard total, then the typed price. */
+function renderPreview() {
+  const roomType = state.roomTypes.find((r) => r.name === form.elements.room_type.value);
+  const preview = standardPreview(roomType, form.elements.check_in_date.value, nightsValue());
+  previewBox.replaceChildren();
+  if (!preview) {
+    const note = document.createElement("p");
+    note.className = "preview-empty";
+    note.textContent = "Choose room type, check-in date and nights to see the price.";
+    previewBox.append(note);
+    return;
+  }
+  const list = document.createElement("dl");
+  list.className = "preview-list";
+  const line = (label, value, className) => {
+    const row = document.createElement("div");
+    if (className) row.className = className;
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const detail = document.createElement("dd");
+    detail.textContent = value;
+    row.append(term, detail);
+    list.append(row);
+  };
+  const { season, rate } = preview;
+  line("Season", season[0].toUpperCase() + season.slice(1));
+  line("Standard rate per night", money.format(rate.standard_nightly_dkk));
+  line("Nights", number.format(preview.nights));
+  line("Standard total", money.format(preview.total), state.priceMode ? undefined : "total");
+  if (state.priceMode) {
+    const nightly = amount(nightlyInput);
+    const total = amount(totalInput);
+    line("Your price per night", Number.isFinite(nightly) ? money.format(nightly) : "–");
+    line("Your total", Number.isFinite(total) ? money.format(total) : "–", "total");
+  }
+  const band = document.createElement("p");
+  band.className = "hint";
+  band.textContent =
+    `Allowed per night in ${season} season: ${number.format(rate.min_nightly_dkk)}–` +
+    `${number.format(rate.max_nightly_dkk)} DKK. The server checks the price when you save.`;
+  previewBox.append(list, band);
+}
+
+function refreshPrice() {
+  syncPriceFields();
+  renderPreview();
+}
+
+/** Edit mode (FR-020): a banner, another colour scheme for page and form, and a clear way back. */
+function setEditMode(on, booking) {
+  document.body.classList.toggle("edit-mode", on);
+  bannerText.textContent = on
+    ? `Editing booking ${booking.id} (${booking.first_name} ${booking.family_name}). Nothing changes until you press “Save changes”.`
+    : "";
+}
+
 // ---------- form ----------
 
 function formValues() {
@@ -138,30 +248,39 @@ function formValues() {
     room_type: text("room_type"),
     check_in_date: text("check_in_date"),
     days_rented: numeric("days_rented"),
-    price_dkk: numeric("price_dkk"), // empty -> null -> the API uses the standard price
+    // Only the price field in use is sent; with neither, the API uses the standard price.
+    price_dkk: state.priceMode === "total" ? numeric("price_dkk") : null,
+    price_per_night_dkk: state.priceMode === "nightly" ? numeric("price_per_night_dkk") : null,
   };
 }
 
 function resetForm() {
   state.editingId = null;
+  state.priceMode = null;
   form.reset();
   clearErrors();
   formTitle.textContent = "New booking";
   submitButton.textContent = "Create booking";
   cancelButton.hidden = true;
+  setEditMode(false);
   showRateHint();
+  refreshPrice();
 }
 
 function startEdit(booking) {
   state.editingId = booking.id;
   clearErrors();
   for (const name of FIELDS) form.elements[name].value = booking[name] ?? "";
+  state.priceMode = "total"; // a saved booking carries its total; the price per night is worked out from it
   formTitle.textContent = `Edit booking ${booking.id}`;
   submitButton.textContent = "Save changes";
   cancelButton.hidden = false;
+  setEditMode(true, booking);
   showRateHint();
+  refreshPrice();
   say("");
   renderBookings();
+  form.scrollIntoView({ block: "start" });
   form.elements.first_name.focus();
 }
 
@@ -230,13 +349,28 @@ moreButton.addEventListener("click", () => {
 });
 form.elements.room_type.addEventListener("change", showRateHint);
 
-// A different room type, check-in date or number of nights means a different price: clear the field so
-// the API recalculates the standard price (unless the user types one).
+// Another room type or check-in date means another rate band, so a typed price no longer applies: clear it and
+// let the API price the stay. Another number of nights keeps a fixed price per night (the total follows) but
+// not a typed total. In every case the preview follows what is typed.
 for (const name of ["room_type", "check_in_date", "days_rented"]) {
-  form.elements[name].addEventListener("change", () => {
-    form.elements.price_dkk.value = "";
-  });
+  for (const type of ["input", "change"]) {
+    form.elements[name].addEventListener(type, () => {
+      if (name !== "days_rented" || state.priceMode === "total") clearManualPrice();
+      refreshPrice();
+    });
+  }
 }
+totalInput.addEventListener("input", () => onPriceInput("total"));
+nightlyInput.addEventListener("input", () => onPriceInput("nightly"));
+clearPriceButton.addEventListener("click", () => {
+  clearManualPrice();
+  refreshPrice();
+  totalInput.focus();
+});
+bannerCancel.addEventListener("click", () => {
+  resetForm();
+  renderBookings();
+});
 
 async function init() {
   try {

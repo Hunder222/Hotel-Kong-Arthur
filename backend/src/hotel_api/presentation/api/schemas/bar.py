@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict
 from hotel_api.business.domain.models import BarCategoryKpi as BarCategoryKpiModel
 from hotel_api.business.domain.models import BarPriceTierKpi as BarPriceTierKpiModel
 from hotel_api.business.domain.models import BarSummary as BarSummaryModel
-from hotel_api.business.domain.models import DrinkCategory, PriceTier, RankedDrinkSale
+from hotel_api.business.domain.models import DrinkCategory, PriceTier, RankedDrinkSale, ReportingYear
 from hotel_api.presentation.api.schemas.common import AmountDkk, Percent
 
 
@@ -42,7 +42,7 @@ class DrinkSaleList(BaseModel):
 class BarSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    year: int
+    year: ReportingYear
     drink_count: int
     units_sold: int
     total_revenue_dkk: AmountDkk
@@ -56,7 +56,7 @@ class BarSummary(BaseModel):
 class BarCategoryKpi(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    year: int
+    year: ReportingYear
     category: DrinkCategory
     drink_count: int
     units_sold: int
@@ -80,7 +80,7 @@ class BarCategoryKpiList(BaseModel):
 class BarPriceTierKpi(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    year: int
+    year: ReportingYear
     price_tier: PriceTier
     price_from_dkk: AmountDkk
     price_to_dkk: AmountDkk | None

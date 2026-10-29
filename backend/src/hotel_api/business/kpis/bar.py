@@ -1,11 +1,13 @@
-"""Bar KPIs (B1-B3; FR-012-FR-014; data-model §7). Pure functions, no I/O.
+"""Bar KPIs (B1-B3; FR-012-FR-014, FR-021; data-model §7). Pure functions, no I/O.
 
 Revenue per drink is `BarDrinkSale.revenue_dkk` (unit price x units sold, exact Decimal). Shares follow
-`rules/numbers.py` (each column sums to exactly 100.00) and ranks follow `rules/ranking.py`.
+`rules/numbers.py` (each column sums to exactly 100.00) and ranks follow `rules/ranking.py`. With `year=None`
+every year counts (all-time, FR-021) and the rows report `year` "all".
 """
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from decimal import Decimal
 
@@ -16,6 +18,7 @@ from hotel_api.business.domain.models import (
     BarSummary,
     DrinkCategory,
     RankedDrinkSale,
+    year_label,
 )
 from hotel_api.business.rules.numbers import round_half_up, shares_pct
 from hotel_api.business.rules.price_tiers import TIER_ORDER, tier_bounds, tier_for_price
@@ -24,8 +27,16 @@ from hotel_api.business.rules.ranking import rank_descending
 CATEGORY_ORDER: tuple[DrinkCategory, ...] = (DrinkCategory.COCKTAIL, DrinkCategory.COFFEE)
 
 
-def bar_sales_of_year(sales: Iterable[BarDrinkSale], year: int) -> list[BarDrinkSale]:
+def bar_sales_of_year(sales: Iterable[BarDrinkSale], year: int | None) -> list[BarDrinkSale]:
+    """The drink sales of one year; all of them for `year=None` (all-time, FR-021)."""
+    if year is None:
+        return list(sales)
     return [s for s in sales if s.sales_year == year]
+
+
+def _drink_count(sales: Iterable[BarDrinkSale]) -> int:
+    """Distinct drinks: one on the menu in several years is still one drink (names are unique within a year)."""
+    return len({s.drink_name for s in sales})
 
 
 def ranked_drink_sales(sales: Sequence[BarDrinkSale]) -> list[RankedDrinkSale]:
@@ -39,14 +50,24 @@ def ranked_drink_sales(sales: Sequence[BarDrinkSale]) -> list[RankedDrinkSale]:
     return [RankedDrinkSale(s, revenue_ranks[s.id], units_ranks[s.id]) for s in ordered]
 
 
-def bar_summary(sales: Iterable[BarDrinkSale], year: int) -> BarSummary:
-    """Helene Christine's total bar sales for the year (B1): revenue, units and number of drinks."""
+def ranked_drink_sales_by_year(sales: Iterable[BarDrinkSale]) -> list[RankedDrinkSale]:
+    """The all-time list of drink sales (FR-021): one row per drink and year, years in ascending order, every
+    year ranked on its own, so that for a single year it equals `ranked_drink_sales`."""
+    by_year: dict[int, list[BarDrinkSale]] = defaultdict(list)
+    for s in sales:
+        by_year[s.sales_year].append(s)
+    return [ranked for year in sorted(by_year) for ranked in ranked_drink_sales(by_year[year])]
+
+
+def bar_summary(sales: Iterable[BarDrinkSale], year: int | None) -> BarSummary:
+    """Helene Christine's total bar sales for the year, or for all years with `year=None` (B1): revenue, units and
+    number of drinks."""
     in_year = bar_sales_of_year(sales, year)
     revenue = round_half_up(sum((s.revenue_dkk for s in in_year), Decimal("0.00")))
-    return BarSummary(year, len(in_year), sum(s.units_sold for s in in_year), revenue)
+    return BarSummary(year_label(year), _drink_count(in_year), sum(s.units_sold for s in in_year), revenue)
 
 
-def bar_by_category(sales: Iterable[BarDrinkSale], year: int) -> list[BarCategoryKpi]:
+def bar_by_category(sales: Iterable[BarDrinkSale], year: int | None) -> list[BarCategoryKpi]:
     """Cocktail vs coffee (B3): always both rows, split by revenue and by units, each share column = 100.00."""
     in_year = bar_sales_of_year(sales, year)
     groups = [[s for s in in_year if s.category is category] for category in CATEGORY_ORDER]
@@ -56,9 +77,9 @@ def bar_by_category(sales: Iterable[BarDrinkSale], year: int) -> list[BarCategor
     unit_shares = shares_pct(units)
     return [
         BarCategoryKpi(
-            year=year,
+            year=year_label(year),
             category=category,
-            drink_count=len(group),
+            drink_count=_drink_count(group),
             units_sold=units[i],
             unit_share_pct=unit_shares[i],
             revenue_dkk=revenues[i],
@@ -68,7 +89,7 @@ def bar_by_category(sales: Iterable[BarDrinkSale], year: int) -> list[BarCategor
     ]
 
 
-def bar_by_price_tier(sales: Iterable[BarDrinkSale], year: int) -> list[BarPriceTierKpi]:
+def bar_by_price_tier(sales: Iterable[BarDrinkSale], year: int | None) -> list[BarPriceTierKpi]:
     """Demand per price tier (FR-016, US4/A7): always budget, standard, premium, with units, revenue and shares
     (each share column = 100.00), so the CFO can see whether guests buy cheaper or dearer drinks."""
     in_year = bar_sales_of_year(sales, year)
@@ -82,11 +103,11 @@ def bar_by_price_tier(sales: Iterable[BarDrinkSale], year: int) -> list[BarPrice
         price_from, price_to = tier_bounds(tier)
         rows.append(
             BarPriceTierKpi(
-                year=year,
+                year=year_label(year),
                 price_tier=tier,
                 price_from_dkk=price_from,
                 price_to_dkk=price_to,
-                drink_count=len(group),
+                drink_count=_drink_count(group),
                 units_sold=units[i],
                 unit_share_pct=unit_shares[i],
                 revenue_dkk=revenues[i],

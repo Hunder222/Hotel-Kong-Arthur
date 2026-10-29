@@ -25,8 +25,9 @@ info:
     - `season` (`low` = Jan, Feb, Nov; `mid` = Mar, Apr, May, Sep, Oct; `high` = Jun, Jul, Aug, Dec)
       and `year` are derived by the API from `check_in_date` or `stay_date`. A stay belongs
       entirely to the season and year of its check-in date.
-    - KPI endpoints take `year` (default: the current calendar year, Europe/Copenhagen) and are
-      computed on every request. Every response carries `Cache-Control: no-store`.
+    - KPI endpoints take `year`: a calendar year, or `all` (also what an omitted `year` means) for
+      all-time totals, where each row reports `year: "all"` (FR-021). They are computed on every
+      request. Every response carries `Cache-Control: no-store`.
     - Errors use RFC 9457 Problem Details (`application/problem+json`):
       - `400`: malformed JSON, or an invalid query or path parameter.
       - `404`: unknown id in the path.
@@ -289,7 +290,9 @@ paths:
       operationId: listDrinkSales
       summary: Drink sales for a year, with revenue per drink, ranks and price tier
       description: |
-        One row per drink on Helene Christine's menu for the year, ordered by `revenue_rank`.
+        One row per drink on Helene Christine's menu for the year, ordered by `revenue_rank`. For
+        `year=all` (or no `year`) it is one row per drink and sales year, years in ascending order, and
+        each row's ranks are among the drinks of its own year.
         **Scope:** B2 (FR-012, FR-013), plus the per-drink popularity and price tiers of FR-016.
       parameters:
         - $ref: '#/components/parameters/ReportYear'
@@ -310,7 +313,7 @@ paths:
     get:
       tags: [Hotel KPIs]
       operationId: getHotelSummary
-      summary: Hotel totals for a year
+      summary: Hotel totals for a year, or for all time
       description: |
         **Scope:** A6 and K2 (total room revenue), K1 (occupancy), K3 (satisfaction), and A7
         (ALOS, ADR, revenue per booking) for the whole hotel.
@@ -400,7 +403,8 @@ paths:
       operationId: listHotelKpisByCountry
       summary: Guest origin and revenue per country, ranked by revenue
       description: |
-        One row per country that has bookings in the year, ordered by `revenue_rank`.
+        One row per country that has bookings in the year (in any year for `year=all`), ordered by
+        `revenue_rank`.
         **Scope:** A1 (guest origin), A3 (revenue per country) and A5 (top countries) (FR-009).
       parameters:
         - $ref: '#/components/parameters/ReportYear'
@@ -420,7 +424,7 @@ paths:
     get:
       tags: [Bar KPIs]
       operationId: getBarSummary
-      summary: Helene Christine's total bar sales for a year
+      summary: Helene Christine's total bar sales for a year, or for all time
       description: '**Scope:** B1 (FR-013).'
       parameters:
         - $ref: '#/components/parameters/ReportYear'
@@ -488,8 +492,10 @@ components:
       required: false
       description: |
         Reporting year. Bookings count in the year of their `check_in_date`, reviews in the year of
-        their `stay_date`, and drink sales in their sales year. Defaults to the current calendar
-        year (Europe/Copenhagen).
+        their `stay_date`, and drink sales in their sales year. `all`, or no `year` at all, gives
+        all-time totals over every year (FR-021): rows then report `year: "all"`, and available
+        room-nights cover every calendar year from the first to the last booking (none, and so an
+        occupancy of 0, while there are no bookings).
       schema:
         oneOf:
           - type: integer
@@ -669,6 +675,7 @@ components:
       description: Rate in percent with 2 decimals. Occupancy can only exceed 100 if more nights are sold than rooms exist.
       example: 6.89
     Year:
+      description: A calendar year, or `all` for the all-time scope of a KPI row (FR-021).
       oneOf:
         - type: integer
           minimum: 2000
@@ -802,10 +809,11 @@ components:
           minimum: 0
           exclusiveMinimum: true
           description: |
-            Total price in DKK with at most 2 decimals. If it is omitted or `null`, the price is the
-            room type's standard nightly rate for the season × `days_rented`. If it is given,
-            `price_dkk / days_rented` must lie inside the room type's band for the season (see
-            `GET /api/v1/room-types`).
+            Total price in DKK with at most 2 decimals. If neither this nor `price_per_night_dkk` is
+            given (omitted or `null`), the price is the room type's standard nightly rate for the
+            season × `days_rented`. If it is given, `price_dkk / days_rented` must lie inside the room
+            type's band for the season (see `GET /api/v1/room-types`). Giving `price_per_night_dkk`
+            as well is a `422`.
           example: 6000.00
         price_per_night_dkk:
           type: number
@@ -814,7 +822,10 @@ components:
           minimum: 0
           exclusiveMinimum: true
           description: |
-            Fixed nightly price in DKK with at most 2 decimals. Mutually exclusive with price_dkk on manual entry. Total price is calculated as price_per_night_dkk * days_rented.
+            Fixed price per night in DKK with at most 2 decimals (FR-019). The stored total is this ×
+            `days_rented`, and the price per night must lie inside the room type's band for the
+            season. Mutually exclusive with `price_dkk`: giving both is a `422` reported on this
+            field. A booking is read back with its total only (`price_dkk`).
           example: 2000.00
     Booking:
       type: object
@@ -1008,7 +1019,7 @@ components:
         available_room_nights:
           allOf:
             - $ref: '#/components/schemas/Count'
-          description: 214 rooms × days in the year (78,110 in 2026).
+          description: 214 rooms × days in the year (78,110 in 2026). For `year=all`, 214 rooms × the days of every year from the first to the last booking (0 without bookings).
         occupancy_rate_pct:
           allOf:
             - $ref: '#/components/schemas/RatePct'
@@ -1090,7 +1101,7 @@ components:
         available_room_nights:
           allOf:
             - $ref: '#/components/schemas/Count'
-          description: room_count × days in the year.
+          description: room_count × days in the year. For `year=all`, room_count × the days of every year from the first to the last booking.
         occupancy_rate_pct:
           $ref: '#/components/schemas/RatePct'
         review_count:
@@ -1146,7 +1157,7 @@ components:
         season_days:
           type: integer
           minimum: 1
-          description: Days of the season in this year (2026 has low 89, mid 153, high 123).
+          description: Days of the season in this year (2026 has low 89, mid 153, high 123). For `year=all`, the days of the season summed over every year from the first to the last booking.
           example: 89
         booking_count:
           $ref: '#/components/schemas/Count'

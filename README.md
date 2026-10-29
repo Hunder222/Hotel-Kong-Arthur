@@ -118,15 +118,17 @@ route-parity test checks that the implemented routes equal the contract's 19 ope
 | `kpis/bar/summary`, `by-category`, `by-price-tier` | `GET` | `B1`, `B3`, `A7` (price-tier demand) |
 | `health` | `GET` | liveness and database check |
 
-KPI endpoints take `?year=` (2000–2100, default: the current year in Europe/Copenhagen), are computed on every
-request and send `Cache-Control: no-store`. Status codes: `200`, `201` (with `Location`), `204`, `400` (malformed
-JSON or bad parameter), `404`, `422` (a field or business rule is broken), `503` (database unavailable). Errors are
-`application/problem+json` with an `errors` list of `{field, message}`. There is no authentication (prototype).
+KPI endpoints take `?year=` (2000–2100, or `all`). Without `year`, or with `year=all`, they give all-time totals
+and each row reports `year` `"all"`. They are computed on every request and send `Cache-Control: no-store`.
+Status codes: `200`, `201` (with `Location`), `204`, `400` (malformed JSON or bad parameter), `404`, `422` (a field
+or business rule is broken), `503` (database unavailable). Errors are `application/problem+json` with an `errors`
+list of `{field, message}`. There is no authentication (prototype).
 
 Example: `POST /api/v1/bookings` with `{"first_name": "Elena", "family_name": "Müller", "country": "Germany", "room_type":
 "Superior Double", "check_in_date": "2026-07-14", "days_rented": 3}` returns `201`, `Location: /api/v1/bookings/<id>`,
 `season` `high` and `price_dkk` `6000.0` (the room type's standard rate for that season times 3 nights; a given
-price must lie inside the band shown by `GET /api/v1/room-types`).
+price must lie inside the band shown by `GET /api/v1/room-types`). Instead of a total `price_dkk`, a booking can
+carry a fixed `price_per_night_dkk` (stored as nights times that price); giving both is a `422`.
 
 ## Data and persistence
 

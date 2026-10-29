@@ -113,6 +113,62 @@ def test_put_errors(client, check_contract, created):
     check_contract(bad_id)
 
 
+# ---- FR-019: a fixed price per night instead of a total price ----
+
+
+def test_create_with_a_price_per_night_stores_the_total(client, check_contract):
+    response = client.post("/api/v1/bookings", json={**QUICKSTART, "price_per_night_dkk": 2000})
+    assert response.status_code == 201
+    check_contract(response)
+    body = response.json()
+    assert body["price_dkk"] == 6000.0  # 3 nights x 2000.00
+    assert "price_per_night_dkk" not in body  # a booking is read back with its total only
+
+
+def test_a_null_price_field_is_accepted_next_to_the_other(client, check_contract):
+    response = client.post("/api/v1/bookings", json={**QUICKSTART, "price_dkk": None, "price_per_night_dkk": 2000})
+    assert response.status_code == 201
+    check_contract(response)
+    assert response.json()["price_dkk"] == 6000.0
+
+
+def test_create_with_a_price_per_night_outside_the_band_is_422(client, check_contract):
+    response = client.post("/api/v1/bookings", json={**QUICKSTART, "price_per_night_dkk": 1000})
+    assert response.status_code == 422
+    check_contract(response)
+    assert [e["field"] for e in response.json()["errors"]] == ["price_per_night_dkk"]
+    assert client.get("/api/v1/bookings").json() == {"items": []}
+
+
+def test_create_with_both_prices_is_422_and_stores_nothing(client, check_contract):
+    response = client.post("/api/v1/bookings", json={**QUICKSTART, "price_dkk": 6000, "price_per_night_dkk": 2000})
+    assert response.status_code == 422
+    check_contract(response)
+    assert [e["field"] for e in response.json()["errors"]] == ["price_per_night_dkk"]
+    assert client.get("/api/v1/bookings").json() == {"items": []}
+
+
+def test_put_with_a_price_per_night_recalculates_the_total(client, check_contract, created):
+    booking_id = created.json()["id"]
+    response = client.put(
+        f"/api/v1/bookings/{booking_id}", json={**QUICKSTART, "days_rented": 5, "price_per_night_dkk": 2100.5}
+    )
+    assert response.status_code == 200
+    check_contract(response)
+    assert response.json()["price_dkk"] == 10502.5  # 5 nights x 2100.50
+    assert client.get(f"/api/v1/bookings/{booking_id}").json()["price_dkk"] == 10502.5
+
+
+def test_put_with_both_prices_is_422_and_changes_nothing(client, check_contract, created):
+    booking_id = created.json()["id"]
+    response = client.put(
+        f"/api/v1/bookings/{booking_id}", json={**QUICKSTART, "price_dkk": 6000, "price_per_night_dkk": 2000}
+    )
+    assert response.status_code == 422
+    check_contract(response)
+    assert client.get(f"/api/v1/bookings/{booking_id}").json() == created.json()
+
+
 def test_delete_then_404(client, check_contract, created):
     booking_id = created.json()["id"]
     response = client.delete(f"/api/v1/bookings/{booking_id}")

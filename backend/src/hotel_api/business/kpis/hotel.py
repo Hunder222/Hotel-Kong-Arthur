@@ -1,10 +1,12 @@
 """Hotel KPIs: revenue (K2, A2-A6), occupancy (K1), satisfaction (K3), ALOS / ADR / revenue per booking (A7).
-FR-006-FR-011, FR-015, data-model §7.
+FR-006-FR-011, FR-015, FR-021, data-model §7.
 
 Pure functions, no I/O. Each function takes the reporting `year` and counts only bookings whose
 `check_in_date` lies in that year and reviews whose `stay_date` lies in it: a booking (with its revenue
 and nights) belongs entirely to the season and year of its check-in date, a review to those of its stay
-date (research R8). Rounding and shares follow `rules/numbers.py`; ranks follow `rules/ranking.py`;
+date (research R8). With `year=None` every booking and review counts (all-time, FR-021): the rows then
+report `year` "all", and the capacity covers every year from the first to the last booking (a hotel
+without bookings has none). Rounding and shares follow `rules/numbers.py`; ranks follow `rules/ranking.py`;
 available room-nights follow `rules/seasons.py`.
 """
 
@@ -24,16 +26,34 @@ from hotel_api.business.domain.models import (
     RoomTypeSeasonKpi,
     Season,
     SeasonKpi,
+    year_label,
 )
 from hotel_api.business.rules.numbers import round_half_up, safe_average, safe_pct, shares_pct
 from hotel_api.business.rules.ranking import rank_descending
-from hotel_api.business.rules.seasons import SEASON_ORDER, available_room_nights, days_in_year, season_days
+from hotel_api.business.rules.seasons import (
+    SEASON_ORDER,
+    available_room_nights,
+    calendar_days,
+    covered_years,
+    season_days_over,
+)
 
 _ZERO = Decimal("0.00")
 
 
-def bookings_of_year(bookings: Iterable[Booking], year: int) -> list[Booking]:
+def bookings_of_year(bookings: Iterable[Booking], year: int | None) -> list[Booking]:
+    """The bookings of one calendar year (by check-in date); every booking for `year=None` (all-time)."""
+    if year is None:
+        return list(bookings)
     return [b for b in bookings if b.check_in_date.year == year]
+
+
+def _capacity_years(scoped: Sequence[Booking], year: int | None) -> Sequence[int]:
+    """The calendar years whose rooms count as available: `year` itself or, all-time, every year from the first
+    to the last booking (none without bookings, so no capacity and a 0.00 occupancy)."""
+    if year is not None:
+        return [year]
+    return covered_years(b.check_in_date.year for b in scoped)
 
 
 def _totals(bookings: Sequence[Booking]) -> tuple[int, int, Decimal]:
@@ -59,7 +79,10 @@ def _stay_named(booking_count: int, nights_sold: int, revenue: Decimal) -> dict[
     return dict(zip(keys, stay_figures(booking_count, nights_sold, revenue)))
 
 
-def reviews_of_year(reviews: Iterable[GuestReview], year: int) -> list[GuestReview]:
+def reviews_of_year(reviews: Iterable[GuestReview], year: int | None) -> list[GuestReview]:
+    """The reviews of one calendar year (by stay date); every review for `year=None` (all-time)."""
+    if year is None:
+        return list(reviews)
     return [r for r in reviews if r.stay_date.year == year]
 
 
@@ -89,13 +112,17 @@ def _named(figures: tuple[int, Decimal, int, Decimal, Decimal]) -> dict[str, obj
 
 
 def hotel_summary(
-    bookings: Iterable[Booking], reviews: Iterable[GuestReview], room_types: Sequence[RoomType], year: int
+    bookings: Iterable[Booking], reviews: Iterable[GuestReview], room_types: Sequence[RoomType], year: int | None
 ) -> HotelSummary:
-    """Year totals: revenue (A6, K2), nights, occupancy over all rooms (K1), satisfaction (K3), ALOS / ADR (A7)."""
-    count, nights, revenue = _totals(bookings_of_year(bookings, year))
-    available = available_room_nights(sum(r.room_count for r in room_types), days_in_year(year))
+    """Totals of one year, or of all time for `year=None`: revenue (A6, K2), nights, occupancy over all rooms (K1),
+    satisfaction (K3), ALOS / ADR (A7)."""
+    scoped = bookings_of_year(bookings, year)
+    count, nights, revenue = _totals(scoped)
+    available = available_room_nights(
+        sum(r.room_count for r in room_types), calendar_days(_capacity_years(scoped, year))
+    )
     return HotelSummary(
-        year=year,
+        year=year_label(year),
         booking_count=count,
         nights_sold=nights,
         total_revenue_dkk=revenue,
@@ -105,25 +132,28 @@ def hotel_summary(
 
 
 def kpis_by_room_type(
-    bookings: Iterable[Booking], reviews: Iterable[GuestReview], room_types: Sequence[RoomType], year: int
+    bookings: Iterable[Booking], reviews: Iterable[GuestReview], room_types: Sequence[RoomType], year: int | None
 ) -> list[RoomTypeKpi]:
     """One row per room type (always all of them), ranked by revenue (A4), revenue shares sum to 100.
 
-    Also ALOS / ADR (A7). Occupancy uses the room type's own rooms x days in the year; satisfaction uses the reviews of that room type.
+    Also ALOS / ADR (A7). Occupancy uses the room type's own rooms x the days of the period (the year, or all-time
+    every year of the span); satisfaction uses the reviews of that room type.
     """
+    scoped = bookings_of_year(bookings, year)
     groups: dict[str, list[Booking]] = defaultdict(list)
-    for booking in bookings_of_year(bookings, year):
+    for booking in scoped:
         groups[booking.room_type].append(booking)
     review_groups: dict[str, list[GuestReview]] = defaultdict(list)
     for review in reviews_of_year(reviews, year):
         review_groups[review.room_type].append(review)
+    days = calendar_days(_capacity_years(scoped, year))
 
     rows = [(room_type, *_totals(groups.get(room_type.name, []))) for room_type in room_types]
     ranked = rank_descending(rows, value=lambda r: r[3], name=lambda r: r[0].name)
     shares = shares_pct([row[3] for _, row in ranked])
     return [
         RoomTypeKpi(
-            year=year,
+            year=year_label(year),
             revenue_rank=rank,
             room_type=room_type.name,
             room_count=room_type.room_count,
@@ -134,7 +164,7 @@ def kpis_by_room_type(
             **_named(
                 _capacity_and_satisfaction(
                     nights,
-                    available_room_nights(room_type.room_count, days_in_year(year)),
+                    available_room_nights(room_type.room_count, days),
                     review_groups.get(room_type.name, []),
                 )
             ),
@@ -145,26 +175,28 @@ def kpis_by_room_type(
 
 
 def kpis_by_season(
-    bookings: Iterable[Booking], reviews: Iterable[GuestReview], room_types: Sequence[RoomType], year: int
+    bookings: Iterable[Booking], reviews: Iterable[GuestReview], room_types: Sequence[RoomType], year: int | None
 ) -> list[SeasonKpi]:
     """Three rows in the order low, mid, high; revenue shares sum to 100.
 
-    Also ALOS / ADR (A7). Occupancy uses all rooms x the season's days; a review belongs to the season of its stay date.
+    Also ALOS / ADR (A7). Occupancy uses all rooms x the season's days (all-time: summed over every year of the
+    span); a review belongs to the season of its stay date.
     """
+    scoped = bookings_of_year(bookings, year)
     groups: dict[Season, list[Booking]] = defaultdict(list)
-    for booking in bookings_of_year(bookings, year):
+    for booking in scoped:
         groups[booking.season].append(booking)
     review_groups: dict[Season, list[GuestReview]] = defaultdict(list)
     for review in reviews_of_year(reviews, year):
         review_groups[review.season].append(review)
     total_rooms = sum(r.room_count for r in room_types)
 
-    days = season_days(year)
+    days = season_days_over(_capacity_years(scoped, year))
     totals = [_totals(groups.get(season, [])) for season in SEASON_ORDER]
     shares = shares_pct([revenue for _, _, revenue in totals])
     return [
         SeasonKpi(
-            year=year,
+            year=year_label(year),
             season=season,
             season_days=days[season],
             booking_count=count,
@@ -183,7 +215,7 @@ def kpis_by_season(
 
 
 def revenue_by_room_type_and_season(
-    bookings: Iterable[Booking], room_types: Sequence[RoomType], year: int
+    bookings: Iterable[Booking], room_types: Sequence[RoomType], year: int | None
 ) -> list[RoomTypeSeasonKpi]:
     """24 rows (A2): every room type in the given order, then low, mid, high."""
     groups: dict[tuple[str, Season], list[Booking]] = defaultdict(list)
@@ -194,11 +226,11 @@ def revenue_by_room_type_and_season(
     for room_type in room_types:
         for season in SEASON_ORDER:
             count, nights, revenue = _totals(groups.get((room_type.name, season), []))
-            rows.append(RoomTypeSeasonKpi(year, room_type.name, season, count, nights, revenue))
+            rows.append(RoomTypeSeasonKpi(year_label(year), room_type.name, season, count, nights, revenue))
     return rows
 
 
-def revenue_by_country(bookings: Iterable[Booking], year: int) -> list[CountryKpi]:
+def revenue_by_country(bookings: Iterable[Booking], year: int | None) -> list[CountryKpi]:
     """One row per guest country that has bookings (A1 shape, A3, A5), ranked by revenue."""
     groups: dict[str, list[Booking]] = defaultdict(list)
     for booking in bookings_of_year(bookings, year):
@@ -210,7 +242,7 @@ def revenue_by_country(bookings: Iterable[Booking], year: int) -> list[CountryKp
     booking_shares = shares_pct([row[1] for _, row in ranked])
     return [
         CountryKpi(
-            year=year,
+            year=year_label(year),
             revenue_rank=rank,
             country=country,
             booking_count=count,

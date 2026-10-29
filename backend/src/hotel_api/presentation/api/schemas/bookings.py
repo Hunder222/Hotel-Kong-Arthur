@@ -40,6 +40,7 @@ class BookingInput(BaseModel):
     check_in_date: Any = Field(...)
     days_rented: Any = Field(...)
     price_dkk: Any = None
+    price_per_night_dkk: Any = None  # FR-019: a fixed nightly price instead of a total; the rules turn it into the total
 
 
 class Booking(BaseModel):

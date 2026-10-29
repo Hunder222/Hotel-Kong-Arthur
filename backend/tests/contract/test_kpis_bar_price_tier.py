@@ -47,13 +47,28 @@ def test_an_empty_year_has_three_zero_rows(client, check_contract):
     assert items[2]["price_to_dkk"] is None
 
 
-def test_the_year_defaults_to_the_current_year(client, check_contract):
-    response = client.get(URL)
-    assert response.status_code == 200
+def test_year_all_totals_every_year_and_is_what_an_omitted_year_means(client, check_contract, seeded):
+    explicit = client.get(URL + "?year=all")
+    assert explicit.status_code == 200
+    check_contract(explicit)
+    items = explicit.json()["items"]
+    assert [i["year"] for i in items] == ["all"] * 3
+    # the sample data is all in 2026, so the all-time tiers equal that year's
+    assert [(i["drink_count"], i["units_sold"]) for i in items] == [(10, 117881), (10, 29306), (10, 32771)]
+    omitted = client.get(URL)
+    assert omitted.status_code == 200
+    check_contract(omitted)
+    assert omitted.json() == explicit.json()
+
+
+def test_year_all_with_no_data_has_three_zero_rows(client, check_contract):
+    response = client.get(URL + "?year=all")
     check_contract(response)
+    items = response.json()["items"]
+    assert len(items) == 3 and all(i["year"] == "all" and i["units_sold"] == 0 for i in items)
 
 
-@pytest.mark.parametrize("query", ["?year=abc", "?year=1999", "?year=2101"])
+@pytest.mark.parametrize("query", ["?year=abc", "?year=1999", "?year=2101", "?year=ALL"])
 def test_a_bad_year_is_400(client, check_contract, query):
     response = client.get(URL + query)
     assert response.status_code == 400

@@ -22,6 +22,7 @@ from hotel_api.business.domain.models import (
     RoomTypeSeasonKpi as RoomTypeSeasonKpiModel,
 )
 from hotel_api.business.domain.models import (
+    ReportingYear,
     Season,
 )
 from hotel_api.business.domain.models import (
@@ -33,7 +34,7 @@ from hotel_api.presentation.api.schemas.common import AmountDkk, Percent
 class HotelSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    year: int
+    year: ReportingYear
     booking_count: int
     nights_sold: int
     total_revenue_dkk: AmountDkk
@@ -61,7 +62,7 @@ class HotelSummary(BaseModel):
 class RoomTypeKpi(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    year: int
+    year: ReportingYear
     revenue_rank: int
     room_type: str
     room_count: int
@@ -100,7 +101,7 @@ class RoomTypeKpiList(BaseModel):
 class SeasonKpi(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    year: int
+    year: ReportingYear
     season: Season
     season_days: int
     booking_count: int
@@ -137,7 +138,7 @@ class SeasonKpiList(BaseModel):
 class RoomTypeSeasonKpi(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    year: int
+    year: ReportingYear
     room_type: str
     season: Season
     booking_count: int
@@ -159,7 +160,7 @@ class RoomTypeSeasonKpiList(BaseModel):
 class CountryKpi(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    year: int
+    year: ReportingYear
     revenue_rank: int
     country: str
     booking_count: int

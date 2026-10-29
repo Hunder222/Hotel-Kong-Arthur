@@ -262,7 +262,7 @@
 - [X] T102 Remove the `xfail` marker from the route-parity test (T037) and confirm it passes: the app's routes equal the contract's 19 operations
 - [X] T103 Verify Swagger UI at `http://localhost:8081`: the contract renders, *Try it out* on `GET /api/v1/room-types` returns 200 (CORS allows `http://localhost:8081`); verify persistence (`docker compose down` then `up -d` keeps bookings)
 - [ ] T104 [P] Team-owned, manual, outside the repository (FR-017): the first day the API runs, prove the Tableau route against `GET /api/v1/kpis/hotel/by-room-type?year=2026` (quickstart §8). After that, build the dashboard from quickstart §4–§7 and compare every figure within 0.01 DKK / 0.01% (SC-003). Run `git ls-files | grep -Ei '\.(twb|twbx|tbm|tds|tdsx|hyper)$'` and confirm no output
-- [ ] T105 [P] Process items from plan.md "Spec follow-ups" that need the team: amend the constitution wording (Gate VI/VIII, WDC hint, OQ-1, OQ-4) with `/speckit-constitution`; amend FR-010 (366-day leap year) and FR-003 (R17 bounds) in `SPEC/spec.md`; then run `/speckit-checklist` and `/speckit-analyze` before `/speckit-implement`
+- [ ] T105 [P] Process items from plan.md "Spec follow-ups" that need the team: amend the constitution wording (Gate VI/VIII, WDC hint, OQ-1, OQ-4) with `/speckit-constitution` (Principle VII, the display-only frontend price mirror for FR-018/FR-019, is already amended: v1.1.0, 2026-10-29); amend FR-010 (366-day leap year) and FR-003 (R17 bounds) in `SPEC/spec.md`; then run `/speckit-checklist` and `/speckit-analyze` before `/speckit-implement`
 - [X] T106 Run every quickstart section (§1–§10) one last time and tick off each golden value
 
 ---
@@ -273,18 +273,18 @@
 
 ### Tests for Revision Phase
 
-- [ ] T107 [P] Unit tests in `backend/tests/unit/test_pricing.py` and `test_booking_validation.py` for dual price inputs: mutual exclusivity between `price_dkk` and `price_per_night_dkk`, validation that `price_per_night_dkk` falls inside the seasonal rate band, and calculation of total `price_dkk`.
-- [ ] T108 [P] Unit tests in `backend/tests/unit/test_hotel_revenue_kpis.py` and `test_bar_kpis.py` for all-time aggregations (`year="all"` / omitted): calculating overall multi-year totals, multi-year room-night availability for occupancy, and bar sales aggregates across all recorded sales years.
-- [ ] T109 [P] Contract tests in `backend/tests/contract/test_bookings.py` for `POST/PUT /api/v1/bookings` with `price_per_night_dkk`, and in `test_kpis_hotel_revenue.py` / `test_bar.py` for KPI endpoints with `?year=all` returning valid 200 responses matching `openapi.yaml`.
+- [X] T107 [P] Unit tests in `backend/tests/unit/test_pricing.py` and `test_booking_validation.py` for dual price inputs: mutual exclusivity between `price_dkk` and `price_per_night_dkk`, validation that `price_per_night_dkk` falls inside the seasonal rate band, and calculation of total `price_dkk`.
+- [X] T108 [P] Unit tests in `backend/tests/unit/test_hotel_revenue_kpis.py` and `test_bar_kpis.py` for all-time aggregations (`year="all"` / omitted): calculating overall multi-year totals, multi-year room-night availability for occupancy, and bar sales aggregates across all recorded sales years.
+- [X] T109 [P] Contract tests in `backend/tests/contract/test_bookings.py` for `POST/PUT /api/v1/bookings` with `price_per_night_dkk`, and in `test_kpis_hotel_revenue.py` / `test_bar.py` for KPI endpoints with `?year=all` returning valid 200 responses matching `openapi.yaml`.
 
 ### Implementation for Revision Phase
 
-- [ ] T110 Implement dual price calculation and validation rules in `SRC/business/rules/pricing.py` and `SRC/business/rules/booking_validation.py` (FR-019).
-- [ ] T111 Update `SRC/presentation/api/schemas/bookings.py` to accept `price_per_night_dkk` in `BookingInput` and map to `NewBooking` in `SRC/presentation/api/routers/bookings.py`.
-- [ ] T112 Extend `SRC/business/kpis/hotel.py`, `SRC/business/kpis/bar.py`, and `SRC/business/services/kpi_service.py` to support all-time aggregation when `year="all"` or omitted (FR-021).
-- [ ] T113 Update `SRC/presentation/api/routers/kpis_hotel.py` and `SRC/presentation/api/routers/kpis_bar.py` query parameter handlers to accept `'all'` and pass to service layer.
-- [ ] T114 Update `frontend/public/index.html` and `frontend/public/styles.css`: add live price summary preview container (rate per night, total standard price), add nightly rate input field next to total price, and design a distinct, highlighted visual theme/banner for "Edit Mode" (FR-018, FR-019, FR-020).
-- [ ] T115 Update `frontend/public/app.js`: calculate dynamic price preview as user selects room type and dates, enforce single-field entry between total price and price-per-night, and toggle prominent "Edit Mode" UI styling with cancel action when editing existing bookings.
+- [X] T110 Implement dual price calculation and validation rules in `SRC/business/rules/pricing.py` and `SRC/business/rules/booking_validation.py` (FR-019).
+- [X] T111 Update `SRC/presentation/api/schemas/bookings.py` to accept `price_per_night_dkk` in `BookingInput` and map to `NewBooking` in `SRC/presentation/api/routers/bookings.py`. (Done: the router needed no edit, it already forwards `body.model_dump()` to `BookingService`, and `validate_booking` builds the `NewBooking` with the derived total.)
+- [X] T112 Extend `SRC/business/kpis/hotel.py`, `SRC/business/kpis/bar.py`, and `SRC/business/services/kpi_service.py` to support all-time aggregation when `year="all"` or omitted (FR-021). (Done, also `rules/seasons.py` for the all-time capacity span, `domain/models.py` for the `year` label, `services/bar_service.py`, `ports.py` and `data/repositories/bar_sales.py` for an unfiltered bar query.)
+- [X] T113 Update `SRC/presentation/api/routers/kpis_hotel.py` and `SRC/presentation/api/routers/kpis_bar.py` query parameter handlers to accept `'all'` and pass to service layer. (Done through the shared `report_year` dependency, so `routers/bar.py` (`/bar/drink-sales`) accepts `all` as well, as the contract's shared `ReportYear` parameter says.)
+- [X] T114 Update `frontend/public/index.html` and `frontend/public/styles.css`: add live price summary preview container (rate per night, total standard price), add nightly rate input field next to total price, and design a distinct, highlighted visual theme/banner for "Edit Mode" (FR-018, FR-019, FR-020).
+- [X] T115 Update `frontend/public/app.js`: calculate dynamic price preview as user selects room type and dates, enforce single-field entry between total price and price-per-night, and toggle prominent "Edit Mode" UI styling with cancel action when editing existing bookings. (Done. The season table and price arithmetic live in the new `frontend/public/price-preview.js`, a display-only mirror guarded by `backend/tests/architecture/test_frontend_price_mirror.py`. This departs from R15 and Principle VII, see "Open for the team" under R15 in `research.md`.)
 
 ---
 

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 
 import pytest
 
-from hotel_api.business.domain.models import Booking, RoomType, Season
+from hotel_api.business.domain.models import Booking, GuestReview, RoomType, Season
 from hotel_api.business.kpis import hotel
 from hotel_api.business.services.kpi_service import KpiService
 
@@ -159,3 +160,129 @@ def test_service_loads_one_year_and_delegates(room_types):
     assert service.by_country(2026)[0].country == "Germany"
     assert repo.years == [2026] * 5
     assert service.summary(2030).total_revenue_dkk == Decimal("0.00")
+
+
+# ---- FR-021: all-time totals (`year=None`): every booking counts, the row reports year "all" ----
+
+ALL_TIME_TOTAL = Decimal("51850.50")  # the six bookings above: 2025 + 2026 + 2027
+
+
+def review(i, room_type, stay_date, rating):
+    return GuestReview(i, None, room_type, stay_date, rating)
+
+
+def test_all_time_summary_counts_every_year_and_reports_year_all():
+    s = hotel.hotel_summary(BOOKINGS, [], ROOMS, None)
+    assert (s.year, s.booking_count, s.nights_sold, s.total_revenue_dkk) == ("all", 6, 20, ALL_TIME_TOTAL)
+    assert hotel.hotel_summary(BOOKINGS, [], ROOMS, 2026).year == 2026
+
+
+def test_all_time_capacity_covers_every_year_from_the_first_to_the_last_booking():
+    s = hotel.hotel_summary(BOOKINGS, [], ROOMS, None)  # bookings in 2025, 2026 and 2027
+    assert s.available_room_nights == 26 * (365 * 3) == 28470
+    assert s.occupancy_rate_pct == Decimal("0.07")  # 20 nights / 28470
+
+
+def test_a_year_without_bookings_between_two_busy_years_still_counts():
+    gap = [BOOKINGS[4], BOOKINGS[5]]  # 2025-12-31 and 2027-01-01, nothing in 2026
+    assert hotel.hotel_summary(gap, [], ROOMS, None).available_room_nights == 26 * 1095
+
+
+def test_a_leap_year_in_the_span_has_366_days():
+    span = [booking(1, "Suite", "X", date(2027, 6, 1), 1, 3000), booking(2, "Suite", "X", date(2028, 6, 1), 1, 3000)]
+    assert hotel.hotel_summary(span, [], ROOMS, None).available_room_nights == 26 * (365 + 366)
+
+
+def test_all_time_of_a_single_year_equals_that_year_apart_from_the_label(room_types):
+    only_2026 = hotel.bookings_of_year(BOOKINGS, 2026)
+    assert hotel.hotel_summary(only_2026, [], ROOMS, None) == replace(
+        hotel.hotel_summary(only_2026, [], ROOMS, 2026), year="all"
+    )
+    assert hotel.kpis_by_room_type(only_2026, [], room_types, None) == [
+        replace(r, year="all") for r in hotel.kpis_by_room_type(only_2026, [], room_types, 2026)
+    ]
+    assert hotel.kpis_by_season(only_2026, [], ROOMS, None) == [
+        replace(r, year="all") for r in hotel.kpis_by_season(only_2026, [], ROOMS, 2026)
+    ]
+
+
+def test_all_time_by_room_type_ranks_over_all_years(room_types):
+    rows = hotel.kpis_by_room_type(BOOKINGS, [], room_types, None)
+    assert len(rows) == 8 and all(r.year == "all" for r in rows)
+    assert [(r.revenue_rank, r.room_type) for r in rows[:3]] == [(1, "Suite"), (2, "Grand Lit"), (3, "Standard Single")]
+    suite = rows[0]
+    assert (suite.booking_count, suite.nights_sold, suite.revenue_dkk) == (4, 15, Decimal("45250.00"))
+    assert suite.available_room_nights == 26 * 1095  # the room type's own rooms x the days of the span
+    assert rows[1].available_room_nights == 27 * 1095  # Grand Lit has 27 rooms
+    assert sum(r.revenue_share_pct for r in rows) == Decimal("100.00")
+
+
+def test_all_time_by_season_sums_the_season_days_of_every_year_in_the_span():
+    rows = hotel.kpis_by_season(BOOKINGS, [], ROOMS, None)
+    assert all(r.year == "all" for r in rows)
+    assert [r.season_days for r in rows] == [267, 459, 369]  # three years of (89, 153, 123)
+    assert [r.available_room_nights for r in rows] == [26 * 267, 26 * 459, 26 * 369]
+    assert [r.booking_count for r in rows] == [3, 1, 2]
+    assert [r.revenue_dkk for r in rows] == [Decimal("21500.50"), Decimal("5600.00"), Decimal("24750.00")]
+    assert sum(r.revenue_share_pct for r in rows) == Decimal("100.00")
+    assert rows[0].occupancy_rate_pct == Decimal("0.12")  # 8 nights / (26 rooms x 267 days)
+
+
+def test_all_time_by_room_type_and_season_has_24_rows_over_every_year(room_types):
+    rows = hotel.revenue_by_room_type_and_season(BOOKINGS, room_types, None)
+    assert len(rows) == 24 and all(r.year == "all" for r in rows)
+    by_key = {(r.room_type, r.season): r for r in rows}
+    suite_low, suite_high = by_key[("Suite", Season.LOW)], by_key[("Suite", Season.HIGH)]
+    assert (suite_low.revenue_dkk, suite_low.booking_count) == (Decimal("20500.00"), 2)  # Jan 2026 + Jan 2027
+    assert (suite_high.revenue_dkk, suite_high.booking_count) == (Decimal("24750.00"), 2)  # Jul 2026 + Dec 2025
+    assert sum(r.revenue_dkk for r in rows) == ALL_TIME_TOTAL
+
+
+def test_all_time_by_country_ranks_over_every_year():
+    rows = hotel.revenue_by_country(BOOKINGS, None)
+    assert all(r.year == "all" for r in rows)
+    assert [(r.revenue_rank, r.country, r.revenue_dkk) for r in rows] == [
+        (1, "Japan", Decimal("30000.00")),
+        (2, "Germany", Decimal("15250.00")),
+        (3, "Sweden", Decimal("6600.50")),
+    ]
+    assert sum(r.revenue_share_pct for r in rows) == Decimal("100.00")
+    assert sum(r.booking_share_pct for r in rows) == Decimal("100.00")
+
+
+def test_all_time_counts_the_reviews_of_every_year():
+    reviews = [
+        review(1, "Suite", date(2025, 12, 31), 5),
+        review(2, "Suite", date(2026, 7, 1), 3),
+        review(3, "Grand Lit", date(2027, 2, 2), 4),
+    ]
+    everything = hotel.hotel_summary(BOOKINGS, reviews, ROOMS, None)
+    assert (everything.review_count, everything.average_satisfaction, everything.satisfied_share_pct) == (
+        3, Decimal("4.00"), Decimal("66.67"))
+    one_year = hotel.hotel_summary(BOOKINGS, reviews, ROOMS, 2026)
+    assert (one_year.review_count, one_year.average_satisfaction, one_year.satisfied_share_pct) == (
+        1, Decimal("3.00"), Decimal("0.00"))
+    assert [r.review_count for r in hotel.kpis_by_season(BOOKINGS, reviews, ROOMS, None)] == [1, 0, 2]
+
+
+def test_all_time_without_bookings_has_no_capacity_and_returns_zeros(room_types):
+    s = hotel.hotel_summary([], [], room_types, None)
+    assert (s.year, s.booking_count, s.total_revenue_dkk, s.available_room_nights, s.occupancy_rate_pct) == (
+        "all", 0, Decimal("0.00"), 0, Decimal("0.00"))
+    assert all(r.available_room_nights == 0 for r in hotel.kpis_by_room_type([], [], room_types, None))
+    assert [(r.season_days, r.available_room_nights) for r in hotel.kpis_by_season([], [], room_types, None)] == [
+        (0, 0)] * 3
+    assert len(hotel.revenue_by_room_type_and_season([], room_types, None)) == 24
+    assert hotel.revenue_by_country([], None) == []
+
+
+def test_service_without_a_year_loads_everything(room_types):
+    repo = FakeBookings(BOOKINGS)
+    service = KpiService(repo, FakeRoomTypes(room_types), FakeReviews())
+    assert service.summary(None).total_revenue_dkk == ALL_TIME_TOTAL
+    assert service.summary(None).year == "all"
+    assert len(service.by_room_type(None)) == 8
+    assert len(service.by_season(None)) == 3
+    assert len(service.by_room_type_and_season(None)) == 24
+    assert service.by_country(None)[0].country == "Japan"
+    assert repo.years == [None] * 6

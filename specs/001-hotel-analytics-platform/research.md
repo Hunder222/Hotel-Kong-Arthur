@@ -384,7 +384,19 @@ v5.4 are available.
     maps months to seasons and never calculates prices.
   - Validation messages from Problem Details appear next to the fields.
   - When room type, check-in date or nights change, the price field is cleared, so the API
-    recalculates the price unless the user types one.
+    recalculates the price unless the user types one. (Amended below: a fixed price per night
+    survives a change of nights.)
+  - **Amended 2026-10-29 (FR-018, FR-019, T114, T115)**: the price preview and the two price fields
+    need the season and the standard price before anything is saved. `frontend/public/price-preview.js`
+    therefore mirrors the month → season table and the standard-price arithmetic, **for display only**.
+    The API still derives the season, prices the stay and validates every field on save, and
+    `backend/tests/architecture/test_frontend_price_mirror.py` fails if the table drifts from
+    `business/rules/seasons.py`. A change of room type or check-in date clears a typed price, a change
+    of nights clears a typed total but keeps a fixed price per night.
+  - **Open for the team**: this departs from "JavaScript implements no business rule" above and from
+    the plan's Gate VII evidence ("the frontend computes nothing"), so Principle VII's wording needs
+    an amendment with `/speckit-constitution` (add it to T105), or the preview moves behind a new
+    read-only API operation.
 - **Rationale**: The smallest thing that satisfies F1 inside Docker (OQ-1 resolved toward the
   compose container). No business logic in the client keeps Principle VII true for every client.
 - **Alternatives considered**:

@@ -46,6 +46,8 @@ curl -s "http://localhost:8000/api/v1/kpis/hotel/summary?year=2026"
 - `{"items": []}`.
 - A summary with every count and amount at 0, `available_room_nights` = **78110** and
   `occupancy_rate_pct` = 0 (zero-division rule).
+- The same call without `?year=` is all-time (FR-021): `year` is `"all"` and, with no bookings
+  yet, there is no period, so `available_room_nights` is **0** and `occupancy_rate_pct` 0.
 
 ## 2. Load the sample data (idempotent reset/replace)
 
@@ -129,11 +131,32 @@ curl -s -i http://localhost:8000/api/v1/bookings/<id>
 - The summary is back to 1000 bookings and **11234034.00** DKK.
 - Each change shows up on the very next request (SC-004 allows up to 5 seconds).
 
+```bash
+# Scenario 5: a fixed price per night instead of a total price (FR-019)
+curl -s -i -X POST http://localhost:8000/api/v1/bookings \
+  -H 'Content-Type: application/json' \
+  -d '{"first_name":"Elena","family_name":"Müller","country":"Germany","room_type":"Superior Double","check_in_date":"2026-07-14","days_rented":3,"price_per_night_dkk":2100.50}'
+```
+
+**Expected**:
+
+- `201`, and `price_dkk` **6301.50** (3 × 2100.50).
+- The same body with `"price_dkk": 6301.50` added gives `422` with an error on `price_per_night_dkk`
+  (both prices given); a `price_per_night_dkk` of 1000 gives `422` naming 1,800.00–2,200.00 DKK per
+  night for Superior Double in high season.
+- Delete the booking afterwards (Scenario 3) so the summary is back to 1000 bookings.
+
 **In the browser** (http://localhost:8080):
 
 - Create, edit and delete one booking. Each takes less than 30 seconds (SC-001).
-- An invalid entry shows its message next to the field.
+- An invalid entry shows its message next to the field (a rejected price per night shows next to
+  that field).
 - The list refreshes after each change, and `Müller` displays correctly.
+- Choosing room type, check-in date and nights shows the season, the standard rate, the nights and
+  the standard total (FR-018). Typing a total price or a price per night locks the other field,
+  which then shows the calculated value; **Use standard price** clears both (FR-019).
+- **Edit** switches the page into Edit Mode: an "EDIT MODE" banner, other colours and **Cancel edit**
+  (FR-020). Saving or cancelling returns to the normal look.
 
 ## 4. US2: Revenue by room type, season and country (A2–A6, K2, FR-006–FR-009)
 
@@ -190,8 +213,12 @@ Edge cases (spec):
 
 - `GET /api/v1/kpis/hotel/summary?year=2030` returns 0 for every count, amount, average and rate,
   and `available_room_nights` = 78110. There is no error.
-- `?year=abc` returns `400`.
+- `?year=abc` returns `400`, and so does `?year=ALL` (only lowercase `all` is accepted).
 - `GET /api/v1/kpis/bar/by-category?year=2030` returns both categories with 0 values.
+- `GET /api/v1/kpis/hotel/summary?year=all`, or without `year`, is all-time (FR-021). After `seed`
+  every row has `year` `"all"` and the same figures as 2026, because all sample data is in 2026
+  (`total_revenue_dkk` 11234034.00, `available_room_nights` 78110). A booking in 2027 widens the
+  period to 2026–2027, so `available_room_nights` becomes 156220.
 
 ## 8. Tableau route check (team, manual, outside this repository; FR-017)
 

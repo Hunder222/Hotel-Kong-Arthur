@@ -50,7 +50,9 @@ def test_drink_sales_of_an_empty_year_is_an_empty_list(client, check_contract):
     assert response.json() == {"items": []}
 
 
-@pytest.mark.parametrize("query", ["?year=abc", "?year=1999", "?year=2101", "?category=Tea", "?category=cocktail"])
+@pytest.mark.parametrize(
+    "query", ["?year=abc", "?year=1999", "?year=2101", "?year=ALL", "?category=Tea", "?category=cocktail"]
+)
 def test_drink_sales_with_a_bad_parameter_is_400(client, check_contract, query):
     response = client.get("/api/v1/bar/drink-sales" + query)
     assert response.status_code == 400
@@ -89,11 +91,48 @@ def test_by_category_of_an_empty_year_still_has_both_rows(client, check_contract
     assert all(i["revenue_dkk"] == 0 and i["revenue_share_pct"] == 0 and i["drink_count"] == 0 for i in items)
 
 
-def test_the_year_defaults_to_the_current_year(client, check_contract):
-    for path in ("/api/v1/kpis/bar/summary", "/api/v1/kpis/bar/by-category", "/api/v1/bar/drink-sales"):
-        response = client.get(path)
-        assert response.status_code == 200
-        check_contract(response)
+# ---- FR-021: `year=all`, or no year at all, means all-time ----
+
+
+def test_summary_and_split_for_year_all_total_every_year(client, check_contract, seeded):
+    summary = client.get("/api/v1/kpis/bar/summary?year=all")
+    assert summary.status_code == 200
+    check_contract(summary)
+    # the sample data is all in 2026, so the all-time totals equal that year's, labelled "all"
+    assert summary.json() == {"year": "all", "drink_count": 30, "units_sold": 179958, "total_revenue_dkk": 13448640.34}
+    split = client.get("/api/v1/kpis/bar/by-category?year=all")
+    assert split.status_code == 200
+    check_contract(split)
+    items = split.json()["items"]
+    assert [(i["year"], i["category"]) for i in items] == [("all", "Cocktail"), ("all", "Coffee")]
+    assert round(sum(i["revenue_share_pct"] for i in items), 2) == 100.0
+
+
+def test_drink_sales_for_year_all_keep_each_rows_own_year_and_rank(client, check_contract, seeded):
+    response = client.get("/api/v1/bar/drink-sales?year=all")
+    assert response.status_code == 200
+    check_contract(response)
+    items = response.json()["items"]
+    assert len(items) == 30 and {i["year"] for i in items} == {2026}
+    assert items[0]["drink_name"] == "Espresso" and items[0]["revenue_rank"] == 1
+    assert response.json() == client.get("/api/v1/bar/drink-sales?year=2026").json()
+
+
+@pytest.mark.parametrize("path", ["/api/v1/kpis/bar/summary", "/api/v1/kpis/bar/by-category", "/api/v1/bar/drink-sales"])
+def test_omitting_the_year_means_all_time(client, check_contract, seeded, path):
+    omitted = client.get(path)
+    assert omitted.status_code == 200
+    check_contract(omitted)
+    assert omitted.json() == client.get(path + "?year=all").json()
+
+
+def test_year_all_with_no_data_is_zeros(client, check_contract):
+    response = client.get("/api/v1/kpis/bar/summary?year=all")
+    check_contract(response)
+    assert response.json() == {"year": "all", "drink_count": 0, "units_sold": 0, "total_revenue_dkk": 0.0}
+    drinks = client.get("/api/v1/bar/drink-sales?year=all")
+    check_contract(drinks)
+    assert drinks.json() == {"items": []}
 
 
 @pytest.mark.parametrize("path", ["/api/v1/kpis/bar/summary", "/api/v1/kpis/bar/by-category"])

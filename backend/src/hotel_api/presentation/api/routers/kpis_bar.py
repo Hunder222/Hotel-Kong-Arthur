@@ -18,19 +18,19 @@ router = APIRouter(prefix="/api/v1/kpis/bar", tags=["Bar KPIs"])
 
 
 @router.get("/summary", response_model=BarSummary, operation_id="getBarSummary")
-def get_bar_summary(year: int = Depends(report_year), service: BarService = Depends(get_bar_service)) -> BarSummary:
+def get_bar_summary(year: int | None = Depends(report_year), service: BarService = Depends(get_bar_service)) -> BarSummary:
     return BarSummary.from_model(service.summary(year))
 
 
 @router.get("/by-category", response_model=BarCategoryKpiList, operation_id="listBarKpisByCategory")
 def list_by_category(
-    year: int = Depends(report_year), service: BarService = Depends(get_bar_service)
+    year: int | None = Depends(report_year), service: BarService = Depends(get_bar_service)
 ) -> BarCategoryKpiList:
     return BarCategoryKpiList(items=[BarCategoryKpi.from_model(r) for r in service.by_category(year)])
 
 
 @router.get("/by-price-tier", response_model=BarPriceTierKpiList, operation_id="listBarKpisByPriceTier")
 def list_by_price_tier(
-    year: int = Depends(report_year), service: BarService = Depends(get_bar_service)
+    year: int | None = Depends(report_year), service: BarService = Depends(get_bar_service)
 ) -> BarPriceTierKpiList:
     return BarPriceTierKpiList(items=[BarPriceTierKpi.from_model(r) for r in service.by_price_tier(year)])

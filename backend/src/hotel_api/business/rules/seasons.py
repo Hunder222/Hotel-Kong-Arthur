@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import calendar
+from collections.abc import Iterable
 from datetime import date
 
 from hotel_api.business.domain.models import Season
@@ -49,3 +50,27 @@ def days_in_year(year: int) -> int:
 def available_room_nights(room_count: int, days: int) -> int:
     """K1 denominator: rooms x days."""
     return room_count * days
+
+
+def covered_years(years: Iterable[int]) -> range:
+    """Every calendar year from the earliest to the latest of `years`, years in between included (FR-021).
+
+    This is the period an all-time scope has capacity for: a year without a single booking between two busy
+    years still had its rooms available. No years, no period.
+    """
+    found = list(years)
+    return range(min(found), max(found) + 1) if found else range(0)
+
+
+def calendar_days(years: Iterable[int]) -> int:
+    """Days in the given calendar years, leap years included."""
+    return sum(days_in_year(year) for year in years)
+
+
+def season_days_over(years: Iterable[int]) -> dict[Season, int]:
+    """Days per season summed over the given calendar years."""
+    total = {season: 0 for season in SEASON_ORDER}
+    for year in years:
+        for season, days in season_days(year).items():
+            total[season] += days
+    return total
