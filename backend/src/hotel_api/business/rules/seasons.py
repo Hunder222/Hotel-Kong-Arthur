@@ -34,6 +34,11 @@ def season_of(day: date) -> Season:
 
 
 
+def days_in_year(year: int) -> int:
+    """Calendar days in `year` (366 in leap year, 365 otherwise)."""
+    return (date(year + 1, 1, 1) - date(year, 1, 1)).days
+
+
 def days_in_season(year: int, season: Season) -> int:
     """Calendar days of `year` that fall in `season` (2026: 89 low, 153 mid, 123 high; 90 low in a leap year)."""
     first = date(year, 1, 1)
