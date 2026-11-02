@@ -103,3 +103,4 @@ def test_bar_breakdowns_all_time_totals(client, seeded):
     assert len(items_tier) == 3
     assert sum(t["revenue_dkk"] for t in items_tier) == pytest.approx(13448640.34, abs=TOLERANCE)
     assert sum(t["units_sold"] for t in items_tier) == 179958
+
