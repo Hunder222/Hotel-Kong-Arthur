@@ -207,12 +207,12 @@
 
 **Purpose**: End-to-end verification, contract route parity, cross-cutting all-time tests, and updated system documentation.
 
-- [ ] T063 [P] Add multi-year / all-time integration tests in `backend/tests/integration/test_all_time_kpis.py`: query hotel and bar KPI endpoints with `year=all` and omitted `year`, verifying available room-nights span all booking years and bar totals aggregate across sales years (FR-021)
-- [ ] T064 Update route-parity contract test in `backend/tests/contract/test_contract_validity.py`: assert that FastAPI app registers exactly the 20 operations across 15 paths specified in `contracts/openapi.yaml`, and validate OpenAPI 3.0.3 schema validity
-- [ ] T065 [P] Run architecture tests in `backend/tests/architecture/test_no_tableau_files.py` (assert zero `.twb`, `.twbx`, `.hyper` files) and `test_frontend_price_mirror.py` (assert price preview season table matches `seasons.py`)
-- [ ] T066 [P] Update `README.md`: update architecture diagram with PostgreSQL container (`postgres:17-alpine`) and 6 Swagger UI tags, document Week 2 MySQL → PostgreSQL migration and Git release `v1.0.0`, explain the new `Hotel Analytics` API endpoints with filter attributes, and document the frontend prototype analytics view
-- [ ] T067 [P] Update `CONTRIBUTE.md`: document PostgreSQL connection setup, running tests via `docker compose run --rm tests`, database reset via `docker compose down -v`, and seeding via `docker compose run --rm seed`
-- [ ] T068 Execute full quickstart.md validation (§1–§9): test fresh `docker compose up` startup under 60 seconds (SC-005), run seed twice, test booking CRUD (SC-001), verify all 9 `Hotel Analytics` endpoints and frontend views, and confirm all test suites pass
+- [X] T063 [P] Add multi-year / all-time integration tests in `backend/tests/integration/test_all_time_kpis.py`: query hotel and bar KPI endpoints with `year=all` and omitted `year`, verifying available room-nights span all booking years and bar totals aggregate across sales years (FR-021)
+- [X] T064 Update route-parity contract test in `backend/tests/contract/test_contract_validity.py`: assert that FastAPI app registers exactly the 20 operations across 15 paths specified in `contracts/openapi.yaml`, and validate OpenAPI 3.0.3 schema validity
+- [X] T065 [P] Run architecture tests in `backend/tests/architecture/test_no_tableau_files.py` (assert zero `.twb`, `.twbx`, `.hyper` files) and `test_frontend_price_mirror.py` (assert price preview season table matches `seasons.py`)
+- [X] T066 [P] Update `README.md`: update architecture diagram with PostgreSQL container (`postgres:17-alpine`) and 6 Swagger UI tags, document Week 2 MySQL → PostgreSQL migration and Git release `v1.0.0`, explain the new `Hotel Analytics` API endpoints with filter attributes, and document the frontend prototype analytics view
+- [X] T067 [P] Update `CONTRIBUTE.md`: document PostgreSQL connection setup, running tests via `docker compose run --rm tests`, database reset via `docker compose down -v`, and seeding via `docker compose run --rm seed`
+- [X] T068 Execute full quickstart.md validation (§1–§9): test fresh `docker compose up` startup under 60 seconds (SC-005), run seed twice, test booking CRUD (SC-001), verify all 9 `Hotel Analytics` endpoints and frontend views, and confirm all test suites pass
 
 ---
 

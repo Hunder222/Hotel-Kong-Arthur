@@ -1,13 +1,23 @@
 # Hotel Kong Arthur: Operations & Analytics Platform
 
 A live data platform for Hotel Kong Arthur (214 rooms, 8 room types, lobby bar). It replaces static CSV extracts
-with operational data in MySQL that is changed and read through one REST/JSON API:
+with operational data in PostgreSQL that is changed and read through one REST/JSON API:
 
 - **Receptionist**: creates, edits and deletes bookings in a browser page (`F1`).
 - **The hotel's booking system**: can write to the same API (`POST` / `PUT` / `DELETE`).
-- **Hotel CFO**: connects Tableau Desktop to the raw REST API endpoints (`bookings`, `room-types`, `reviews`,
-  `bar/drink-sales`) with no query parameters, and the team builds dashboards and calculates the KPIs
-  (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) manually in Tableau (see [Tableau handover](#tableau-handover)).
+- **Hotel Analytics Consumers & Receptionist UI**: read backend-calculated hotel and bar KPIs directly from the
+  **`Hotel Analytics`** endpoints (`/api/v1/kpis/hotel/*` and `/api/v1/kpis/bar/*`) with optional filter attributes
+  (`year`, `season`, `room_type`, `country`, `category`, `price_tier`), skipping the manual Tableau step.
+- **Hotel CFO (Tableau)**: connects Tableau Desktop to the preserved parameterless raw REST API collection endpoints
+  (`bookings`, `room-types`, `reviews`, `bar/drink-sales`) with no query parameters (`$.items[*]`), 100% backward-compatible
+  with `v1.0.0` (see [Tableau handover](#tableau-handover)).
+
+### Week 2 Updates (Git Release `v1.0.0` → Current)
+As specified in `Tillægsopgave_uge_2.md`:
+1. **Database Layer Migration**: Migrated from MySQL 8.4 to **PostgreSQL 17** (`postgres:17-alpine`) using `psycopg` 3.2.
+2. **Hotel Analytics Tag**: Added Swagger UI tag `Hotel Analytics` containing 9 backend-calculated KPI endpoints with dynamic filtering.
+3. **Frontend Analytics View**: The browser prototype (`http://localhost:8080`) provides a real-time Hotel Analytics dashboard with revenue cards, occupancy rate, customer satisfaction, cocktail bar category split, ranked drink sales table, and stay length / price tier demand metrics.
+4. **Git Release Preservation**: The prior MySQL state is preserved on GitHub as Git Release **`v1.0.0`**.
 
 Built spec-driven with GitHub Spec Kit. The artefacts are in [`specs/001-hotel-analytics-platform/`](specs/001-hotel-analytics-platform/)
 (`spec.md`, `plan.md`, `tasks.md`, `data-model.md`, `research.md`, `quickstart.md`, the OpenAPI contract) and the
@@ -18,17 +28,17 @@ constitution is in [`.specify/memory/constitution.md`](.specify/memory/constitut
 You need Docker with Compose v2.
 
 ```bash
-docker compose up --build -d      # db, api, frontend, swagger-ui; healthy within about a minute
+docker compose up --build -d      # db (PostgreSQL), api, frontend, swagger-ui; healthy within about a minute
 docker compose run --rm seed      # optional: load the sample data (1,000 bookings, 500 reviews, 30 drink sales)
 ```
 
 | What | URL |
 |------|-----|
-| Booking page (frontend) | http://localhost:8080 |
+| Booking page & Analytics (frontend) | http://localhost:8080 |
 | REST API | http://localhost:8000/api/v1/ |
 | Swagger UI (the contract) | http://localhost:8081 |
 
-MySQL has **no published port**: every client reaches the data only through the API.
+PostgreSQL has **no published port**: every client reaches the data only through the API.
 
 `docker compose up` starts the system **empty**: the schema, the 8 room types (214 rooms) and their seasonal
 price bands exist, but there are no bookings, reviews or bar sales. Bookings can be created at once. The bar KPIs
@@ -42,8 +52,8 @@ Stop with `docker compose down -v`. Run `docker compose run --rm tests` for the 
 ```mermaid
 flowchart LR
     subgraph Clients["Clients (outside Docker)"]
-        BROWSER["Browser<br/>Receptionist"]
-        TABLEAU["Tableau Desktop<br/>Hotel CFO<br/>(built manually, FR-017)"]
+        BROWSER["Browser<br/>Receptionist & Analytics (F1, F2)"]
+        TABLEAU["Tableau Desktop<br/>Hotel CFO<br/>(raw extracts, FR-017)"]
         HOTELSYS["Hotel's booking system"]
         DEV["Developer<br/>(Swagger UI)"]
     end
@@ -53,11 +63,11 @@ flowchart LR
         SW["swagger-ui · :8081<br/>serves openapi.yaml"]
         subgraph API["api · FastAPI/Uvicorn · :8000"]
             P["Presentation<br/>routers · DTOs · Problem Details"]
-            B["Business<br/>domain · rules · services"]
-            D["Data<br/>repositories · SQL (PyMySQL)"]
+            B["Business<br/>domain · rules · services · KPIs"]
+            D["Data<br/>repositories · SQL (psycopg)"]
             P --> B --> D
         end
-        DB[("db · MySQL 8.4<br/>volume mysql-data<br/>no host port")]
+        DB[("db · PostgreSQL 17<br/>volume postgres-data<br/>no host port")]
     end
 
     subgraph Tools["On demand (compose profiles)"]
@@ -67,18 +77,17 @@ flowchart LR
 
     BROWSER -->|"HTTP :8080"| FE
     FE -->|"proxies /api to api:8000"| P
-    TABLEAU -->|"GET JSON :8000<br/>REST API Connector"| P
+    TABLEAU -->|"GET JSON :8000<br/>Raw Endpoints"| P
     HOTELSYS -->|"POST/PUT/DELETE JSON :8000"| P
     DEV -->|"HTTP :8081"| SW
     SW -.->|"Try it out (CORS)"| P
-    D -->|"SQL · db:3306"| DB
+    D -->|"SQL · db:5432"| DB
     SEED -.->|"CSV → business → data"| DB
     TESTS -.->|"hotel_test database"| DB
 ```
 
-Containers start in this order: `db` becomes healthy (a TCP query on `room_types`, so it cannot pass before the
-init scripts have finished), then `api` (`GET /api/v1/health`), then `frontend`. `swagger-ui` is independent.
-Containers find each other by compose service name (`api` connects to `db:3306`, nginx proxies `/api/` to
+Containers start in this order: `db` becomes healthy (`pg_isready`), then `api` (`GET /api/v1/health`), then `frontend`. `swagger-ui` is independent.
+Containers find each other by compose service name (`api` connects to `db:5432`, nginx proxies `/api/` to
 `http://api:8000`). The two tool services, `seed` and `tests`, are in compose profiles, so `up` never starts them.
 
 ### Backend: three layers
@@ -88,122 +97,62 @@ The backend (`backend/src/hotel_api/`) has exactly three layers. Calls go one wa
 
 | Layer | Package | Contains | May import |
 |-------|---------|----------|------------|
-| 1. Presentation | `presentation/` | REST routers, DTOs, RFC 9457 Problem Details, the seed CLI. No business rules, no SQL | business |
-| 2. Business | `business/` | Domain models, rules (seasons, pricing, validation, rounding), services, repository ports. No HTTP, no SQL | business only |
-| 3. Data | `data/` | PyMySQL connection handling and repositories with parameterised SQL. The only code that talks to MySQL | business models and ports |
+| 1. Presentation | `presentation/` | REST routers, DTOs, RFC 9457 Problem Details, dependencies, seed CLI. No business rules, no SQL | business |
+| 2. Business | `business/` | Domain models, rules (seasons, pricing, ranking, price tiers), pure KPI calculators, services, repository ports. No HTTP, no SQL | business only |
+| 3. Data | `data/` | PostgreSQL connection handling (`psycopg`) and repositories with parameterised SQL. The only code that talks to PostgreSQL | business models and ports |
 
 `main.py` is the composition root: the only module that knows all three layers. It wires one database
 connection and one transaction per request, committed **before** the response is sent and rolled back on any error.
 
-**Operational rules are in the business layer; analytical KPIs are built in Tableau.** Every operational rule
-(month-to-season mapping, seasonal nightly rate bands, standard price calculation, and booking/review validation) is
-defined once in `business/rules/`, and each booking and review returned by the API includes its derived `season` and
-`year`. Analytical KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) are calculated manually by the team in Tableau from the raw
-REST endpoints (see [data-model.md §7](specs/001-hotel-analytics-platform/data-model.md#7-kpi-reference-catalog-for-tableau-principle-vii)).
+### REST API & Swagger UI
 
-**Replaceability.** Swapping MySQL touches only `data/`, `db/init/` and the compose `db` service. Replacing the web
-frontend with the hotel's own booking system touches nothing in the backend.
+The OpenAPI 3.0.3 contract ([`contracts/openapi.yaml`](specs/001-hotel-analytics-platform/contracts/openapi.yaml)) is the single authoritative contract, shown by Swagger UI. It defines **20 operations across 16 paths** categorized under 6 tags:
 
-### REST API
+1. **`Health`**: `GET /api/v1/health`
+2. **`Reference data`**: `GET /api/v1/room-types`
+3. **`Bookings`**: `GET /api/v1/bookings`, `POST /api/v1/bookings`, `GET /api/v1/bookings/{id}`, `PUT /api/v1/bookings/{id}`, `DELETE /api/v1/bookings/{id}`
+4. **`Reviews`**: `GET /api/v1/reviews`, `POST /api/v1/reviews`, `GET /api/v1/reviews/{id}`
+5. **`Bar`**: `GET /api/v1/bar/drink-sales` (parameterless for Tableau)
+6. **`Hotel Analytics`**:
+   - `GET /api/v1/kpis/hotel/summary` (occupancy rate, available room nights, revenue, satisfaction, ALOS, ADR, rev/booking)
+   - `GET /api/v1/kpis/hotel/by-room-type` (room revenue, rank, occupancy, satisfaction, ALOS, ADR)
+   - `GET /api/v1/kpis/hotel/by-season` (seasonal revenue, occupancy, satisfaction, ALOS, ADR)
+   - `GET /api/v1/kpis/hotel/by-room-type-and-season` (cross-dimensional room type × season revenue)
+   - `GET /api/v1/kpis/hotel/by-country` (country origin ranking, booking count, revenue, revenue rank)
+   - `GET /api/v1/kpis/bar/summary` (total bar sales, total units, distinct drinks)
+   - `GET /api/v1/kpis/bar/by-drink` (ranked drinks by revenue and units with price tiers)
+   - `GET /api/v1/kpis/bar/by-category` (cocktail vs. coffee split with largest-remainder rounding)
+   - `GET /api/v1/kpis/bar/by-price-tier` (budget, standard, premium demand distribution)
 
-All endpoints are under `/api/v1` and take **no query parameters**. The OpenAPI 3.0.3 contract
-([`contracts/openapi.yaml`](specs/001-hotel-analytics-platform/contracts/openapi.yaml)) is the single authoritative
-contract, shown by Swagger UI. Contract tests validate every response of the running code against it, and a
-route-parity test checks that the implemented routes equal the contract's 11 operations.
-
-| Resource | Methods | Scope |
-|----------|---------|-------|
-| `room-types` | `GET` | reference data (8 room types, 214 rooms, seasonal rate bands; `K1` denominator) |
-| `bookings`, `bookings/{id}` | `GET`, `POST`, `PUT`, `DELETE` | `F1` CRUD + raw booking records for `A1`–`A7`, `K1`, `K2` |
-| `reviews`, `reviews/{id}` | `GET`, `POST` | raw guest satisfaction reviews for `K3` |
-| `bar/drink-sales` | `GET` | raw bar drink sales (`unit_price_dkk`, `units_sold`, `category`, `year`) for `B1`–`B3`, `A7` |
-| `health` | `GET` | liveness and database check |
-
-All `GET` collection endpoints return `{"items": [...]}` with no query parameters and send `Cache-Control: no-store`.
-Status codes: `200`, `201` (with `Location`), `204`, `400` (malformed JSON or bad path parameter), `404`, `422` (a field
-or business rule is broken), `503` (database unavailable). Errors are `application/problem+json` with an `errors`
-list of `{field, message}`. There is no authentication (prototype).
-
-Example: `POST /api/v1/bookings` with `{"first_name": "Elena", "family_name": "Müller", "country": "Germany", "room_type":
-"Superior Double", "check_in_date": "2026-07-14", "days_rented": 3}` returns `201`, `Location: /api/v1/bookings/<id>`,
-`season` `high` and `price_dkk` `6000.0` (the room type's standard rate for that season times 3 nights; a given
-price must lie inside the band shown by `GET /api/v1/room-types`). Instead of a total `price_dkk`, a booking can
-carry a fixed `price_per_night_dkk` (stored as nights times that price); giving both is a `422`.
+All collection endpoints return `{"items": [...]}`. Status codes: `200`, `201` (with `Location`), `204`, `400` (Problem Details on invalid query or body), `404`, `422`, `503`.
 
 ## Data and persistence
 
-- All runtime data is in MySQL, in the named Docker volume **`mysql-data`**.
+- All runtime data is in PostgreSQL, in the named Docker volume **`postgres-data`**.
 - `docker compose stop`, `down` and restarts **keep** all bookings, reviews and bar sales.
-- `docker compose down -v` **deletes the volume**. The next `up` recreates the schema and reference data, and the
-  system is empty again.
-- The schema and reference data (`db/init/*.sql`) only run on an **empty** volume. After changing them, run
-  `docker compose down -v && docker compose up --build -d`.
-- **Seeding**: `docker compose run --rm seed` loads the sample data from `context/teacher/*.csv` in one transaction.
-  It is idempotent (every run ends in the same state, with booking ids 1–1000 equal to the CSV row order) and it
-  **removes bookings and reviews created through the API**. The CSV files are never read at runtime.
-- The sample data has no dates, so the seed gives each booking a deterministic 2026 check-in date inside its
-  season, repairs the family name `M�ller` in the CSV file to `Müller`, and generates 500 synthetic reviews
-  (satisfaction data does not exist in the CSV files).
+- `docker compose down -v` **deletes the volume**. The next `up` recreates the schema and reference data, and the system is empty again.
+- The schema and reference data (`db/init/*.sql`) only run on an **empty** volume. After changing them, run `docker compose down -v && docker compose up --build -d`.
+- **Seeding**: `docker compose run --rm seed` loads the sample data from `context/teacher/*.csv` in one transaction. It is idempotent (every run ends in the same state, with booking ids 1–1000 equal to the CSV row order).
 
 ## Tableau handover
 
-The Hotel CFO's dashboard and all KPI calculations (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) are built **by hand by the team
-in Tableau** on top of the raw REST API collections. This repository delivers only the REST API and its contract, and
-contains **no Tableau files** (`.twb`, `.twbx`, `.tbm`, `.tds`, `.tdsx`, `.hyper`) and no connector code (FR-017; an
-architecture test enforces it).
+Tableau connects to the parameterless raw collection endpoints:
+- `http://localhost:8000/api/v1/bookings`
+- `http://localhost:8000/api/v1/room-types`
+- `http://localhost:8000/api/v1/reviews`
+- `http://localhost:8000/api/v1/bar/drink-sales`
 
-Tableau cannot read an HTTP endpoint with its built-in JSON connector (that reads files). The route we expect to work
-is Tableau's **REST API Connector** from Tableau Exchange (Tableau Desktop 2023.3 or later). The Web Data Connector
-is deprecated by Tableau and is not used.
-
-1. Install the **REST API Connector** from Tableau Exchange, and put its JDBC REST driver (`.jar`) in Tableau's
-   `Drivers` folder (macOS: `~/Library/Tableau/Drivers`; Windows: `C:\Program Files\Tableau\Drivers`).
-2. In Tableau Desktop choose *Connect → To a Server → REST API* and connect to the four parameterless `GET` endpoints:
-   - `http://localhost:8000/api/v1/bookings`
-   - `http://localhost:8000/api/v1/room-types`
-   - `http://localhost:8000/api/v1/reviews`
-   - `http://localhost:8000/api/v1/bar/drink-sales`
-3. Set the JSONPath to the records to **`$.items[*]`** for all four endpoints.
-4. The API has no authentication. If the connector insists on credentials, any Basic or Bearer value works.
-5. The connector is **extract-only**: Tableau reads a copy of the data. To see the current state, choose
-   *Data → Refresh All Extracts*. A booking changed through the API appears after the next refresh.
-
-Every response is flat JSON with stable field names, JSON numbers (never strings), ISO dates, derived `season` and
-`year` on bookings and reviews, no query parameters, no pagination (the largest table has about 1,000 rows) and no
-authentication.
-
-| Dashboard view / KPI | Raw REST endpoint(s) consumed by Tableau |
-|----------------------|------------------------------------------|
-| `A1` where guests come from | `GET /api/v1/bookings` (`country`) |
-| `A2` revenue per room type per season | `GET /api/v1/bookings` (`room_type`, `season`, `price_dkk`, `days_rented`) |
-| `A3` revenue per country, `A5` top countries | `GET /api/v1/bookings` (`country`, `price_dkk`) |
-| `A4` top room types | `GET /api/v1/bookings` (`room_type`, `price_dkk`) |
-| `A6` the year's revenue, `K2` room revenue | `GET /api/v1/bookings` (`price_dkk`, `year`) |
-| `A7` average stay (ALOS), daily rate (ADR), revenue per booking | `GET /api/v1/bookings` (`days_rented`, `price_dkk`) |
-| `K1` occupancy rate | `GET /api/v1/bookings` (`days_rented`, `room_type`, `season`) + `GET /api/v1/room-types` (`room_count`) |
-| `K3` guest satisfaction | `GET /api/v1/reviews` (`rating`, `room_type`, `season`, `year`) |
-| `B1` total bar sales, `B2` revenue per drink, `B3` cocktail vs coffee, `A7` bar price tiers | `GET /api/v1/bar/drink-sales` (`drink_name`, `category`, `unit_price_dkk`, `units_sold`, `year`) |
-
-**Check the route early** (the first day the API runs): connect to `http://localhost:8000/api/v1/bookings` after
-seeding, confirm 1,000 rows load, create a booking, refresh the extract and check that the new row appears. When the
-dashboard is built, compare every figure with the golden reference values in
-[quickstart.md §4–§7](specs/001-hotel-analytics-platform/quickstart.md) (within 0.01 DKK / 0.01 %).
-
-## Performance
-
-Booking CRUD operations (`POST /bookings`, `GET /bookings/{id}`, `PUT /bookings/{id}`, `DELETE /bookings/{id}`) have a
-measured p95 latency of ~10–12 ms (target < 200 ms), `GET /reviews` (5,000 rows) has p95 ~80 ms, `GET /bookings`
-(10,000 rows) has p95 ~212 ms, and `GET /bar/drink-sales` has p95 ~10 ms (target < 500 ms for raw collection endpoints).
+Set the JSONPath to **`$.items[*]`**. This repository delivers the REST API and contract, and contains **no Tableau files** (`.twb`, `.twbx`, `.hyper`) or connector code (FR-017; enforced by architecture tests).
 
 ## Repository layout
 
 ```text
-docker-compose.yml     db, api, frontend, swagger-ui; profiles: tools (seed), test (tests)
+docker-compose.yml     db (PostgreSQL), api, frontend, swagger-ui; profiles: tools (seed), test (tests)
 backend/               Python 3.13 / FastAPI service (src/hotel_api) and its tests
-frontend/              static booking page served by nginx (no build step)
-db/init/               schema, reference data (8 room types, 214 rooms, 24 rate bands), hotel_test database
-context/               teacher requirements and sample data, team plan
-specs/                 Spec Kit artefacts and the OpenAPI contract
+frontend/              static booking page and Hotel Analytics dashboard served by nginx
+db/init/               PostgreSQL schema, reference data (8 room types, 214 rooms, 24 rate bands), test db init
+context/               teacher requirements (tværfaglig_opgave, Tillægsopgave_uge_2) and sample data
+specs/                 Spec Kit artefacts and the authoritative OpenAPI contract
 ```
 
 See [CONTRIBUTE.md](CONTRIBUTE.md) for development setup, tests and commit conventions.
