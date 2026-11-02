@@ -2,6 +2,7 @@
 // validates every field when a booking is saved (research R15). The live price preview and the two price
 // fields use price-preview.js, a display-only mirror of the season table and the standard price (FR-018, FR-019).
 import { ApiError, createBooking, deleteBooking, listBookings, listRoomTypes, replaceBooking } from "./api.js";
+import { refreshAnalytics } from "./analytics.js";
 import { nightlyFromTotal, standardPreview, totalFromNightly } from "./price-preview.js";
 
 const PAGE_SIZE = 50;
@@ -291,6 +292,7 @@ function busy(isBusy) {
 async function reload() {
   state.bookings = await listBookings();
   renderBookings();
+  refreshAnalytics(state.roomTypes, state.bookings); // fire and forget: analytics report their own errors
 }
 
 async function onSubmit(event) {

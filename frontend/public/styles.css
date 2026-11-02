@@ -129,3 +129,14 @@ body.edit-mode #booking-card {
 body.edit-mode #booking-card h2 { color: var(--edit-dark); }
 body.edit-mode #submit-button { background: var(--edit); border-color: var(--edit); }
 body.edit-mode #cancel-button { border-color: var(--edit); color: var(--edit-dark); font-weight: 600; }
+
+/* ---------- Hotel Analytics (FR-022) ---------- */
+
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem 1rem; }
+#analytics h3 { margin: 1.25rem 0 0.4rem; font-size: 0.95rem; }
+#analytics .status { margin: 0.75rem 0 0; }
+.metric-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
+.metric { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.75rem 1rem; background: #f1f7f9; border: 1px solid #c9dde4; border-radius: 8px; }
+.metric-label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.metric strong { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+#analytics td.num { font-variant-numeric: tabular-nums; }

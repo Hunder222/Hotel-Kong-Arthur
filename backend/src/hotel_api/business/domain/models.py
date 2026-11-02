@@ -9,6 +9,23 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Literal, Union
+
+
+# A calendar year (2000-2100) or "all" for the all-time scope (FR-021).
+ReportYear = Union[int, Literal["all"]]
+
+# The 8 room types in canonical (T1) order; the valid values of the `room_type` filter.
+ROOM_TYPE_NAMES: tuple[str, ...] = (
+    "Standard Single",
+    "Grand Lit",
+    "Standard Double",
+    "Superior Double",
+    "Junior Suite",
+    "Spa Executive",
+    "Suite",
+    "LOFT Suite",
+)
 
 
 class Season(str, Enum):
@@ -116,3 +133,83 @@ class BarDrinkSale:
     unit_price_dkk: Decimal
     units_sold: int
 
+
+
+@dataclass(frozen=True)
+class HotelFilters:
+    """The optional filter attributes of the `Hotel Analytics` hotel endpoints."""
+
+    year: ReportYear = "all"
+    season: Season | None = None
+    room_type: str | None = None
+    country: str | None = None
+
+
+@dataclass(frozen=True)
+class StayMetrics:
+    """Booking figures shared by every hotel KPI row (K2, A7)."""
+
+    booking_count: int
+    nights_sold: int
+    revenue_dkk: Decimal
+    average_length_of_stay_nights: Decimal
+    average_daily_rate_dkk: Decimal
+    average_revenue_per_booking_dkk: Decimal
+
+
+@dataclass(frozen=True)
+class SatisfactionMetrics:
+    """Review figures shared by the room type and season KPI rows (K3)."""
+
+    review_count: int
+    average_satisfaction: Decimal
+    satisfied_share_pct: Decimal
+
+
+@dataclass(frozen=True)
+class RoomTypeKpi:
+    year: ReportYear
+    revenue_rank: int
+    room_type: str
+    room_count: int
+    stay: StayMetrics
+    revenue_share_pct: Decimal
+    available_room_nights: int
+    occupancy_rate_pct: Decimal
+    satisfaction: SatisfactionMetrics
+
+
+@dataclass(frozen=True)
+class SeasonKpi:
+    year: ReportYear
+    season: Season
+    season_days: int
+    stay: StayMetrics
+    revenue_share_pct: Decimal
+    available_room_nights: int
+    occupancy_rate_pct: Decimal
+    satisfaction: SatisfactionMetrics
+
+
+@dataclass(frozen=True)
+class RoomTypeSeasonKpi:
+    year: ReportYear
+    room_type: str
+    season: Season
+    room_count: int
+    season_days: int
+    stay: StayMetrics
+    available_room_nights: int
+    occupancy_rate_pct: Decimal
+
+
+@dataclass(frozen=True)
+class CountryKpi:
+    year: ReportYear
+    revenue_rank: int
+    country: str
+    booking_count: int
+    booking_share_pct: Decimal
+    nights_sold: int
+    revenue_dkk: Decimal
+    revenue_share_pct: Decimal

@@ -10,7 +10,7 @@
 <body>
   <header class="page-header">
     <h1>Hotel Kong Arthur</h1>
-    <p>Bookings for reception</p>
+    <p>Bookings for reception and revenue analytics</p>
   </header>
 
   <main>
@@ -99,6 +99,108 @@
       </div>
       <p id="empty" class="muted" hidden>No bookings yet.</p>
       <button type="button" id="more-button" hidden>Show more</button>
+    </section>
+
+    <section class="card" id="analytics" aria-labelledby="analytics-title">
+      <h2 id="analytics-title">Hotel Analytics <span class="muted">revenue calculated by the API</span></h2>
+      <form id="analytics-filters" class="filters" aria-label="Analytics filters">
+        <label>Year
+          <select name="year"><option value="">All years</option></select>
+        </label>
+        <label>Season
+          <select name="season">
+            <option value="">All seasons</option>
+            <option value="low">Low</option>
+            <option value="mid">Mid</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+        <label>Room type
+          <select name="room_type"><option value="">All room types</option></select>
+        </label>
+        <label>Country
+          <select name="country"><option value="">All countries</option></select>
+        </label>
+      </form>
+      <p id="analytics-status" class="status" role="status" aria-live="polite"></p>
+
+      <div class="metric-cards">
+        <div class="metric"><span class="metric-label">Total revenue</span><strong id="metric-revenue">–</strong></div>
+        <div class="metric"><span class="metric-label">Bookings</span><strong id="metric-bookings">–</strong></div>
+        <div class="metric"><span class="metric-label">Nights sold</span><strong id="metric-nights">–</strong></div>
+      </div>
+
+      <h3>Revenue by room type</h3>
+      <div class="table-wrap">
+        <table>
+          <caption class="visually-hidden">Revenue by room type, ranked by revenue</caption>
+          <thead>
+            <tr>
+              <th scope="col" class="num">Rank</th>
+              <th scope="col">Room type</th>
+              <th scope="col" class="num">Bookings</th>
+              <th scope="col" class="num">Nights</th>
+              <th scope="col" class="num">Revenue</th>
+              <th scope="col" class="num">Share</th>
+            </tr>
+          </thead>
+          <tbody id="room-type-rows"></tbody>
+        </table>
+      </div>
+
+      <h3>Revenue by season</h3>
+      <div class="table-wrap">
+        <table>
+          <caption class="visually-hidden">Revenue by season</caption>
+          <thead>
+            <tr>
+              <th scope="col">Season</th>
+              <th scope="col" class="num">Days</th>
+              <th scope="col" class="num">Bookings</th>
+              <th scope="col" class="num">Nights</th>
+              <th scope="col" class="num">Revenue</th>
+              <th scope="col" class="num">Share</th>
+            </tr>
+          </thead>
+          <tbody id="season-rows"></tbody>
+        </table>
+      </div>
+
+      <h3>Revenue by room type and season</h3>
+      <div class="table-wrap">
+        <table>
+          <caption class="visually-hidden">Revenue by room type and season</caption>
+          <thead>
+            <tr>
+              <th scope="col">Room type</th>
+              <th scope="col" class="num">Low</th>
+              <th scope="col" class="num">Mid</th>
+              <th scope="col" class="num">High</th>
+            </tr>
+          </thead>
+          <tbody id="room-type-season-rows"></tbody>
+        </table>
+      </div>
+
+      <h3>Guest origin and revenue by country</h3>
+      <div class="table-wrap">
+        <table>
+          <caption class="visually-hidden">Guest origin and revenue by country, ranked by revenue</caption>
+          <thead>
+            <tr>
+              <th scope="col" class="num">Rank</th>
+              <th scope="col">Country</th>
+              <th scope="col" class="num">Bookings</th>
+              <th scope="col" class="num">Booking share</th>
+              <th scope="col" class="num">Nights</th>
+              <th scope="col" class="num">Revenue</th>
+              <th scope="col" class="num">Revenue share</th>
+            </tr>
+          </thead>
+          <tbody id="country-rows"></tbody>
+        </table>
+      </div>
+      <p id="country-empty" class="muted" hidden>No bookings match these filters.</p>
     </section>
   </main>
 

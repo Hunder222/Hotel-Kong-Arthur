@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from hotel_api.business.domain.models import Season
 
@@ -32,3 +32,10 @@ def season_of(day: date) -> Season:
     """A stay belongs entirely to the season of its check-in date."""
     return _MONTH_TO_SEASON[day.month]
 
+
+
+def days_in_season(year: int, season: Season) -> int:
+    """Calendar days of `year` that fall in `season` (2026: 89 low, 153 mid, 123 high; 90 low in a leap year)."""
+    first = date(year, 1, 1)
+    days = (date(year + 1, 1, 1) - first).days
+    return sum(1 for offset in range(days) if season_of(first + timedelta(days=offset)) is season)

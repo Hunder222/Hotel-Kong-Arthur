@@ -47,3 +47,16 @@ export const listBookings = () => request("GET", "/bookings").then((r) => r.item
 export const createBooking = (booking) => request("POST", "/bookings", booking);
 export const replaceBooking = (id, booking) => request("PUT", `/bookings/${id}`, booking);
 export const deleteBooking = (id) => request("DELETE", `/bookings/${id}`);
+
+/**
+ * Hotel revenue KPIs calculated by the API (`Hotel Analytics`). `kind` is one of `by-room-type`, `by-season`,
+ * `by-room-type-and-season` or `by-country`; `filters` holds the optional year, season, room_type and country.
+ */
+export function getHotelKpis(kind, filters = {}) {
+  const query = new URLSearchParams();
+  for (const [name, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== null && value !== "") query.set(name, value);
+  }
+  const text = query.toString();
+  return request("GET", `/kpis/hotel/${kind}${text ? "?" + text : ""}`).then((r) => r.items);
+}

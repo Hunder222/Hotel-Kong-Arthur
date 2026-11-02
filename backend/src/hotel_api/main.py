@@ -19,6 +19,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from hotel_api.business.services.bar_service import BarService
 from hotel_api.business.services.booking_service import BookingService
 from hotel_api.business.services.health_service import HealthService
+from hotel_api.business.services.kpi_service import KpiService
 from hotel_api.business.services.review_service import ReviewService
 from hotel_api.business.services.room_type_service import RoomTypeService
 from hotel_api.business.services.sample_data_service import SampleDataService
@@ -31,7 +32,7 @@ from hotel_api.data.repositories.reviews import PostgresReviewRepository
 from hotel_api.data.repositories.room_types import PostgresRoomTypeRepository
 from hotel_api.presentation.api import dependencies as deps
 from hotel_api.presentation.api.errors import register_error_handlers
-from hotel_api.presentation.api.routers import bar, bookings, health, reviews, room_types
+from hotel_api.presentation.api.routers import bar, bookings, health, kpis_hotel, reviews, room_types
 
 
 @contextmanager
@@ -107,7 +108,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def bar_service(conn: Connection = connection) -> BarService:
         return BarService(PostgresBarSalesRepository(conn))
 
+    def kpi_service(conn: Connection = connection) -> KpiService:
+        return KpiService(PostgresBookingRepository(conn), PostgresReviewRepository(conn), PostgresRoomTypeRepository(conn))
+
     app.dependency_overrides[deps.get_health_service] = health_service
+    app.dependency_overrides[deps.get_kpi_service] = kpi_service
     app.dependency_overrides[deps.get_bar_service] = bar_service
     app.dependency_overrides[deps.get_review_service] = review_service
     app.dependency_overrides[deps.get_booking_service] = booking_service
@@ -118,6 +123,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(bookings.router)
     app.include_router(reviews.router)
     app.include_router(bar.router)
+    app.include_router(kpis_hotel.router)
     return app
 
 
