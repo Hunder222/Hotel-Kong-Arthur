@@ -26,24 +26,24 @@ class Settings:
     """Runtime configuration for the Hotel Kong Arthur API and CLI tools."""
 
     db_host: str = "db"
-    db_port: int = 3306
+    db_port: int = 5432
     db_name: str = "hotel"
     db_user: str = "hotel"
-    db_password: str = "hotel"
+    db_password: str = "hotel_dev"
     cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
     tz: str = "Europe/Copenhagen"
 
     @classmethod
     def from_env(cls) -> Settings:
         """Build settings from environment variables, falling back to development defaults."""
-        host = os.environ.get("DB_HOST") or os.environ.get("MYSQL_HOST") or "db"
-        port_raw = os.environ.get("DB_PORT") or os.environ.get("MYSQL_PORT") or "3306"
-        name = os.environ.get("DB_NAME") or os.environ.get("MYSQL_DATABASE") or "hotel"
-        user = os.environ.get("DB_USER") or os.environ.get("MYSQL_USER") or "hotel"
+        host = os.environ.get("DB_HOST") or os.environ.get("POSTGRES_HOST") or "db"
+        port_raw = os.environ.get("DB_PORT") or os.environ.get("POSTGRES_PORT") or "5432"
+        name = os.environ.get("DB_NAME") or os.environ.get("POSTGRES_DB") or "hotel"
+        user = os.environ.get("DB_USER") or os.environ.get("POSTGRES_USER") or "hotel"
         password = (
             os.environ.get("DB_PASSWORD")
             if "DB_PASSWORD" in os.environ
-            else os.environ.get("MYSQL_PASSWORD", "hotel")
+            else os.environ.get("POSTGRES_PASSWORD", "hotel_dev")
         )
         cors_origins = _parse_cors_origins(os.environ.get("CORS_ORIGINS"))
         tz = os.environ.get("TZ") or "Europe/Copenhagen"

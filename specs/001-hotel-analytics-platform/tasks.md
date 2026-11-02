@@ -31,9 +31,9 @@
 
 **Purpose**: Update project dependencies and Docker infrastructure to replace MySQL with PostgreSQL 17 per Week 2 requirements.
 
-- [ ] T001 Update `backend/pyproject.toml` to replace `PyMySQL[rsa]` with `psycopg[binary] >= 3.2.0`, keeping FastAPI 0.16x, Uvicorn 0.5x, Pydantic 2.14, and dev dependencies (pytest 9, httpx 0.28, openapi-core 0.23, openapi-spec-validator 0.9)
-- [ ] T002 [P] Update `docker-compose.yml` to replace the `db` service image with `postgres:17-alpine`, configure environment variables (`POSTGRES_DB=hotel`, `POSTGRES_USER=hotel`, `POSTGRES_PASSWORD=hotel_dev`), mount `./db/init` to `/docker-entrypoint-initdb.d`, attach named volume `postgres-data`, and set TCP healthcheck `pg_isready -U hotel -d hotel -h 127.0.0.1`
-- [ ] T003 [P] Update `SRC/config.py` with PostgreSQL development defaults (DB host `db`, default port `5432`, DB name `hotel`, user `hotel`, password `hotel_dev`, CORS origins, `TZ=Europe/Copenhagen`)
+- [X] T001 Update `backend/pyproject.toml` to replace `PyMySQL[rsa]` with `psycopg[binary] >= 3.2.0`, keeping FastAPI 0.16x, Uvicorn 0.5x, Pydantic 2.14, and dev dependencies (pytest 9, httpx 0.28, openapi-core 0.23, openapi-spec-validator 0.9)
+- [X] T002 [P] Update `docker-compose.yml` to replace the `db` service image with `postgres:17-alpine`, configure environment variables (`POSTGRES_DB=hotel`, `POSTGRES_USER=hotel`, `POSTGRES_PASSWORD=hotel_dev`), mount `./db/init` to `/docker-entrypoint-initdb.d`, attach named volume `postgres-data`, and set TCP healthcheck `pg_isready -U hotel -d hotel -h 127.0.0.1`
+- [X] T003 [P] Update `SRC/config.py` with PostgreSQL development defaults (DB host `db`, default port `5432`, DB name `hotel`, user `hotel`, password `hotel_dev`, CORS origins, `TZ=Europe/Copenhagen`)
 
 ---
 
