@@ -216,6 +216,28 @@
 
 ---
 
+## Phase 9: Revision — Frontend Navigation Tabs & Analytics View Split (Priority: P2)
+
+**Goal**: Refactor the web frontend prototype to provide a top navigation bar switching between "Bookings" and "Hotel Analytics" views, and organize the Analytics view with an overarching revenue summary (room revenue, bar revenue, total revenue) and an interactive view toggle between "Room Booking Analytics" and "Bar Sales Analytics" (`TODOS.md`).
+
+**User Impact**: Improves usability by separating operational receptionist booking entry/management from analytical inspection, presenting executive summary revenue totals immediately at the top of Analytics, and allowing focused switching between room performance and Helene Christine's cocktail bar sales.
+
+### Tasks for Revision Phase 9
+
+- [ ] T069 [P] Update navigation and view structure in `frontend/public/index.html`: add top navigation (`<nav class="topnav">`) with tab buttons for "Bookings" and "Hotel Analytics", group the receptionist booking card and bookings table into `#view-bookings`, and structure `#view-analytics` with:
+  - Top combined revenue summary cards (Room revenue, Bar sales revenue, Combined total revenue)
+  - Sub-navigation toggle switch between "Room Booking Analytics" (`#analytics-subview-hotel`) and "Bar Sales Analytics" (`#analytics-subview-bar`)
+- [ ] T070 [P] Add tab navigation and view-switching styles in `frontend/public/styles.css`: style `.topnav`, `.nav-tab` (active states, focus ring, accessibility), `.analytics-subnav`, `.subnav-btn`, view container toggling (`[hidden]`), and the top combined revenue summary card row
+- [ ] T071 Implement tab routing and analytics view switching in `frontend/public/app.js`:
+  - Manage active primary view state (`bookings` vs. `analytics`), updating active tab styles and showing/hiding `#view-bookings` vs. `#view-analytics`
+  - Manage active analytics sub-view state (`hotel` vs. `bar`), switching between room booking analytics and bar sales analytics
+  - Calculate and render top combined revenue summary (Room revenue + Bar sales revenue = Combined total revenue) dynamically based on current filter selections
+  - Support URL hash navigation (`#bookings`, `#analytics`, `#analytics/hotel`, `#analytics/bar`) and maintain browser back/forward history support
+- [ ] T072 [P] Update architecture and frontend tests in `backend/tests/architecture/test_frontend_price_mirror.py`: verify that HTML and JS structure preserves price preview season table integrity, adheres to no-store semantics, and maintains semantic accessibility (`role="tab"`, `aria-selected`, `aria-controls`)
+- [ ] T073 Manual & automated verification of frontend revision: verify tab switching between Bookings and Hotel Analytics, toggle between room and bar analytics subviews, check responsive layout on mobile/desktop, and verify that creating/editing bookings updates both the booking list and analytics revenue figures correctly
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
