@@ -87,16 +87,16 @@
 
 ### Tests for User Story 1
 
-- [ ] T019 [P] [US1] Unit tests in `backend/tests/unit/test_booking_service.py`: verify standard price derivation, custom price validation against seasonal bands, dual price mutual exclusivity (FR-019), and unknown ID handling
-- [ ] T020 [P] [US1] Contract tests in `backend/tests/contract/test_bookings.py`: validate `GET /api/v1/bookings`, `POST /api/v1/bookings` (201 + `Location`), `GET /api/v1/bookings/{booking_id}`, `PUT /api/v1/bookings/{booking_id}`, and `DELETE /api/v1/bookings/{booking_id}` responses against `openapi.yaml` using `openapi-core`
-- [ ] T021 [P] [US1] Integration tests in `backend/tests/integration/test_booking_crud.py`: verify booking creation persists in PostgreSQL, update modifies fields and price, delete removes record while leaving linked reviews with `booking_id = NULL`, and subsequent booking ID sequence increments properly
+- [X] T019 [P] [US1] Unit tests in `backend/tests/unit/test_booking_service.py`: verify standard price derivation, custom price validation against seasonal bands, dual price mutual exclusivity (FR-019), and unknown ID handling
+- [X] T020 [P] [US1] Contract tests in `backend/tests/contract/test_bookings.py`: validate `GET /api/v1/bookings`, `POST /api/v1/bookings` (201 + `Location`), `GET /api/v1/bookings/{booking_id}`, `PUT /api/v1/bookings/{booking_id}`, and `DELETE /api/v1/bookings/{booking_id}` responses against `openapi.yaml` using `openapi-core`
+- [X] T021 [P] [US1] Integration tests in `backend/tests/integration/test_booking_crud.py`: verify booking creation persists in PostgreSQL, update modifies fields and price, delete removes record while leaving linked reviews with `booking_id = NULL`, and subsequent booking ID sequence increments properly
 
 ### Implementation for User Story 1
 
-- [ ] T022 [US1] Verify and wire `SRC/business/services/booking_service.py` with PostgreSQL `BookingRepository` and `RoomTypeRepository`, ensuring validation, seasonal pricing, and transaction commits function identically to specification
-- [ ] T023 [US1] Verify `SRC/presentation/api/routers/bookings.py` and `SRC/presentation/api/schemas/bookings.py` handle parameterless list `GET`, single get, create `POST` (201 + `Location`), replace `PUT`, and delete `DELETE` (204)
-- [ ] T024 [P] [US1] Verify frontend booking management in `frontend/public/app.js`, `frontend/public/api.js`, `frontend/public/price-preview.js`, `frontend/public/index.html`, and `frontend/public/styles.css`: dynamic price breakdown preview before create (FR-018), dual price input mutual exclusivity (FR-019), and distinct visual Edit Mode banner/theme with cancel action (FR-020)
-- [ ] T025 [US1] Execute quickstart.md §3 manual validation in browser at `http://localhost:8080` and via `curl`: verify create, edit, price-per-night, and delete operations take < 30 seconds (SC-001) and persist in PostgreSQL
+- [X] T022 [US1] Verify and wire `SRC/business/services/booking_service.py` with PostgreSQL `BookingRepository` and `RoomTypeRepository`, ensuring validation, seasonal pricing, and transaction commits function identically to specification
+- [X] T023 [US1] Verify `SRC/presentation/api/routers/bookings.py` and `SRC/presentation/api/schemas/bookings.py` handle parameterless list `GET`, single get, create `POST` (201 + `Location`), replace `PUT`, and delete `DELETE` (204)
+- [X] T024 [P] [US1] Verify frontend booking management in `frontend/public/app.js`, `frontend/public/api.js`, `frontend/public/price-preview.js`, `frontend/public/index.html`, and `frontend/public/styles.css`: dynamic price breakdown preview before create (FR-018), dual price input mutual exclusivity (FR-019), and distinct visual Edit Mode banner/theme with cancel action (FR-020)
+- [X] T025 [US1] Execute quickstart.md §3 manual validation in browser at `http://localhost:8080` and via `curl`: verify create, edit, price-per-night, and delete operations take < 30 seconds (SC-001) and persist in PostgreSQL
 
 **Checkpoint**: User Story 1 works completely on PostgreSQL. Live booking CRUD operates via browser and REST API with zero errors.
 

@@ -1,4 +1,4 @@
-"""BookingService over the real repositories and MySQL (T044, F1, FR-005).
+"""BookingService over the real repositories and PostgreSQL (T021, F1, FR-005).
 
 Each `connection_scope` block stands for one request: one connection and one transaction that is
 committed on success and rolled back on error. A later block therefore sees only committed data.
@@ -108,3 +108,19 @@ def test_deleting_a_booking_keeps_its_review_with_a_null_booking_id(test_setting
         kept = PostgresReviewRepository(conn).get(review.id)
     assert kept is not None and kept.booking_id is None
     assert (kept.room_type, kept.stay_date, kept.rating) == ("Superior Double", booking.check_in_date, 5)
+
+
+def test_subsequent_booking_id_sequence_increments_properly(test_settings, clean_db):
+    with connection_scope(test_settings) as conn:
+        first = service(conn).create(ELENA)
+        second = service(conn).create({**ELENA, "first_name": "Lars"})
+    assert first.id == 1
+    assert second.id == 2
+
+    with connection_scope(test_settings) as conn:
+        service(conn).delete(second.id)
+
+    with connection_scope(test_settings) as conn:
+        third = service(conn).create({**ELENA, "first_name": "Mette", "price_per_night_dkk": 2100.50})
+    assert third.id == 3
+    assert third.price_dkk == Decimal("6301.50")

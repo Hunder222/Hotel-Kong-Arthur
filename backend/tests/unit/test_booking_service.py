@@ -1,4 +1,4 @@
-"""BookingService with in-memory fake ports (T042): US1 scenarios 1-4, no database."""
+"""BookingService with in-memory fake ports (T019): US1 scenarios 1-4 and FR-019, no database."""
 
 from __future__ import annotations
 
@@ -98,6 +98,28 @@ def test_create_with_null_price_uses_the_standard_price(service):
 def test_create_with_manual_price_inside_the_band_keeps_it(service):
     booking = service.create({**QUICKSTART, "price_dkk": 5700})
     assert booking.price_dkk == Decimal("5700.00")
+
+
+def test_create_with_price_per_night_derives_the_total_price(service):
+    booking = service.create({**QUICKSTART, "price_per_night_dkk": 2100.50})
+    assert booking.price_dkk == Decimal("6301.50")
+
+
+def test_create_with_both_price_fields_is_rejected_and_nothing_is_stored(service, repo):
+    with pytest.raises(ValidationFailed) as caught:
+        service.create({**QUICKSTART, "price_dkk": 6000, "price_per_night_dkk": 2000})
+    assert [e.field for e in caught.value.field_errors] == ["price_per_night_dkk"]
+    assert "not both" in caught.value.field_errors[0].message
+    assert "add" not in repo.calls and repo.rows == {}
+
+
+def test_replace_with_both_price_fields_is_rejected_and_changes_nothing(service, repo):
+    created = service.create(QUICKSTART)
+    with pytest.raises(ValidationFailed) as caught:
+        service.replace(created.id, {**QUICKSTART, "price_dkk": 6000, "price_per_night_dkk": 2000})
+    assert [e.field for e in caught.value.field_errors] == ["price_per_night_dkk"]
+    assert "replace" not in repo.calls
+    assert repo.rows[created.id] == created
 
 
 def test_manual_price_outside_the_band_is_rejected_and_nothing_is_stored(service, repo):

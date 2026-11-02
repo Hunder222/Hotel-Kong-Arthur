@@ -1,4 +1,4 @@
-"""Contract tests for the 5 booking operations (T043), every response validated with openapi-core."""
+"""Contract tests for the 5 booking operations (T020), every response validated with openapi-core."""
 
 from __future__ import annotations
 

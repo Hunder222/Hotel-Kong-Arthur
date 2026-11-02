@@ -50,4 +50,5 @@ Thumbs.db
 
 # Docker volumes / persistence
 mysql-data/
+postgres-data/
 
