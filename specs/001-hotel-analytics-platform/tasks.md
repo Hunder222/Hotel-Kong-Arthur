@@ -136,17 +136,17 @@
 
 ### Tests for User Story 3
 
-- [ ] T036 [P] [US3] Unit tests in `backend/tests/unit/test_hotel_occupancy_satisfaction.py`: verify occupancy calculation (`nights_sold / available_room_nights * 100`), available room-nights calculation for single year, leap year, all-time, and filtered slices; verify customer satisfaction mean rating (1–5) and satisfied share (% ratings >= 4), handling zero reviews and zero denominators safely
-- [ ] T037 [P] [US3] Contract tests in `backend/tests/contract/test_kpis_hotel_summary.py`: validate `GET /api/v1/kpis/hotel/summary` under tag `Hotel Analytics` with optional `year`, `season`, `room_type`, `country` filters, asserting 200 response matching `HotelSummary` schema and 400 Problem Details on invalid filter query parameters
-- [ ] T038 [P] [US3] Golden-value integration test in `backend/tests/integration/test_golden_occupancy_satisfaction.py`: against seeded PostgreSQL data, assert exact occupancy rates (overall 6.89%, low 9.34%, mid 5.61%, high 6.70%, Suite 7.44%, Standard Single 6.37%) and review metrics within 0.01 tolerance (SC-003)
+- [X] T036 [P] [US3] Unit tests in `backend/tests/unit/test_hotel_occupancy_satisfaction.py`: verify occupancy calculation (`nights_sold / available_room_nights * 100`), available room-nights calculation for single year, leap year, all-time, and filtered slices; verify customer satisfaction mean rating (1–5) and satisfied share (% ratings >= 4), handling zero reviews and zero denominators safely
+- [X] T037 [P] [US3] Contract tests in `backend/tests/contract/test_kpis_hotel_summary.py`: validate `GET /api/v1/kpis/hotel/summary` under tag `Hotel Analytics` with optional `year`, `season`, `room_type`, `country` filters, asserting 200 response matching `HotelSummary` schema and 400 Problem Details on invalid filter query parameters
+- [X] T038 [P] [US3] Golden-value integration test in `backend/tests/integration/test_golden_occupancy_satisfaction.py`: against seeded PostgreSQL data, assert exact occupancy rates (overall 6.89%, low 9.34%, mid 5.61%, high 6.70%, Suite 7.44%, Standard Single 6.37%) and review metrics within 0.01 tolerance (SC-003)
 
 ### Implementation for User Story 3
 
-- [ ] T039 [US3] Extend `SRC/business/kpis/hotel.py` with occupancy and satisfaction logic: calculate `available_room_nights` using calendar days and inventory, `occupancy_rate_pct`, `review_count`, `average_satisfaction`, and `satisfied_share_pct` for summary and breakdowns
-- [ ] T040 [US3] Extend `SRC/business/services/kpi_service.py` to fetch reviews from `ReviewRepository` matching filter scope and compute complete `HotelSummary` and enriched room-type/season breakdowns
-- [ ] T041 [P] [US3] Update DTOs in `SRC/presentation/api/schemas/kpis_hotel.py`: implement `HotelSummary` DTO and ensure `RoomTypeKpi` and `SeasonKpi` include `available_room_nights`, `occupancy_rate_pct`, `review_count`, `average_satisfaction`, and `satisfied_share_pct`
-- [ ] T042 [US3] Add `GET /api/v1/kpis/hotel/summary` to `SRC/presentation/api/routers/kpis_hotel.py` with filter parameters (`year`, `season`, `room_type`, `country`) under tag `Hotel Analytics`
-- [ ] T043 [US3] Add occupancy rate, available room-nights, and satisfaction cards/metrics to the Hotel Analytics dashboard in `frontend/public/index.html`, `frontend/public/app.js`, and `frontend/public/styles.css` (FR-022)
+- [X] T039 [US3] Extend `SRC/business/kpis/hotel.py` with occupancy and satisfaction logic: calculate `available_room_nights` using calendar days and inventory, `occupancy_rate_pct`, `review_count`, `average_satisfaction`, and `satisfied_share_pct` for summary and breakdowns
+- [X] T040 [US3] Extend `SRC/business/services/kpi_service.py` to fetch reviews from `ReviewRepository` matching filter scope and compute complete `HotelSummary` and enriched room-type/season breakdowns
+- [X] T041 [P] [US3] Update DTOs in `SRC/presentation/api/schemas/kpis_hotel.py`: implement `HotelSummary` DTO and ensure `RoomTypeKpi` and `SeasonKpi` include `available_room_nights`, `occupancy_rate_pct`, `review_count`, `average_satisfaction`, and `satisfied_share_pct`
+- [X] T042 [US3] Add `GET /api/v1/kpis/hotel/summary` to `SRC/presentation/api/routers/kpis_hotel.py` with filter parameters (`year`, `season`, `room_type`, `country`) under tag `Hotel Analytics`
+- [X] T043 [US3] Add occupancy rate, available room-nights, and satisfaction cards/metrics to the Hotel Analytics dashboard in `frontend/public/index.html`, `frontend/public/app.js`, and `frontend/public/styles.css` (FR-022)
 
 **Checkpoint**: User Story 3 is complete. Occupancy rate (K1), guest satisfaction (K3), and geographic origin (A1) are calculated in backend and displayed in frontend prototype and API.
 

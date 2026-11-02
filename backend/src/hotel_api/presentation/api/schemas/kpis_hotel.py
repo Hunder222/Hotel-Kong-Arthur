@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from hotel_api.business.domain.models import (
     CountryKpi as CountryKpiModel,
+    HotelSummary as HotelSummaryModel,
     RoomTypeKpi as RoomTypeKpiModel,
     RoomTypeSeasonKpi as RoomTypeSeasonKpiModel,
     Season,
@@ -17,6 +18,40 @@ from hotel_api.presentation.api.schemas.common import AmountDkk
 
 # Percentages, rates and averages leave the API as JSON numbers, like money.
 Year = Union[int, Literal["all"]]
+
+
+class HotelSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    year: Year
+    booking_count: int
+    nights_sold: int
+    total_revenue_dkk: AmountDkk
+    available_room_nights: int
+    occupancy_rate_pct: AmountDkk
+    review_count: int
+    average_satisfaction: AmountDkk
+    satisfied_share_pct: AmountDkk
+    average_length_of_stay_nights: AmountDkk
+    average_daily_rate_dkk: AmountDkk
+    average_revenue_per_booking_dkk: AmountDkk
+
+    @classmethod
+    def from_model(cls, kpi: HotelSummaryModel) -> HotelSummary:
+        return cls(
+            year=kpi.year,
+            booking_count=kpi.stay.booking_count,
+            nights_sold=kpi.stay.nights_sold,
+            total_revenue_dkk=kpi.stay.revenue_dkk,
+            available_room_nights=kpi.available_room_nights,
+            occupancy_rate_pct=kpi.occupancy_rate_pct,
+            review_count=kpi.satisfaction.review_count,
+            average_satisfaction=kpi.satisfaction.average_satisfaction,
+            satisfied_share_pct=kpi.satisfaction.satisfied_share_pct,
+            average_length_of_stay_nights=kpi.stay.average_length_of_stay_nights,
+            average_daily_rate_dkk=kpi.stay.average_daily_rate_dkk,
+            average_revenue_per_booking_dkk=kpi.stay.average_revenue_per_booking_dkk,
+        )
 
 
 class RoomTypeKpi(BaseModel):

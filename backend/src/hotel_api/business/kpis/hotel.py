@@ -1,4 +1,4 @@
-"""Hotel KPI calculations (data-model §7): revenue, shares and ranks (A1-A6, K2).
+"""Hotel KPI calculations (data-model §7): revenue, shares, ranks, occupancy and satisfaction (A1-A7, K1-K3).
 
 Pure functions over already-loaded bookings, reviews and room types. The caller filters the records
 to the requested scope with `filter_bookings` / `filter_reviews` and passes the room types, seasons and
@@ -16,6 +16,7 @@ from hotel_api.business.domain.models import (
     CountryKpi,
     GuestReview,
     HotelFilters,
+    HotelSummary,
     ReportYear,
     RoomType,
     RoomTypeKpi,
@@ -113,7 +114,28 @@ def occupancy_rate_pct(nights_sold: int, available_nights: int) -> Decimal:
     return safe_ratio(nights_sold, available_nights, 100)
 
 
-# ---------- breakdowns ----------
+# ---------- summary & breakdowns ----------
+
+
+def hotel_summary(
+    bookings: Sequence[Booking],
+    reviews: Sequence[GuestReview],
+    room_types: Sequence[RoomType],
+    seasons: Sequence[Season],
+    years: Sequence[int],
+    year: ReportYear,
+) -> HotelSummary:
+    """Overall hotel KPI summary (A6, K1, K2, K3, A7) for the requested scope."""
+    stay = stay_metrics(bookings)
+    rooms = sum(rt.room_count for rt in room_types)
+    available = available_room_nights(rooms, years, seasons)
+    return HotelSummary(
+        year=year,
+        stay=stay,
+        available_room_nights=available,
+        occupancy_rate_pct=occupancy_rate_pct(stay.nights_sold, available),
+        satisfaction=satisfaction_metrics(reviews),
+    )
 
 
 def room_type_kpis(

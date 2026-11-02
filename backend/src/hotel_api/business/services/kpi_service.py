@@ -10,6 +10,7 @@ from hotel_api.business.domain.models import (
     CountryKpi,
     GuestReview,
     HotelFilters,
+    HotelSummary,
     RoomType,
     RoomTypeKpi,
     RoomTypeSeasonKpi,
@@ -40,6 +41,12 @@ class KpiService:
         self._bookings = bookings
         self._reviews = reviews
         self._room_types = room_types
+
+    def summary(self, filters: HotelFilters) -> HotelSummary:
+        scope = self._scope(filters)
+        return hotel.hotel_summary(
+            scope.bookings, scope.reviews, scope.room_types, scope.seasons, scope.years, filters.year
+        )
 
     def by_room_type(self, filters: HotelFilters) -> list[RoomTypeKpi]:
         scope = self._scope(filters)

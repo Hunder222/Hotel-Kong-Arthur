@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hotel Kong Arthur · Bookings</title>
+  <title>Hotel Kong Arthur · Bookings &amp; Analytics</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="page-header">
     <h1>Hotel Kong Arthur</h1>
-    <p>Bookings for reception and revenue analytics</p>
+    <p>Bookings for reception and hotel analytics</p>
   </header>
 
   <main>
@@ -102,7 +102,7 @@
     </section>
 
     <section class="card" id="analytics" aria-labelledby="analytics-title">
-      <h2 id="analytics-title">Hotel Analytics <span class="muted">revenue calculated by the API</span></h2>
+      <h2 id="analytics-title">Hotel Analytics <span class="muted">revenue, occupancy &amp; satisfaction calculated by the API</span></h2>
       <form id="analytics-filters" class="filters" aria-label="Analytics filters">
         <label>Year
           <select name="year"><option value="">All years</option></select>
@@ -128,38 +128,54 @@
         <div class="metric"><span class="metric-label">Total revenue</span><strong id="metric-revenue">–</strong></div>
         <div class="metric"><span class="metric-label">Bookings</span><strong id="metric-bookings">–</strong></div>
         <div class="metric"><span class="metric-label">Nights sold</span><strong id="metric-nights">–</strong></div>
+        <div class="metric"><span class="metric-label">Available room-nights</span><strong id="metric-available-nights">–</strong></div>
+        <div class="metric"><span class="metric-label">Occupancy rate</span><strong id="metric-occupancy">–</strong></div>
+        <div class="metric"><span class="metric-label">Guest reviews</span><strong id="metric-reviews">–</strong></div>
+        <div class="metric"><span class="metric-label">Avg. satisfaction</span><strong id="metric-satisfaction">–</strong></div>
+        <div class="metric"><span class="metric-label">Satisfied share (4–5)</span><strong id="metric-satisfied-share">–</strong></div>
       </div>
 
-      <h3>Revenue by room type</h3>
+      <h3>Revenue, occupancy and satisfaction by room type</h3>
       <div class="table-wrap">
         <table>
-          <caption class="visually-hidden">Revenue by room type, ranked by revenue</caption>
+          <caption class="visually-hidden">KPIs by room type, ranked by revenue</caption>
           <thead>
             <tr>
               <th scope="col" class="num">Rank</th>
               <th scope="col">Room type</th>
+              <th scope="col" class="num">Rooms</th>
               <th scope="col" class="num">Bookings</th>
               <th scope="col" class="num">Nights</th>
+              <th scope="col" class="num">Avail. nights</th>
+              <th scope="col" class="num">Occupancy</th>
               <th scope="col" class="num">Revenue</th>
               <th scope="col" class="num">Share</th>
+              <th scope="col" class="num">Reviews</th>
+              <th scope="col" class="num">Satisfaction</th>
+              <th scope="col" class="num">Satisfied</th>
             </tr>
           </thead>
           <tbody id="room-type-rows"></tbody>
         </table>
       </div>
 
-      <h3>Revenue by season</h3>
+      <h3>Revenue, occupancy and satisfaction by season</h3>
       <div class="table-wrap">
         <table>
-          <caption class="visually-hidden">Revenue by season</caption>
+          <caption class="visually-hidden">KPIs by season</caption>
           <thead>
             <tr>
               <th scope="col">Season</th>
               <th scope="col" class="num">Days</th>
               <th scope="col" class="num">Bookings</th>
               <th scope="col" class="num">Nights</th>
+              <th scope="col" class="num">Avail. nights</th>
+              <th scope="col" class="num">Occupancy</th>
               <th scope="col" class="num">Revenue</th>
               <th scope="col" class="num">Share</th>
+              <th scope="col" class="num">Reviews</th>
+              <th scope="col" class="num">Satisfaction</th>
+              <th scope="col" class="num">Satisfied</th>
             </tr>
           </thead>
           <tbody id="season-rows"></tbody>

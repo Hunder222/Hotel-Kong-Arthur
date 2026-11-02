@@ -10,6 +10,7 @@ from hotel_api.presentation.api.dependencies import get_kpi_service, hotel_filte
 from hotel_api.presentation.api.schemas.kpis_hotel import (
     CountryKpi,
     CountryKpiList,
+    HotelSummary,
     RoomTypeKpi,
     RoomTypeKpiList,
     RoomTypeSeasonKpi,
@@ -19,6 +20,14 @@ from hotel_api.presentation.api.schemas.kpis_hotel import (
 )
 
 router = APIRouter(prefix="/api/v1/kpis/hotel", tags=["Hotel Analytics"])
+
+
+@router.get("/summary", response_model=HotelSummary, operation_id="getHotelSummary")
+def get_hotel_summary(
+    filters: HotelFilters = Depends(hotel_filters),
+    service: KpiService = Depends(get_kpi_service),
+) -> HotelSummary:
+    return HotelSummary.from_model(service.summary(filters))
 
 
 @router.get("/by-room-type", response_model=RoomTypeKpiList, operation_id="listHotelKpisByRoomType")

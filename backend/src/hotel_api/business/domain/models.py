@@ -134,7 +134,6 @@ class BarDrinkSale:
     units_sold: int
 
 
-
 @dataclass(frozen=True)
 class HotelFilters:
     """The optional filter attributes of the `Hotel Analytics` hotel endpoints."""
@@ -159,11 +158,58 @@ class StayMetrics:
 
 @dataclass(frozen=True)
 class SatisfactionMetrics:
-    """Review figures shared by the room type and season KPI rows (K3)."""
+    """Review figures shared by the summary, room type and season KPI rows (K3)."""
 
     review_count: int
     average_satisfaction: Decimal
     satisfied_share_pct: Decimal
+
+
+@dataclass(frozen=True)
+class HotelSummary:
+    """Overall hotel KPI summary for the requested filter scope (A6, K1, K2, K3, A7)."""
+
+    year: ReportYear
+    stay: StayMetrics
+    available_room_nights: int
+    occupancy_rate_pct: Decimal
+    satisfaction: SatisfactionMetrics
+
+    @property
+    def booking_count(self) -> int:
+        return self.stay.booking_count
+
+    @property
+    def nights_sold(self) -> int:
+        return self.stay.nights_sold
+
+    @property
+    def total_revenue_dkk(self) -> Decimal:
+        return self.stay.revenue_dkk
+
+    @property
+    def review_count(self) -> int:
+        return self.satisfaction.review_count
+
+    @property
+    def average_satisfaction(self) -> Decimal:
+        return self.satisfaction.average_satisfaction
+
+    @property
+    def satisfied_share_pct(self) -> Decimal:
+        return self.satisfaction.satisfied_share_pct
+
+    @property
+    def average_length_of_stay_nights(self) -> Decimal:
+        return self.stay.average_length_of_stay_nights
+
+    @property
+    def average_daily_rate_dkk(self) -> Decimal:
+        return self.stay.average_daily_rate_dkk
+
+    @property
+    def average_revenue_per_booking_dkk(self) -> Decimal:
+        return self.stay.average_revenue_per_booking_dkk
 
 
 @dataclass(frozen=True)
