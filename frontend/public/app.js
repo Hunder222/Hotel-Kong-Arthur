@@ -49,6 +49,9 @@ const metricBookings = document.getElementById("metric-bookings");
 const metricNights = document.getElementById("metric-nights");
 const metricAvailableNights = document.getElementById("metric-available-nights");
 const metricOccupancy = document.getElementById("metric-occupancy");
+const metricAlos = document.getElementById("metric-alos");
+const metricAdr = document.getElementById("metric-adr");
+const metricRevPerBooking = document.getElementById("metric-rev-per-booking");
 const metricReviews = document.getElementById("metric-reviews");
 const metricSatisfaction = document.getElementById("metric-satisfaction");
 const metricSatisfiedShare = document.getElementById("metric-satisfied-share");
@@ -62,6 +65,7 @@ const metricBarRevenue = document.getElementById("metric-bar-revenue");
 const metricBarUnits = document.getElementById("metric-bar-units");
 const metricBarDrinks = document.getElementById("metric-bar-drinks");
 const barCategoryRows = document.getElementById("bar-category-rows");
+const barPriceTierRows = document.getElementById("bar-price-tier-rows");
 const barDrinkRows = document.getElementById("bar-drink-rows");
 const barDrinkEmpty = document.getElementById("bar-drink-empty");
 
@@ -221,8 +225,16 @@ function currentAnalyticsFilters() {
 function currentBarFilters() {
   return {
     year: (analyticsForm && analyticsForm.elements.year.value) || "all",
-    category: (barForm && barForm.elements.category.value) || undefined,
+    category: (barForm && barForm.elements.category && barForm.elements.category.value) || undefined,
+    price_tier: (barForm && barForm.elements.price_tier && barForm.elements.price_tier.value) || undefined,
   };
+}
+
+function formatPriceTierRange(row) {
+  if (row.price_to_dkk === null || row.price_to_dkk === undefined) {
+    return `≥ ${number.format(row.price_from_dkk)} DKK`;
+  }
+  return `${number.format(row.price_from_dkk)}–${number.format(row.price_to_dkk)} DKK`;
 }
 
 function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, byCountry) {
@@ -231,6 +243,9 @@ function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, b
   metricNights.textContent = number.format(summary.nights_sold);
   metricAvailableNights.textContent = number.format(summary.available_room_nights);
   metricOccupancy.textContent = pct(summary.occupancy_rate_pct);
+  if (metricAlos) metricAlos.textContent = `${decimalFmt.format(summary.average_length_of_stay_nights)} nights`;
+  if (metricAdr) metricAdr.textContent = money.format(summary.average_daily_rate_dkk);
+  if (metricRevPerBooking) metricRevPerBooking.textContent = money.format(summary.average_revenue_per_booking_dkk);
   metricReviews.textContent = number.format(summary.review_count);
   metricSatisfaction.textContent = rating(summary.review_count, summary.average_satisfaction);
   metricSatisfiedShare.textContent = summary.review_count > 0 ? pct(summary.satisfied_share_pct) : "–";
@@ -246,6 +261,9 @@ function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, b
       cell(number.format(row.nights_sold), "num"),
       cell(number.format(row.available_room_nights), "num"),
       cell(pct(row.occupancy_rate_pct), "num"),
+      cell(decimalFmt.format(row.average_length_of_stay_nights), "num"),
+      cell(money.format(row.average_daily_rate_dkk), "num"),
+      cell(money.format(row.average_revenue_per_booking_dkk), "num"),
       cell(money.format(row.revenue_dkk), "num"),
       cell(pct(row.revenue_share_pct), "num"),
       cell(number.format(row.review_count), "num"),
@@ -265,6 +283,9 @@ function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, b
       cell(number.format(row.nights_sold), "num"),
       cell(number.format(row.available_room_nights), "num"),
       cell(pct(row.occupancy_rate_pct), "num"),
+      cell(decimalFmt.format(row.average_length_of_stay_nights), "num"),
+      cell(money.format(row.average_daily_rate_dkk), "num"),
+      cell(money.format(row.average_revenue_per_booking_dkk), "num"),
       cell(money.format(row.revenue_dkk), "num"),
       cell(pct(row.revenue_share_pct), "num"),
       cell(number.format(row.review_count), "num"),
@@ -308,7 +329,7 @@ function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, b
   countryEmpty.hidden = byCountry.length > 0;
 }
 
-function renderBarAnalytics(barSummary, barByCategory, barByDrink) {
+function renderBarAnalytics(barSummary, barByCategory, barByPriceTier, barByDrink) {
   if (!metricBarRevenue) return;
   metricBarRevenue.textContent = money.format(barSummary.total_revenue_dkk);
   metricBarUnits.textContent = number.format(barSummary.units_sold);
@@ -326,6 +347,23 @@ function renderBarAnalytics(barSummary, barByCategory, barByDrink) {
       cell(pct(row.revenue_share_pct), "num"),
     );
     barCategoryRows.append(tr);
+  }
+
+  if (barPriceTierRows) {
+    barPriceTierRows.replaceChildren();
+    for (const row of barByPriceTier) {
+      const tr = document.createElement("tr");
+      tr.append(
+        cell(row.price_tier),
+        cell(formatPriceTierRange(row)),
+        cell(number.format(row.drink_count), "num"),
+        cell(number.format(row.units_sold), "num"),
+        cell(pct(row.unit_share_pct), "num"),
+        cell(money.format(row.revenue_dkk), "num"),
+        cell(pct(row.revenue_share_pct), "num"),
+      );
+      barPriceTierRows.append(tr);
+    }
   }
 
   barDrinkRows.replaceChildren();
@@ -361,6 +399,7 @@ async function loadAnalytics() {
       byCountry,
       barSummary,
       barByCategory,
+      barByPriceTier,
       barByDrink,
     ] = await Promise.all([
       getHotelSummary(hotelFilters),
@@ -370,10 +409,11 @@ async function loadAnalytics() {
       getHotelKpis("by-country", hotelFilters),
       getBarSummary(barFilters),
       getBarKpis("by-category", barFilters),
+      getBarKpis("by-price-tier", barFilters),
       getBarKpis("by-drink", barFilters),
     ]);
     renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, byCountry);
-    renderBarAnalytics(barSummary, barByCategory, barByDrink);
+    renderBarAnalytics(barSummary, barByCategory, barByPriceTier, barByDrink);
   } catch (error) {
     analyticsStatus.textContent = error instanceof ApiError ? error.message : "Failed to load analytics.";
     analyticsStatus.className = "status error";

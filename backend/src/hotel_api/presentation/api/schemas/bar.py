@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 from hotel_api.business.domain.models import (
     BarCategoryKpi as BarCategoryKpiModel,
     BarDrinkSale,
+    BarPriceTierKpi as BarPriceTierKpiModel,
     BarSummary as BarSummaryModel,
     DrinkCategory,
     PriceTier,
@@ -129,3 +130,37 @@ class BarCategoryKpiList(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     items: list[BarCategoryKpi]
+
+
+class BarPriceTierKpi(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    year: Year
+    price_tier: PriceTier
+    price_from_dkk: AmountDkk
+    price_to_dkk: AmountDkk | None
+    drink_count: int
+    units_sold: int
+    unit_share_pct: AmountDkk
+    revenue_dkk: AmountDkk
+    revenue_share_pct: AmountDkk
+
+    @classmethod
+    def from_model(cls, kpi: BarPriceTierKpiModel) -> BarPriceTierKpi:
+        return cls(
+            year=kpi.year,
+            price_tier=kpi.price_tier,
+            price_from_dkk=kpi.price_from_dkk,
+            price_to_dkk=kpi.price_to_dkk,
+            drink_count=kpi.drink_count,
+            units_sold=kpi.units_sold,
+            unit_share_pct=kpi.unit_share_pct,
+            revenue_dkk=kpi.revenue_dkk,
+            revenue_share_pct=kpi.revenue_share_pct,
+        )
+
+
+class BarPriceTierKpiList(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[BarPriceTierKpi]

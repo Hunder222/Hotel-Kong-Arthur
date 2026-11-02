@@ -185,19 +185,19 @@
 
 ### Tests for User Story 5
 
-- [ ] T053 [P] [US5] Unit tests in `backend/tests/unit/test_hotel_stay_kpis.py`: verify ALOS (`nights_sold / booking_count`), ADR (`room_revenue / nights_sold`), and revenue per booking (`room_revenue / booking_count`) across summary, room types, and seasons, with zero denominators safely returning 0.00
-- [ ] T054 [P] [US5] Unit tests in `backend/tests/unit/test_price_tiers.py` and `backend/tests/unit/test_bar_price_tier_kpis.py`: verify price-tier boundaries (`budget` < 70 DKK, `standard` 70 to < 110 DKK, `premium` >= 110 DKK), units and revenue aggregation per tier, and largest-remainder share rounding summing to 100.00
-- [ ] T055 [P] [US5] Contract tests in `backend/tests/contract/test_kpis_bar_price_tier.py`: validate `GET /api/v1/kpis/bar/by-price-tier` under tag `Hotel Analytics` with optional `year`, `category`, and `price_tier` filters against `BarPriceTierKpiList` schema in `openapi.yaml`
-- [ ] T056 [P] [US5] Golden-value integration test in `backend/tests/integration/test_golden_a7.py`: against seeded PostgreSQL data, assert exact ALOS (5.38), ADR (2088.50 DKK), revenue per booking (11234.03 DKK), and price tier figures (budget 6,343,884.91 DKK, standard 2,739,242.59 DKK, premium 4,365,512.84 DKK) within 0.01 tolerance (SC-003)
+- [X] T053 [P] [US5] Unit tests in `backend/tests/unit/test_hotel_stay_kpis.py`: verify ALOS (`nights_sold / booking_count`), ADR (`room_revenue / nights_sold`), and revenue per booking (`room_revenue / booking_count`) across summary, room types, and seasons, with zero denominators safely returning 0.00
+- [X] T054 [P] [US5] Unit tests in `backend/tests/unit/test_price_tiers.py` and `backend/tests/unit/test_bar_price_tier_kpis.py`: verify price-tier boundaries (`budget` < 70 DKK, `standard` 70 to < 110 DKK, `premium` >= 110 DKK), units and revenue aggregation per tier, and largest-remainder share rounding summing to 100.00
+- [X] T055 [P] [US5] Contract tests in `backend/tests/contract/test_kpis_bar_price_tier.py`: validate `GET /api/v1/kpis/bar/by-price-tier` under tag `Hotel Analytics` with optional `year`, `category`, and `price_tier` filters against `BarPriceTierKpiList` schema in `openapi.yaml`
+- [X] T056 [P] [US5] Golden-value integration test in `backend/tests/integration/test_golden_a7.py`: against seeded PostgreSQL data, assert exact ALOS (5.38), ADR (2088.50 DKK), revenue per booking (11234.03 DKK), and price tier figures (budget 6,343,884.91 DKK, standard 2,739,242.59 DKK, premium 4,365,512.84 DKK) within 0.01 tolerance (SC-003)
 
 ### Implementation for User Story 5
 
-- [ ] T057 [US5] Implement `SRC/business/rules/price_tiers.py`: boundary classification logic for `budget`, `standard`, and `premium` price tiers
-- [ ] T058 [US5] Extend `SRC/business/kpis/hotel.py` and `SRC/business/kpis/bar.py`: compute ALOS, ADR, and revenue per booking for hotel endpoints, and compute price-tier aggregates (`drink_count`, `units_sold`, `unit_share_pct`, `revenue_dkk`, `revenue_share_pct`) for bar endpoints
-- [ ] T059 [US5] Extend `SRC/business/services/kpi_service.py` to calculate price-tier demand for requested filter scope
-- [ ] T060 [P] [US5] Implement `BarPriceTierKpi` and `BarPriceTierKpiList` DTOs in `SRC/presentation/api/schemas/bar.py`
-- [ ] T061 [US5] Add `GET /api/v1/kpis/bar/by-price-tier` to `SRC/presentation/api/routers/kpis_bar.py` under tag `Hotel Analytics`
-- [ ] T062 [US5] Add stay length / ADR metric cards and bar price-tier distribution cards/tables to `frontend/public/index.html`, `frontend/public/app.js`, and `frontend/public/styles.css` (FR-022)
+- [X] T057 [US5] Implement `SRC/business/rules/price_tiers.py`: boundary classification logic for `budget`, `standard`, and `premium` price tiers
+- [X] T058 [US5] Extend `SRC/business/kpis/hotel.py` and `SRC/business/kpis/bar.py`: compute ALOS, ADR, and revenue per booking for hotel endpoints, and compute price-tier aggregates (`drink_count`, `units_sold`, `unit_share_pct`, `revenue_dkk`, `revenue_share_pct`) for bar endpoints
+- [X] T059 [US5] Extend `SRC/business/services/kpi_service.py` to calculate price-tier demand for requested filter scope
+- [X] T060 [P] [US5] Implement `BarPriceTierKpi` and `BarPriceTierKpiList` DTOs in `SRC/presentation/api/schemas/bar.py`
+- [X] T061 [US5] Add `GET /api/v1/kpis/bar/by-price-tier` to `SRC/presentation/api/routers/kpis_bar.py` under tag `Hotel Analytics`
+- [X] T062 [US5] Add stay length / ADR metric cards and bar price-tier distribution cards/tables to `frontend/public/index.html`, `frontend/public/app.js`, and `frontend/public/styles.css` (FR-022)
 
 **Checkpoint**: All 5 user stories are complete. All 20 API operations across the 6 Swagger UI tags exist and are displayed in the frontend prototype and Swagger UI.
 

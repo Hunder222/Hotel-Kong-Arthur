@@ -130,12 +130,15 @@
         <div class="metric"><span class="metric-label">Nights sold</span><strong id="metric-nights">–</strong></div>
         <div class="metric"><span class="metric-label">Available room-nights</span><strong id="metric-available-nights">–</strong></div>
         <div class="metric"><span class="metric-label">Occupancy rate</span><strong id="metric-occupancy">–</strong></div>
+        <div class="metric"><span class="metric-label">Avg. stay (ALOS)</span><strong id="metric-alos">–</strong></div>
+        <div class="metric"><span class="metric-label">Avg. daily rate (ADR)</span><strong id="metric-adr">–</strong></div>
+        <div class="metric"><span class="metric-label">Avg. rev. / booking</span><strong id="metric-rev-per-booking">–</strong></div>
         <div class="metric"><span class="metric-label">Guest reviews</span><strong id="metric-reviews">–</strong></div>
         <div class="metric"><span class="metric-label">Avg. satisfaction</span><strong id="metric-satisfaction">–</strong></div>
         <div class="metric"><span class="metric-label">Satisfied share (4–5)</span><strong id="metric-satisfied-share">–</strong></div>
       </div>
 
-      <h3>Revenue, occupancy and satisfaction by room type</h3>
+      <h3>Revenue, occupancy, stay metrics and satisfaction by room type</h3>
       <div class="table-wrap">
         <table>
           <caption class="visually-hidden">KPIs by room type, ranked by revenue</caption>
@@ -148,6 +151,9 @@
               <th scope="col" class="num">Nights</th>
               <th scope="col" class="num">Avail. nights</th>
               <th scope="col" class="num">Occupancy</th>
+              <th scope="col" class="num">ALOS</th>
+              <th scope="col" class="num">ADR</th>
+              <th scope="col" class="num">Rev. / booking</th>
               <th scope="col" class="num">Revenue</th>
               <th scope="col" class="num">Share</th>
               <th scope="col" class="num">Reviews</th>
@@ -159,7 +165,7 @@
         </table>
       </div>
 
-      <h3>Revenue, occupancy and satisfaction by season</h3>
+      <h3>Revenue, occupancy, stay metrics and satisfaction by season</h3>
       <div class="table-wrap">
         <table>
           <caption class="visually-hidden">KPIs by season</caption>
@@ -171,6 +177,9 @@
               <th scope="col" class="num">Nights</th>
               <th scope="col" class="num">Avail. nights</th>
               <th scope="col" class="num">Occupancy</th>
+              <th scope="col" class="num">ALOS</th>
+              <th scope="col" class="num">ADR</th>
+              <th scope="col" class="num">Rev. / booking</th>
               <th scope="col" class="num">Revenue</th>
               <th scope="col" class="num">Share</th>
               <th scope="col" class="num">Reviews</th>
@@ -220,13 +229,21 @@
 
       <div class="bar-section">
         <div class="section-header">
-          <h3>Cocktail bar analytics <span class="muted">Helene Christine’s lobby bar sales (B1–B3)</span></h3>
+          <h3>Cocktail bar analytics <span class="muted">Helene Christine’s lobby bar sales &amp; price-tier demand (B1–B3, A7)</span></h3>
           <form id="bar-filters" class="filters" aria-label="Bar analytics filters">
             <label>Category
               <select name="category">
                 <option value="">All categories</option>
                 <option value="Cocktail">Cocktail</option>
                 <option value="Coffee">Coffee</option>
+              </select>
+            </label>
+            <label>Price tier
+              <select name="price_tier">
+                <option value="">All price tiers</option>
+                <option value="budget">Budget (&lt; 70 DKK)</option>
+                <option value="standard">Standard (70–109.99 DKK)</option>
+                <option value="premium">Premium (≥ 110 DKK)</option>
               </select>
             </label>
           </form>
@@ -253,6 +270,25 @@
               </tr>
             </thead>
             <tbody id="bar-category-rows"></tbody>
+          </table>
+        </div>
+
+        <h3>Demand and revenue by price tier</h3>
+        <div class="table-wrap">
+          <table>
+            <caption class="visually-hidden">Bar demand and revenue split by price tier</caption>
+            <thead>
+              <tr>
+                <th scope="col">Price tier</th>
+                <th scope="col">Unit price range</th>
+                <th scope="col" class="num">Drinks</th>
+                <th scope="col" class="num">Units sold</th>
+                <th scope="col" class="num">Unit share</th>
+                <th scope="col" class="num">Revenue</th>
+                <th scope="col" class="num">Revenue share</th>
+              </tr>
+            </thead>
+            <tbody id="bar-price-tier-rows"></tbody>
           </table>
         </div>
 

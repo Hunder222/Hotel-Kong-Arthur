@@ -1,7 +1,7 @@
-"""Cocktail bar KPI calculations (data-model §7): total sales, per-drink revenue & ranks, and category split (B1-B3).
+"""Cocktail bar KPI calculations (data-model §7): total sales, per-drink revenue & ranks, category split and price tiers (B1-B3, A7).
 
 Pure functions over already-loaded drink sales. The caller filters the records to the requested scope with
-`filter_drink_sales` and passes the categories in scope.
+`filter_drink_sales` and passes the categories and price tiers in scope.
 """
 
 from __future__ import annotations
@@ -14,12 +14,15 @@ from hotel_api.business.domain.models import (
     BarCategoryKpi,
     BarDrinkSale,
     BarFilters,
+    BarPriceTierKpi,
     BarSummary,
     DrinkCategory,
+    PriceTier,
     RankedDrinkSale,
     ReportYear,
 )
 from hotel_api.business.rules.numbers import largest_remainder_shares, round_half_up
+from hotel_api.business.rules.price_tiers import PRICE_TIER_ORDER, price_tier_bounds
 from hotel_api.business.rules.ranking import competition_ranks
 
 ZERO = Decimal("0.00")
@@ -116,4 +119,35 @@ def category_kpis(
         )
         for i, (category, group) in enumerate(zip(ordered, groups))
     ]
+
+
+def price_tier_kpis(
+    sales: Sequence[BarDrinkSale],
+    year: ReportYear = "all",
+    price_tiers: Sequence[PriceTier] = PRICE_TIER_ORDER,
+) -> list[BarPriceTierKpi]:
+    """A7 / US4 (FR-016): demand and revenue split across budget, standard and premium price tiers."""
+    ordered = [t for t in PRICE_TIER_ORDER if t in price_tiers]
+    groups = [[s for s in sales if s.price_tier is t] for t in ordered]
+    units = [sum(s.units_sold for s in g) for g in groups]
+    revenues = [round_half_up(total_revenue(g)) for g in groups]
+    unit_shares = largest_remainder_shares(units)
+    revenue_shares = largest_remainder_shares(revenues)
+    rows: list[BarPriceTierKpi] = []
+    for i, (tier, group) in enumerate(zip(ordered, groups)):
+        price_from_dkk, price_to_dkk = price_tier_bounds(tier)
+        rows.append(
+            BarPriceTierKpi(
+                year=year,
+                price_tier=tier,
+                price_from_dkk=price_from_dkk,
+                price_to_dkk=price_to_dkk,
+                drink_count=_drink_count(group),
+                units_sold=units[i],
+                unit_share_pct=unit_shares[i],
+                revenue_dkk=revenues[i],
+                revenue_share_pct=revenue_shares[i],
+            )
+        )
+    return rows
 

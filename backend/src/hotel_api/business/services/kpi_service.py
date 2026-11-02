@@ -9,6 +9,7 @@ from hotel_api.business.domain.models import (
     BarCategoryKpi,
     BarDrinkSale,
     BarFilters,
+    BarPriceTierKpi,
     BarSummary,
     Booking,
     CountryKpi,
@@ -102,6 +103,10 @@ class KpiService:
     def bar_by_category(self, filters: BarFilters) -> list[BarCategoryKpi]:
         scope = self._bar_scope(filters)
         return bar.category_kpis(scope.sales, filters.year, scope.categories)
+
+    def bar_by_price_tier(self, filters: BarFilters) -> list[BarPriceTierKpi]:
+        scope = self._bar_scope(filters)
+        return bar.price_tier_kpis(scope.sales, filters.year, scope.price_tiers)
 
     def _scope(self, filters: HotelFilters) -> _HotelScope:
         assert self._bookings is not None and self._reviews is not None and self._room_types is not None

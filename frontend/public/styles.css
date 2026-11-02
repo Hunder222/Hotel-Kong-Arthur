@@ -144,4 +144,4 @@ body.edit-mode #cancel-button { border-color: var(--edit); color: var(--edit-dar
 .bar-section { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 2px solid var(--line); }
 .section-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; }
 .section-header h3 { margin: 0; font-size: 1.02rem; }
-.section-header .filters { min-width: 200px; }
+.section-header .filters { min-width: 360px; }

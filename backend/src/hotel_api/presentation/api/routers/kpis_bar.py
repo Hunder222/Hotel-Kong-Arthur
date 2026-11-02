@@ -10,6 +10,8 @@ from hotel_api.presentation.api.dependencies import bar_filters, get_kpi_service
 from hotel_api.presentation.api.schemas.bar import (
     BarCategoryKpi,
     BarCategoryKpiList,
+    BarPriceTierKpi,
+    BarPriceTierKpiList,
     BarSummary,
     RankedDrinkSale,
     RankedDrinkSaleList,
@@ -40,4 +42,12 @@ def list_by_category(
     service: KpiService = Depends(get_kpi_service),
 ) -> BarCategoryKpiList:
     return BarCategoryKpiList(items=[BarCategoryKpi.from_model(r) for r in service.bar_by_category(filters)])
+
+
+@router.get("/by-price-tier", response_model=BarPriceTierKpiList, operation_id="listBarKpisByPriceTier")
+def list_by_price_tier(
+    filters: BarFilters = Depends(bar_filters),
+    service: KpiService = Depends(get_kpi_service),
+) -> BarPriceTierKpiList:
+    return BarPriceTierKpiList(items=[BarPriceTierKpi.from_model(r) for r in service.bar_by_price_tier(filters)])
 
