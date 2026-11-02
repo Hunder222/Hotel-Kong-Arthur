@@ -1,4 +1,4 @@
-"""Integration tests for MySQL repositories against `hotel_test` (T026, R2, R16).
+"""Integration tests for the PostgreSQL repositories against `hotel_test` (T015, R2, R16).
 
 Covers:
 - Round-trip persistence of `room_types`, `bookings`, `reviews`, `bar_drink_sales`, and `health` ping
@@ -6,6 +6,8 @@ Covers:
 - Filter combinations (`year`, `season`, `room_type`, `country`, `category`) and ordering
 - Full UTF-8 round-trip for international characters (`Müller`, Danish `værelse`)
 - Translation of driver failures into `StorageUnavailable`
+- Identity sequences that continue after rows inserted with explicit ids (seed), `RETURNING` ids and
+  timestamps, time-zone-aware `TIMESTAMPTZ`, and the schema's CHECK / UNIQUE constraints
 """
 
 from __future__ import annotations
@@ -13,12 +15,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 from datetime import date
 from decimal import Decimal
-from pathlib import Path
 from typing import Any
 
-import pymysql
+import psycopg
 import pytest
-from pymysql.connections import Connection
+from psycopg import Connection
 
 from hotel_api.business.domain.models import (
     BarDrinkSale,
@@ -30,86 +31,25 @@ from hotel_api.business.domain.models import (
     Season,
 )
 from hotel_api.business.errors import StorageUnavailable
-from hotel_api.config import get_settings
+from hotel_api.config import Settings, get_settings
 from hotel_api.data.connection import open_connection
-from hotel_api.data.repositories.bar_sales import MySqlBarSalesRepository
-from hotel_api.data.repositories.bookings import MySqlBookingRepository
-from hotel_api.data.repositories.health import MySqlHealthRepository
-from hotel_api.data.repositories.reviews import MySqlReviewRepository
-from hotel_api.data.repositories.room_types import MySqlRoomTypeRepository
+from hotel_api.data.repositories.bar_sales import PostgresBarSalesRepository
+from hotel_api.data.repositories.bookings import PostgresBookingRepository
+from hotel_api.data.repositories.health import PostgresHealthRepository
+from hotel_api.data.repositories.reviews import PostgresReviewRepository
+from hotel_api.data.repositories.room_types import PostgresRoomTypeRepository
 
 pytestmark = pytest.mark.integration
 
 
-def _find_db_init_dir() -> Path:
-    repo_root = Path(__file__).resolve().parents[3]
-    candidate = repo_root / "db" / "init"
-    if candidate.is_dir():
-        return candidate
-    docker_candidate = Path("/repo/db/init")
-    if docker_candidate.is_dir():
-        return docker_candidate
-    raise FileNotFoundError("Could not locate db/init directory for integration tests.")
-
-
-def _execute_sql_script(conn: Connection[Any], sql_path: Path) -> None:
-    raw = sql_path.read_text(encoding="utf-8")
-    lines = [
-        line
-        for line in raw.splitlines()
-        if not line.strip().startswith("--")
-    ]
-    script = "\n".join(lines)
-    statements = [stmt.strip() for stmt in script.split(";") if stmt.strip()]
-    with conn.cursor() as cursor:
-        for stmt in statements:
-            cursor.execute(stmt)
-    conn.commit()
-
-
-def _ensure_hotel_test_schema(conn: Connection[Any]) -> None:
-    init_dir = _find_db_init_dir()
-    _execute_sql_script(conn, init_dir / "01_schema.sql")
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) AS cnt FROM room_types")
-        row = cursor.fetchone()
-        count = int(row["cnt"]) if row else 0
-    if count == 0:
-        _execute_sql_script(conn, init_dir / "02_reference_data.sql")
-
-
-@pytest.fixture(scope="session")
-def _initialized_test_db() -> None:
-    settings = get_settings().with_db_name("hotel_test")
-    conn = open_connection(settings)
-    try:
-        _ensure_hotel_test_schema(conn)
-    finally:
-        conn.close()
-
-
 @pytest.fixture()
-def db_conn(_initialized_test_db: None) -> Iterator[Connection[Any]]:
-    settings = get_settings().with_db_name("hotel_test")
-    conn = open_connection(settings)
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("DELETE FROM reviews")
-            cursor.execute("DELETE FROM bookings")
-            cursor.execute("DELETE FROM bar_drink_sales")
-        conn.commit()
-        yield conn
-    finally:
-        with conn.cursor() as cursor:
-            cursor.execute("DELETE FROM reviews")
-            cursor.execute("DELETE FROM bookings")
-            cursor.execute("DELETE FROM bar_drink_sales")
-        conn.commit()
-        conn.close()
+def db_conn(clean_db: Connection[Any]) -> Iterator[Connection[Any]]:
+    """A connection to `hotel_test` with empty operational tables (see conftest.py)."""
+    yield clean_db
 
 
 def test_health_ping_and_storage_unavailable(db_conn: Connection[Any]) -> None:
-    health_repo = MySqlHealthRepository(db_conn)
+    health_repo = PostgresHealthRepository(db_conn)
     health_repo.ping()
 
     bad_settings = get_settings().with_db_name("hotel_test")
@@ -125,7 +65,7 @@ def test_health_ping_and_storage_unavailable(db_conn: Connection[Any]) -> None:
 
 
 def test_room_type_repository_loads_reference_data(db_conn: Connection[Any]) -> None:
-    repo = MySqlRoomTypeRepository(db_conn)
+    repo = PostgresRoomTypeRepository(db_conn)
     room_types = repo.list_all()
 
     assert len(room_types) == 8
@@ -152,7 +92,7 @@ def test_room_type_repository_loads_reference_data(db_conn: Connection[Any]) -> 
 
 
 def test_booking_repository_crud_utf8_and_filters(db_conn: Connection[Any]) -> None:
-    repo = MySqlBookingRepository(db_conn)
+    repo = PostgresBookingRepository(db_conn)
 
     created_1 = repo.add(
         NewBooking(
@@ -287,8 +227,8 @@ def test_booking_repository_crud_utf8_and_filters(db_conn: Connection[Any]) -> N
 
 
 def test_review_repository_and_on_delete_set_null(db_conn: Connection[Any]) -> None:
-    booking_repo = MySqlBookingRepository(db_conn)
-    review_repo = MySqlReviewRepository(db_conn)
+    booking_repo = PostgresBookingRepository(db_conn)
+    review_repo = PostgresReviewRepository(db_conn)
 
     booking = booking_repo.add(
         NewBooking(
@@ -362,7 +302,7 @@ def test_review_repository_and_on_delete_set_null(db_conn: Connection[Any]) -> N
 
 
 def test_bar_sales_repository_round_trip(db_conn: Connection[Any]) -> None:
-    repo = MySqlBarSalesRepository(db_conn)
+    repo = PostgresBarSalesRepository(db_conn)
 
     sales = [
         BarDrinkSale(
@@ -400,3 +340,100 @@ def test_bar_sales_repository_round_trip(db_conn: Connection[Any]) -> None:
     assert repo.list() == []
 
 
+
+
+# ---------------------------------------------------------------------------
+# PostgreSQL specifics: RETURNING, TIMESTAMPTZ, identity sequences, constraints
+# ---------------------------------------------------------------------------
+
+
+def _booking(**overrides: Any) -> NewBooking:
+    values: dict[str, Any] = dict(
+        first_name="Anna", family_name="Jensen", country="Denmark", room_type="Suite",
+        check_in_date=date(2026, 7, 14), days_rented=2, price_dkk=Decimal("6500.00"),
+    )
+    values.update(overrides)
+    return NewBooking(**values)
+
+
+def test_add_and_replace_return_generated_values_and_aware_timestamps(db_conn: Connection[Any]) -> None:
+    repo = PostgresBookingRepository(db_conn)
+
+    first = repo.add(_booking())
+    second = repo.add(_booking())
+    assert (first.id, second.id) == (1, 2)  # identity sequence restarted by the harness
+    for booking in (first, second):
+        assert booking.created_at is not None and booking.created_at.tzinfo is not None
+        assert booking.updated_at is not None and booking.updated_at >= booking.created_at
+
+    replaced = repo.replace(first.id, _booking(days_rented=5, price_dkk=Decimal("16250.00")))
+    assert replaced is not None
+    assert (replaced.id, replaced.days_rented, replaced.price_dkk) == (first.id, 5, Decimal("16250.00"))
+    assert replaced.created_at == first.created_at
+    assert replaced.updated_at >= first.updated_at
+    assert repo.get(first.id) == replaced  # the returned object equals what is stored
+
+
+def test_identity_sequence_continues_after_explicit_ids(db_conn: Connection[Any]) -> None:
+    repo = PostgresBookingRepository(db_conn)
+    repo.insert_many(
+        [
+            Booking(1, "Liam", "Nguyen", "China", "Spa Executive", date(2026, 3, 1), 1, Decimal("2577.00")),
+            Booking(21, "Hans", "Müller", "Germany", "Standard Single", date(2026, 1, 8), 2, Decimal("2100.00")),
+        ]
+    )
+    assert repo.add(_booking()).id == 22  # MAX(id) + 1, not a collision with 1 or 21
+
+    repo.delete_all()
+    repo.insert_many([])  # nothing to insert, nothing to break
+    assert repo.add(_booking()).id == 23  # an empty table does not rewind a live sequence
+
+
+def test_review_and_bar_sequences_continue_after_explicit_ids(db_conn: Connection[Any]) -> None:
+    reviews = PostgresReviewRepository(db_conn)
+    reviews.insert_many([GuestReview(500, None, "Grand Lit", date(2026, 4, 5), 3)])
+    added = reviews.add(NewReview(rating=4, room_type="Suite", stay_date=date(2026, 1, 20)))
+    assert added.id == 501 and added.room_type == "Suite" and added.created_at.tzinfo is not None
+
+    bar = PostgresBarSalesRepository(db_conn)
+    bar.insert_many([BarDrinkSale(30, 2026, "Latte", DrinkCategory.COFFEE, Decimal("63.19"), 11355)])
+    with db_conn.cursor() as cursor:
+        cursor.execute("SELECT nextval(pg_get_serial_sequence('bar_drink_sales', 'id')) AS n")
+        assert cursor.fetchone()["n"] == 31
+
+
+def test_review_for_a_booking_without_a_resolved_room_type_copies_it_from_the_booking(db_conn: Connection[Any]) -> None:
+    booking = PostgresBookingRepository(db_conn).add(_booking(room_type="Grand Lit"))
+    review = PostgresReviewRepository(db_conn).add(
+        NewReview(rating=5, room_type="", stay_date=None, booking_id=booking.id)  # type: ignore[arg-type]
+    )
+    assert (review.room_type, review.stay_date, review.booking_id) == ("Grand Lit", date(2026, 7, 14), booking.id)
+
+
+def test_schema_rejects_values_that_break_a_check_or_unique_constraint(db_conn: Connection[Any]) -> None:
+    repo = PostgresBookingRepository(db_conn)
+    # CHECK constraints are the last line of defence behind the business rules; the driver error is not
+    # disguised as "database unavailable".
+    for bad in (_booking(days_rented=0), _booking(days_rented=366), _booking(price_dkk=Decimal("0.00"))):
+        with pytest.raises(psycopg.errors.CheckViolation):
+            repo.add(bad)
+        db_conn.rollback()
+
+    bar = PostgresBarSalesRepository(db_conn)
+    sale = BarDrinkSale(1, 2026, "Dup", DrinkCategory.COFFEE, Decimal("10.00"), 1)
+    bar.insert_many([sale])
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        bar.insert_many([BarDrinkSale(2, 2026, "Dup", DrinkCategory.COFFEE, Decimal("12.00"), 2)])
+    db_conn.rollback()
+    with pytest.raises(psycopg.errors.CheckViolation):
+        bar.insert_many([BarDrinkSale(3, 2026, "Free", DrinkCategory.COFFEE, Decimal("0.00"), 2)])
+    db_conn.rollback()
+
+
+def test_a_deleted_connection_is_reported_as_unavailable() -> None:
+    from hotel_api.data.connection import connection_scope
+
+    down = Settings(db_host="127.0.0.1", db_port=1, db_name="hotel_test")
+    with pytest.raises(StorageUnavailable):
+        with connection_scope(down):
+            pass

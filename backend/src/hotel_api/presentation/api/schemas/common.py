@@ -20,7 +20,7 @@ REPORTING_TIME_ZONE = "Europe/Copenhagen"
 
 
 def with_zone(value: datetime | None) -> datetime | None:
-    """MySQL returns naive timestamps in the database's time zone (Europe/Copenhagen, set by TZ)."""
+    """PostgreSQL returns time-zone-aware timestamps; a naive value (a test double) is taken as Europe/Copenhagen."""
     if value is not None and value.tzinfo is None:
         return value.replace(tzinfo=ZoneInfo(REPORTING_TIME_ZONE))
     return value

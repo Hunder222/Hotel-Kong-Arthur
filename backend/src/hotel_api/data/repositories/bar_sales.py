@@ -1,4 +1,4 @@
-"""MySQL repository for lobby bar drink sales (T024, data-model.md §3.3)."""
+"""PostgreSQL repository for lobby bar drink sales (T012, data-model.md §3.3)."""
 
 from __future__ import annotations
 
@@ -6,10 +6,11 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 
-from pymysql.connections import Connection
+from psycopg import Connection
 
 from hotel_api.business.domain.models import BarDrinkSale, DrinkCategory
 from hotel_api.data.connection import db_cursor
+from hotel_api.data.repositories._sequences import sync_identity_sequence
 
 
 def _row_to_bar_sale(row: dict[str, Any]) -> BarDrinkSale:
@@ -23,7 +24,7 @@ def _row_to_bar_sale(row: dict[str, Any]) -> BarDrinkSale:
     )
 
 
-class MySqlBarSalesRepository:
+class PostgresBarSalesRepository:
     """Stores and queries `bar_drink_sales` using parameterised SQL."""
 
     def __init__(self, conn: Connection[Any]) -> None:
@@ -47,7 +48,7 @@ class MySqlBarSalesRepository:
             cursor.execute("DELETE FROM bar_drink_sales")
 
     def insert_many(self, sales: Sequence[BarDrinkSale]) -> None:
-        """Bulk insert bar drink sales with explicit IDs (used by the seed command)."""
+        """Bulk insert drink sales with explicit IDs (seed), then move the identity sequence past the highest id."""
         if not sales:
             return
         params = [
@@ -76,7 +77,8 @@ class MySqlBarSalesRepository:
                 """,
                 params,
             )
+            sync_identity_sequence(cursor, "bar_drink_sales")
 
 
-BarSalesRepo = MySqlBarSalesRepository
+BarSalesRepo = PostgresBarSalesRepository
 

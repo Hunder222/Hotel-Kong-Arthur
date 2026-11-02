@@ -1,18 +1,18 @@
-"""MySQL repository for room types and their seasonal rate bands (T021, data-model.md §2)."""
+"""PostgreSQL repository for room types and their seasonal rate bands (T021, data-model.md §2)."""
 
 from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any
 
-from pymysql.connections import Connection
+from psycopg import Connection
 
 from hotel_api.business.domain.models import RoomType, Season, SeasonRate
 from hotel_api.business.rules.seasons import SEASON_ORDER
 from hotel_api.data.connection import db_cursor
 
 
-class MySqlRoomTypeRepository:
+class PostgresRoomTypeRepository:
     """Reads `room_types` and `room_type_rates` using parameterised SQL."""
 
     def __init__(self, conn: Connection[Any]) -> None:
@@ -34,7 +34,7 @@ class MySqlRoomTypeRepository:
                 """
                 SELECT room_type_id, season, min_nightly_dkk, max_nightly_dkk, standard_nightly_dkk
                 FROM room_type_rates
-                ORDER BY room_type_id ASC, FIELD(season, 'low', 'mid', 'high')
+                ORDER BY room_type_id ASC, CASE season WHEN 'low' THEN 1 WHEN 'mid' THEN 2 ELSE 3 END
                 """
             )
             rate_rows = cursor.fetchall()
@@ -92,7 +92,7 @@ class MySqlRoomTypeRepository:
                 SELECT season, min_nightly_dkk, max_nightly_dkk, standard_nightly_dkk
                 FROM room_type_rates
                 WHERE room_type_id = %s
-                ORDER BY FIELD(season, 'low', 'mid', 'high')
+                ORDER BY CASE season WHEN 'low' THEN 1 WHEN 'mid' THEN 2 ELSE 3 END
                 """,
                 (rt_id,),
             )
@@ -122,5 +122,5 @@ class MySqlRoomTypeRepository:
         )
 
 
-RoomTypeRepo = MySqlRoomTypeRepository
+RoomTypeRepo = PostgresRoomTypeRepository
 

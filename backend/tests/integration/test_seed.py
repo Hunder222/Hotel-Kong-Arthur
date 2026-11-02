@@ -1,10 +1,12 @@
-"""Integration tests for the sample data seed command against `hotel_test` (T041, R13, FR-004).
+"""Integration tests for the sample data seed command against PostgreSQL `hotel_test` (T016, R13, FR-004).
 
 Verifies:
 - Running the seed twice produces identical counts (1000 bookings, 500 reviews, 30 drink sales),
   explicit IDs (1..1000, 1..500, 1..30), and totals.
 - Booking 1 is Liam Nguyen, China, Spa Executive, 2026-03-01, `mid`, 1 night, 2577.00 DKK.
 - Booking 21 has `family_name == "Müller"` and `check_in_date == date(2026, 1, 8)`.
+- After the seed, the identity sequences continue after the seeded ids: the next booking gets id 1001,
+  the next review 501 and the next drink sale 31 (no collision with the explicitly numbered rows).
 - A failing seed (bad CSV or mid-transaction failure after `DELETE`) rolls back and leaves existing
   rows in `hotel_test` intact.
 """
@@ -17,17 +19,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pymysql.connections import Connection
+from psycopg import Connection
 
 from hotel_api.business.domain.models import BarDrinkSale, DrinkCategory, Season
 from hotel_api.business.errors import StorageUnavailable, ValidationFailed
 from hotel_api.business.services.sample_data_service import SampleDataService
 from hotel_api.config import Settings
 from hotel_api.data.connection import connection_scope, open_connection
-from hotel_api.data.repositories.bar_sales import MySqlBarSalesRepository
-from hotel_api.data.repositories.bookings import MySqlBookingRepository
-from hotel_api.data.repositories.reviews import MySqlReviewRepository
-from hotel_api.data.repositories.room_types import MySqlRoomTypeRepository
+from hotel_api.data.repositories.bar_sales import PostgresBarSalesRepository
+from hotel_api.data.repositories.bookings import PostgresBookingRepository
+from hotel_api.data.repositories.reviews import PostgresReviewRepository
+from hotel_api.data.repositories.room_types import PostgresRoomTypeRepository
 from hotel_api.presentation.cli.seed import main as seed_main, parse_bookings_csv, parse_drinks_csv, run_seed
 
 pytestmark = pytest.mark.integration
@@ -36,9 +38,9 @@ pytestmark = pytest.mark.integration
 def _snapshot(settings: Settings) -> dict[str, Any]:
     conn = open_connection(settings)
     try:
-        bookings = MySqlBookingRepository(conn).list()
-        reviews = MySqlReviewRepository(conn).list()
-        drinks = MySqlBarSalesRepository(conn).list()
+        bookings = PostgresBookingRepository(conn).list()
+        reviews = PostgresReviewRepository(conn).list()
+        drinks = PostgresBarSalesRepository(conn).list()
     finally:
         conn.close()
 
@@ -88,7 +90,7 @@ def test_seed_is_idempotent_and_matches_golden_records(
 
     conn = open_connection(test_settings)
     try:
-        bookings_repo = MySqlBookingRepository(conn)
+        bookings_repo = PostgresBookingRepository(conn)
         b1 = bookings_repo.get(1)
         b21 = bookings_repo.get(21)
     finally:
@@ -140,8 +142,8 @@ def test_failing_seed_leaves_existing_rows_intact(
     assert _snapshot(test_settings) == baseline
 
     # 2. Failing seed mid-transaction (after DELETE FROM reviews and DELETE FROM bookings)
-    # rolls back the MySQL transaction so all 1000 bookings, 500 reviews, and 30 drinks remain intact.
-    class FailingBarSalesRepository(MySqlBarSalesRepository):
+    # rolls back the PostgreSQL transaction so all 1000 bookings, 500 reviews, and 30 drinks remain intact.
+    class FailingBarSalesRepository(PostgresBarSalesRepository):
         def insert_many(self, sales: Any) -> None:
             raise StorageUnavailable("Simulated database failure after deleting old rows.")
 
@@ -154,9 +156,9 @@ def test_failing_seed_leaves_existing_rows_intact(
     with pytest.raises(StorageUnavailable):
         with connection_scope(test_settings) as conn:
             svc = SampleDataService(
-                room_types=MySqlRoomTypeRepository(conn),
-                bookings=MySqlBookingRepository(conn),
-                reviews=MySqlReviewRepository(conn),
+                room_types=PostgresRoomTypeRepository(conn),
+                bookings=PostgresBookingRepository(conn),
+                reviews=PostgresReviewRepository(conn),
                 bar_sales=FailingBarSalesRepository(conn),
             )
             svc.replace_with_sample_data(booking_rows, None, drink_rows)
@@ -164,10 +166,39 @@ def test_failing_seed_leaves_existing_rows_intact(
     assert _snapshot(test_settings) == baseline
     conn = open_connection(test_settings)
     try:
-        b21 = MySqlBookingRepository(conn).get(21)
-        drinks = [d for d in MySqlBarSalesRepository(conn).list() if d.category is DrinkCategory.COFFEE]
+        b21 = PostgresBookingRepository(conn).get(21)
+        drinks = [d for d in PostgresBarSalesRepository(conn).list() if d.category is DrinkCategory.COFFEE]
     finally:
         conn.close()
     assert b21 is not None and b21.family_name == "Müller"
     assert len(drinks) == 10
 
+
+
+def test_identity_sequences_continue_after_the_seeded_ids(
+    test_settings: Settings,
+    clean_db: Connection[Any],
+) -> None:
+    from hotel_api.business.domain.models import NewBooking, NewReview
+
+    run_seed(settings=test_settings)
+    run_seed(settings=test_settings)  # a second run must not disturb the sequences
+
+    with connection_scope(test_settings) as conn:
+        booking = PostgresBookingRepository(conn).add(
+            NewBooking("Next", "Guest", "Denmark", "Suite", date(2026, 7, 14), 2, Decimal("6500.00"))
+        )
+        review = PostgresReviewRepository(conn).add(
+            NewReview(rating=5, room_type="Suite", stay_date=date(2026, 7, 14), booking_id=booking.id)
+        )
+    assert booking.id == 1001
+    assert review.id == 501
+    assert (booking.family_name, review.booking_id) == ("Guest", 1001)
+
+    with connection_scope(test_settings) as conn:
+        PostgresBarSalesRepository(conn).insert_many(
+            [BarDrinkSale(31, 2027, "New Drink", DrinkCategory.COFFEE, Decimal("45.00"), 10)]
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT nextval(pg_get_serial_sequence('bar_drink_sales', 'id')) AS n")
+            assert cursor.fetchone()["n"] == 32

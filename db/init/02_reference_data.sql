@@ -4,8 +4,7 @@
 -- (data-model.md §2.1–§2.2)
 -- ============================================================================
 
-SET NAMES utf8mb4;
-SET CHARACTER SET utf8mb4;
+SET client_encoding = 'UTF8';
 
 INSERT INTO room_types (id, name, name_da, room_count, max_guests) VALUES
     (1, 'Standard Single', 'Standard enkeltværelse', 27, 1),

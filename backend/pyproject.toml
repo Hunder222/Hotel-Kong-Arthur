@@ -16,7 +16,8 @@ dev = [
     "pytest>=9.2.0,<10.0.0",
     "httpx>=0.28.1,<0.29.0",
     "openapi-core>=0.23.1,<0.24.0",
-    "openapi-spec-validator>=0.9.0,<1.0.0",
+    # openapi-core 0.23 requires openapi-spec-validator >=0.8,<0.9; 0.9 cannot be installed beside it.
+    "openapi-spec-validator>=0.8.0,<0.9.0",
     "pyyaml>=6.0.3",
 ]
 

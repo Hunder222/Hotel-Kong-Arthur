@@ -1,6 +1,6 @@
 """Repository interfaces owned by the business layer and implemented by the data layer (R3).
 
-Services depend only on these Protocols, so replacing MySQL touches `data/` and nothing above it.
+Services depend only on these Protocols, so replacing the database touches `data/` and nothing above it.
 """
 
 from __future__ import annotations

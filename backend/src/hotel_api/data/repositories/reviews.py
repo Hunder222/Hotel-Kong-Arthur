@@ -1,14 +1,15 @@
-"""MySQL repository for guest satisfaction reviews (T023, data-model.md §3.2)."""
+"""PostgreSQL repository for guest satisfaction reviews (T011, data-model.md §3.2)."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any
 
-from pymysql.connections import Connection
+from psycopg import Connection
 
 from hotel_api.business.domain.models import GuestReview, NewReview
 from hotel_api.data.connection import db_cursor
+from hotel_api.data.repositories._sequences import sync_identity_sequence
 
 
 def _row_to_review(row: dict[str, Any]) -> GuestReview:
@@ -22,7 +23,7 @@ def _row_to_review(row: dict[str, Any]) -> GuestReview:
     )
 
 
-class MySqlReviewRepository:
+class PostgresReviewRepository:
     """Stores and queries `reviews` using parameterised SQL."""
 
     def __init__(self, conn: Connection[Any]) -> None:
@@ -93,22 +94,33 @@ class MySqlReviewRepository:
                     raise ValueError(f"Unknown booking_id: {review.booking_id!r}")
                 room_type_id = int(booking_row["room_type_id"])
                 stay_date = booking_row["check_in_date"]
+                room_type_name = None  # looked up below
             else:
                 room_type_id = self._resolve_room_type_id(cursor, review.room_type)
                 stay_date = review.stay_date
+                room_type_name = review.room_type
 
             cursor.execute(
                 """
                 INSERT INTO reviews (booking_id, room_type_id, stay_date, rating)
                 VALUES (%s, %s, %s, %s)
+                RETURNING id, created_at
                 """,
                 (review.booking_id, room_type_id, stay_date, review.rating),
             )
-            review_id = int(cursor.lastrowid)
+            row = cursor.fetchone()
+            if room_type_name is None:
+                cursor.execute("SELECT name FROM room_types WHERE id = %s", (room_type_id,))
+                room_type_name = str(cursor.fetchone()["name"])
 
-        stored = self.get(review_id)
-        assert stored is not None
-        return stored
+        return GuestReview(
+            id=int(row["id"]),
+            booking_id=review.booking_id,
+            room_type=room_type_name,
+            stay_date=stay_date,
+            rating=review.rating,
+            created_at=row["created_at"],
+        )
 
     def delete_all(self) -> None:
         """Delete all reviews."""
@@ -116,7 +128,7 @@ class MySqlReviewRepository:
             cursor.execute("DELETE FROM reviews")
 
     def insert_many(self, reviews: Sequence[GuestReview]) -> None:
-        """Bulk insert reviews with explicit IDs (used by the seed command)."""
+        """Bulk insert reviews with explicit IDs (seed), then move the identity sequence past the highest id."""
         if not reviews:
             return
         with db_cursor(self._conn) as cursor:
@@ -138,7 +150,8 @@ class MySqlReviewRepository:
                 """,
                 params,
             )
+            sync_identity_sequence(cursor, "reviews")
 
 
-ReviewRepo = MySqlReviewRepository
+ReviewRepo = PostgresReviewRepository
 

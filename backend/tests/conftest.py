@@ -1,7 +1,8 @@
 """Shared test harness (T034, research R16).
 
-- `client`: FastAPI TestClient bound to the separate `hotel_test` database, whose schema is rebuilt
-  from `db/init/*.sql` once per session and whose operational tables are emptied before each test.
+- `client`: FastAPI TestClient bound to the separate PostgreSQL `hotel_test` database, whose schema and
+  reference data are rebuilt from `db/init/01_schema.sql` and `02_reference_data.sql` once per session, and
+  whose operational tables are truncated (identity sequences restarted) before each test.
 - `contract`: openapi-core loader for the one authoritative contract, plus `check_contract` to
   validate a response (status, content type, headers, body) against it.
 
@@ -20,8 +21,10 @@ import pytest
 from fastapi.testclient import TestClient
 from openapi_core import Config, OpenAPI
 from openapi_core.testing import MockRequest, MockResponse
-from pymysql.connections import Connection
+import psycopg
+from psycopg import Connection
 
+from hotel_api.business.errors import StorageUnavailable
 from hotel_api.config import Settings, get_settings
 from hotel_api.data.connection import open_connection
 from hotel_api.main import create_app
@@ -33,23 +36,36 @@ INIT_DIR = REPO_ROOT / "db" / "init"
 TEST_DATABASE = "hotel_test"
 CONTRACT_HOST = "http://localhost:8000"
 
-_TABLES_DEPENDENT_FIRST = (
-    "reviews",
-    "bookings",
-    "bar_drink_sales",
-    "room_type_rates",
-    "room_types",
-)
 _OPERATIONAL_TABLES = ("reviews", "bookings", "bar_drink_sales")
+# 03_test_database.sql creates hotel_test itself, so only the schema and reference data are replayed in it.
+_SCHEMA_SCRIPTS = ("01_schema.sql", "02_reference_data.sql")
 
 
 def _run_sql_file(conn: Connection[Any], path: Path) -> None:
-    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if not line.strip().startswith("--")]
-    statements = [s.strip() for s in "\n".join(lines).split(";") if s.strip()]
+    """Run a whole SQL script (several statements, no parameters) in one go."""
     with conn.cursor() as cursor:
-        for statement in statements:
-            cursor.execute(statement)
+        cursor.execute(path.read_text(encoding="utf-8"))
     conn.commit()
+
+
+def _ensure_test_database(settings: Settings) -> None:
+    """Create `hotel_test` if the compose init script has not (an older volume, or a manual setup)."""
+    try:
+        open_connection(settings).close()
+        return
+    except StorageUnavailable:
+        pass
+    admin = psycopg.connect(
+        host=settings.db_host, port=settings.db_port, dbname="postgres",
+        user=settings.db_user, password=settings.db_password, autocommit=True, connect_timeout=5,
+    )
+    try:
+        with admin.cursor() as cursor:
+            cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (settings.db_name,))
+            if cursor.fetchone() is None:
+                cursor.execute(f'CREATE DATABASE "{settings.db_name}" WITH ENCODING \'UTF8\'')
+    finally:
+        admin.close()
 
 
 @pytest.fixture(scope="session")
@@ -60,35 +76,33 @@ def test_settings() -> Settings:
 @pytest.fixture(scope="session")
 def hotel_test_schema(test_settings: Settings) -> None:
     """Rebuild schema and reference data in `hotel_test` from db/init (never touches `hotel`)."""
+    _ensure_test_database(test_settings)
     conn = open_connection(test_settings)
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
-            for table in _TABLES_DEPENDENT_FIRST:
-                cursor.execute(f"DROP TABLE IF EXISTS {table}")
-            cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+            cursor.execute("DROP TABLE IF EXISTS reviews, bookings, bar_drink_sales, room_type_rates, room_types CASCADE")
         conn.commit()
-        _run_sql_file(conn, INIT_DIR / "01_schema.sql")
-        _run_sql_file(conn, INIT_DIR / "02_reference_data.sql")
+        for script in _SCHEMA_SCRIPTS:
+            _run_sql_file(conn, INIT_DIR / script)
     finally:
         conn.close()
 
 
 @pytest.fixture()
 def clean_db(test_settings: Settings, hotel_test_schema: None) -> Iterator[Connection[Any]]:
-    """A connection to `hotel_test` with empty operational tables; also emptied afterwards."""
+    """A connection to `hotel_test` with empty operational tables and restarted ids; emptied afterwards too."""
     conn = open_connection(test_settings)
 
     def empty() -> None:
         with conn.cursor() as cursor:
-            for table in _OPERATIONAL_TABLES:
-                cursor.execute(f"DELETE FROM {table}")
+            cursor.execute(f"TRUNCATE {', '.join(_OPERATIONAL_TABLES)} RESTART IDENTITY")
         conn.commit()
 
     empty()
     try:
         yield conn
     finally:
+        conn.rollback()
         empty()
         conn.close()
 

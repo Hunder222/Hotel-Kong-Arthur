@@ -1,13 +1,9 @@
 -- ============================================================================
 -- Hotel Kong Arthur Operations & Analytics Platform
--- 03_test_database.sql: Create hotel_test database and grant access to app user
--- (research.md R16)
+-- 03_test_database.sql: the separate hotel_test database used by the automated tests (research R16)
+-- The test harness builds the schema in it from 01_schema.sql and 02_reference_data.sql.
 -- ============================================================================
 
-CREATE DATABASE IF NOT EXISTS hotel_test
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_0900_ai_ci;
+CREATE DATABASE hotel_test WITH ENCODING 'UTF8';
 
-GRANT ALL PRIVILEGES ON hotel_test.* TO 'hotel'@'%';
-FLUSH PRIVILEGES;
-
+GRANT ALL PRIVILEGES ON DATABASE hotel_test TO hotel;

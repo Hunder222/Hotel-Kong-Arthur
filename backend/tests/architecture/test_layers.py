@@ -15,7 +15,7 @@ ROOT = "hotel_api"
 # layer -> (forbidden module prefixes)
 FORBIDDEN: dict[str, tuple[str, ...]] = {
     "presentation": (f"{ROOT}.data",),
-    "business": (f"{ROOT}.presentation", f"{ROOT}.data", "fastapi", "starlette", "pymysql"),
+    "business": (f"{ROOT}.presentation", f"{ROOT}.data", "fastapi", "starlette", "psycopg", "pymysql"),
     "data": (f"{ROOT}.presentation", f"{ROOT}.business.services"),
 }
 
@@ -69,6 +69,8 @@ def test_layer_imports_respect_the_boundaries(layer: str) -> None:
 
 def test_the_detector_flags_each_forbidden_import() -> None:
     assert violations("presentation", "from hotel_api.data.connection import open_connection", f"{ROOT}.presentation.x")
+    assert violations("business", "import psycopg", f"{ROOT}.business.x")
+    assert violations("business", "from psycopg.rows import dict_row", f"{ROOT}.business.x")
     assert violations("business", "import pymysql", f"{ROOT}.business.x")
     assert violations("business", "from fastapi import FastAPI", f"{ROOT}.business.x")
     assert violations("business", "from hotel_api.presentation.api import errors", f"{ROOT}.business.x")
@@ -83,3 +85,5 @@ def test_the_detector_allows_the_permitted_imports() -> None:
     assert not violations("data", "from hotel_api.business.ports import BookingRepository", f"{ROOT}.data.x")
     assert not violations("presentation", "from hotel_api.business.services.x import Y", f"{ROOT}.presentation.x")
     assert not violations("business", "from hotel_api.business.rules import numbers", f"{ROOT}.business.services.x")
+    assert not violations("data", "import psycopg", f"{ROOT}.data.connection")
+    assert not violations("data", "from psycopg.rows import dict_row", f"{ROOT}.data.connection")

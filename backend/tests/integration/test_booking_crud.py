@@ -14,9 +14,9 @@ from hotel_api.business.domain.models import NewReview
 from hotel_api.business.errors import NotFound, ValidationFailed
 from hotel_api.business.services.booking_service import BookingService
 from hotel_api.data.connection import connection_scope
-from hotel_api.data.repositories.bookings import MySqlBookingRepository
-from hotel_api.data.repositories.reviews import MySqlReviewRepository
-from hotel_api.data.repositories.room_types import MySqlRoomTypeRepository
+from hotel_api.data.repositories.bookings import PostgresBookingRepository
+from hotel_api.data.repositories.reviews import PostgresReviewRepository
+from hotel_api.data.repositories.room_types import PostgresRoomTypeRepository
 
 pytestmark = pytest.mark.integration
 
@@ -31,7 +31,7 @@ ELENA = {
 
 
 def service(conn) -> BookingService:
-    return BookingService(MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn))
+    return BookingService(PostgresBookingRepository(conn), PostgresRoomTypeRepository(conn))
 
 
 def count(conn, table: str) -> int:
@@ -95,7 +95,7 @@ def test_an_error_after_a_write_rolls_the_whole_request_back(test_settings, clea
 def test_deleting_a_booking_keeps_its_review_with_a_null_booking_id(test_settings, clean_db):
     with connection_scope(test_settings) as conn:
         booking = service(conn).create(ELENA)
-        review = MySqlReviewRepository(conn).add(
+        review = PostgresReviewRepository(conn).add(
             NewReview(rating=5, room_type=booking.room_type, stay_date=booking.check_in_date, booking_id=booking.id)
         )
     assert review.booking_id == booking.id
@@ -104,7 +104,7 @@ def test_deleting_a_booking_keeps_its_review_with_a_null_booking_id(test_setting
         service(conn).delete(booking.id)
 
     with connection_scope(test_settings) as conn:
-        assert MySqlBookingRepository(conn).get(booking.id) is None
-        kept = MySqlReviewRepository(conn).get(review.id)
+        assert PostgresBookingRepository(conn).get(booking.id) is None
+        kept = PostgresReviewRepository(conn).get(review.id)
     assert kept is not None and kept.booking_id is None
     assert (kept.room_type, kept.stay_date, kept.rating) == ("Superior Double", booking.check_in_date, 5)

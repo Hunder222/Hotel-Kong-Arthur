@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pymysql.connections import Connection
+from psycopg import Connection
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from hotel_api.business.services.bar_service import BarService
@@ -24,11 +24,11 @@ from hotel_api.business.services.room_type_service import RoomTypeService
 from hotel_api.business.services.sample_data_service import SampleDataService
 from hotel_api.config import Settings, get_settings
 from hotel_api.data.connection import connection_scope
-from hotel_api.data.repositories.bar_sales import MySqlBarSalesRepository
-from hotel_api.data.repositories.bookings import MySqlBookingRepository
-from hotel_api.data.repositories.health import MySqlHealthRepository
-from hotel_api.data.repositories.reviews import MySqlReviewRepository
-from hotel_api.data.repositories.room_types import MySqlRoomTypeRepository
+from hotel_api.data.repositories.bar_sales import PostgresBarSalesRepository
+from hotel_api.data.repositories.bookings import PostgresBookingRepository
+from hotel_api.data.repositories.health import PostgresHealthRepository
+from hotel_api.data.repositories.reviews import PostgresReviewRepository
+from hotel_api.data.repositories.room_types import PostgresRoomTypeRepository
 from hotel_api.presentation.api import dependencies as deps
 from hotel_api.presentation.api.errors import register_error_handlers
 from hotel_api.presentation.api.routers import bar, bookings, health, reviews, room_types
@@ -39,10 +39,10 @@ def sample_data_service_scope(settings: Settings | None = None) -> Iterator[Samp
     """Open one transactional database connection and yield a wired `SampleDataService` (R3, R13)."""
     with connection_scope(settings) as conn:
         yield SampleDataService(
-            room_types=MySqlRoomTypeRepository(conn),
-            bookings=MySqlBookingRepository(conn),
-            reviews=MySqlReviewRepository(conn),
-            bar_sales=MySqlBarSalesRepository(conn),
+            room_types=PostgresRoomTypeRepository(conn),
+            bookings=PostgresBookingRepository(conn),
+            reviews=PostgresReviewRepository(conn),
+            bar_sales=PostgresBarSalesRepository(conn),
         )
 
 
@@ -93,19 +93,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     connection = Depends(request_connection, scope="function")
 
     def health_service(conn: Connection = connection) -> HealthService:
-        return HealthService(MySqlHealthRepository(conn))
+        return HealthService(PostgresHealthRepository(conn))
 
     def room_type_service(conn: Connection = connection) -> RoomTypeService:
-        return RoomTypeService(MySqlRoomTypeRepository(conn))
+        return RoomTypeService(PostgresRoomTypeRepository(conn))
 
     def booking_service(conn: Connection = connection) -> BookingService:
-        return BookingService(MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn))
+        return BookingService(PostgresBookingRepository(conn), PostgresRoomTypeRepository(conn))
 
     def review_service(conn: Connection = connection) -> ReviewService:
-        return ReviewService(MySqlReviewRepository(conn), MySqlBookingRepository(conn), MySqlRoomTypeRepository(conn))
+        return ReviewService(PostgresReviewRepository(conn), PostgresBookingRepository(conn), PostgresRoomTypeRepository(conn))
 
     def bar_service(conn: Connection = connection) -> BarService:
-        return BarService(MySqlBarSalesRepository(conn))
+        return BarService(PostgresBarSalesRepository(conn))
 
     app.dependency_overrides[deps.get_health_service] = health_service
     app.dependency_overrides[deps.get_bar_service] = bar_service

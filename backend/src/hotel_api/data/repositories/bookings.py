@@ -1,4 +1,4 @@
-"""MySQL repository for room bookings (T022, data-model.md §3.1)."""
+"""PostgreSQL repository for room bookings (T010, data-model.md §3.1)."""
 
 from __future__ import annotations
 
@@ -6,10 +6,11 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 
-from pymysql.connections import Connection
+from psycopg import Connection
 
 from hotel_api.business.domain.models import Booking, NewBooking
 from hotel_api.data.connection import db_cursor
+from hotel_api.data.repositories._sequences import sync_identity_sequence
 
 
 def _row_to_booking(row: dict[str, Any]) -> Booking:
@@ -27,7 +28,7 @@ def _row_to_booking(row: dict[str, Any]) -> Booking:
     )
 
 
-class MySqlBookingRepository:
+class PostgresBookingRepository:
     """Stores and queries `bookings` using parameterised SQL."""
 
     def __init__(self, conn: Connection[Any]) -> None:
@@ -94,7 +95,7 @@ class MySqlBookingRepository:
         return _row_to_booking(row) if row is not None else None
 
     def add(self, booking: NewBooking) -> Booking:
-        """Insert a booking whose `price_dkk` is already set and read the stored row back."""
+        """Insert a booking whose `price_dkk` is already set; return it with the generated id and timestamps."""
         if booking.price_dkk is None:
             raise ValueError("NewBooking.price_dkk must be set before calling repository.add().")
 
@@ -112,6 +113,7 @@ class MySqlBookingRepository:
                     price_dkk
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, created_at, updated_at
                 """,
                 (
                     booking.first_name,
@@ -123,14 +125,23 @@ class MySqlBookingRepository:
                     booking.price_dkk,
                 ),
             )
-            booking_id = int(cursor.lastrowid)
+            row = cursor.fetchone()
 
-        stored = self.get(booking_id)
-        assert stored is not None
-        return stored
+        return Booking(
+            id=int(row["id"]),
+            first_name=booking.first_name,
+            family_name=booking.family_name,
+            country=booking.country,
+            room_type=booking.room_type,
+            check_in_date=booking.check_in_date,
+            days_rented=booking.days_rented,
+            price_dkk=Decimal(booking.price_dkk),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
 
     def replace(self, booking_id: int, booking: NewBooking) -> Booking | None:
-        """Replace editable fields of `booking_id`; return the updated row, or `None` if not found."""
+        """Replace editable fields of `booking_id`; return the updated booking, or `None` if not found."""
         if booking.price_dkk is None:
             raise ValueError("NewBooking.price_dkk must be set before calling repository.replace().")
 
@@ -146,8 +157,10 @@ class MySqlBookingRepository:
                     room_type_id = %s,
                     check_in_date = %s,
                     days_rented = %s,
-                    price_dkk = %s
+                    price_dkk = %s,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
+                RETURNING id, created_at, updated_at
                 """,
                 (
                     booking.first_name,
@@ -160,8 +173,22 @@ class MySqlBookingRepository:
                     booking_id,
                 ),
             )
+            row = cursor.fetchone()
 
-        return self.get(booking_id)
+        if row is None:
+            return None
+        return Booking(
+            id=int(row["id"]),
+            first_name=booking.first_name,
+            family_name=booking.family_name,
+            country=booking.country,
+            room_type=booking.room_type,
+            check_in_date=booking.check_in_date,
+            days_rented=booking.days_rented,
+            price_dkk=Decimal(booking.price_dkk),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
 
     def delete(self, booking_id: int) -> bool:
         """Delete `booking_id`; return `True` if a row was removed."""
@@ -175,7 +202,7 @@ class MySqlBookingRepository:
             cursor.execute("DELETE FROM bookings")
 
     def insert_many(self, bookings: Sequence[Booking]) -> None:
-        """Bulk insert bookings with explicit IDs (used by the seed command)."""
+        """Bulk insert bookings with explicit IDs (seed), then move the identity sequence past the highest id."""
         if not bookings:
             return
         with db_cursor(self._conn) as cursor:
@@ -209,7 +236,8 @@ class MySqlBookingRepository:
                 """,
                 params,
             )
+            sync_identity_sequence(cursor, "bookings")
 
 
-BookingRepo = MySqlBookingRepository
+BookingRepo = PostgresBookingRepository
 

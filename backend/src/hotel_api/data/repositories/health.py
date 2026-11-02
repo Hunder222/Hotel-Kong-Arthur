@@ -1,15 +1,15 @@
-"""MySQL health repository executing a lightweight `SELECT 1` ping (T025)."""
+"""PostgreSQL health repository executing a lightweight `SELECT 1` ping (T008)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from pymysql.connections import Connection
+from psycopg import Connection
 
 from hotel_api.data.connection import db_cursor
 
 
-class MySqlHealthRepository:
+class PostgresHealthRepository:
     """Checks database reachability with `SELECT 1`."""
 
     def __init__(self, conn: Connection[Any]) -> None:
@@ -22,5 +22,4 @@ class MySqlHealthRepository:
             cursor.fetchone()
 
 
-HealthRepo = MySqlHealthRepository
-
+HealthRepo = PostgresHealthRepository
