@@ -1,7 +1,7 @@
-// Booking page for reception and Hotel Analytics dashboard (FR-022). The API stays the only authority:
-// it derives the season, prices the stay, validates every field and calculates every KPI (research R15).
-// The live price preview and the two price fields use price-preview.js, a display-only mirror of the
-// season table and the standard price (FR-018, FR-019).
+// Booking page for reception and Hotel Analytics dashboard (FR-022, Phase 9 Revision).
+// The API stays the only authority: it derives the season, prices the stay, validates every field
+// and calculates every KPI (research R15). The live price preview and the two price fields use
+// price-preview.js, a display-only mirror of the season table and the standard price (FR-018, FR-019).
 import {
   ApiError,
   createBooking,
@@ -21,9 +21,41 @@ const FIELDS = [
   "first_name", "family_name", "country", "room_type", "check_in_date", "days_rented", "price_dkk", "price_per_night_dkk",
 ];
 
+// Navigation state: primary view ('bookings' | 'analytics') and analytics subview ('hotel' | 'bar')
+const navState = {
+  view: "bookings",
+  analyticsSubView: "hotel",
+};
+
+// Cached revenue numbers for the top executive summary card (TODOS.md)
+const revenueState = {
+  roomRevenue: 0,
+  roomBookings: 0,
+  barRevenue: 0,
+  barUnits: 0,
+};
+
 // priceMode: which manual price field is in use, only one at a time (FR-019): "total", "nightly" or null (standard price).
 const state = { roomTypes: [], bookings: [], editingId: null, visible: PAGE_SIZE, priceMode: null };
 
+// Navigation elements
+const tabBookings = document.getElementById("tab-bookings");
+const tabAnalytics = document.getElementById("tab-analytics");
+const viewBookings = document.getElementById("view-bookings");
+const viewAnalytics = document.getElementById("view-analytics");
+const subtabHotel = document.getElementById("subtab-hotel");
+const subtabBar = document.getElementById("subtab-bar");
+const subviewHotel = document.getElementById("analytics-subview-hotel");
+const subviewBar = document.getElementById("analytics-subview-bar");
+
+// Top Executive Revenue Overview elements
+const metricTopRoomRevenue = document.getElementById("metric-top-room-revenue");
+const metricTopRoomSub = document.getElementById("metric-top-room-sub");
+const metricTopBarRevenue = document.getElementById("metric-top-bar-revenue");
+const metricTopBarSub = document.getElementById("metric-top-bar-sub");
+const metricTopTotalRevenue = document.getElementById("metric-top-total-revenue");
+
+// Booking Form & List elements
 const form = document.getElementById("booking-form");
 const rows = document.getElementById("booking-rows");
 const statusLine = document.getElementById("status");
@@ -41,6 +73,7 @@ const previewBox = document.getElementById("price-preview");
 const bannerText = document.getElementById("edit-banner-text");
 const bannerCancel = document.getElementById("banner-cancel");
 
+// Hotel Analytics elements
 const analyticsForm = document.getElementById("analytics-filters");
 const barForm = document.getElementById("bar-filters");
 const analyticsStatus = document.getElementById("analytics-status");
@@ -49,6 +82,7 @@ const metricBookings = document.getElementById("metric-bookings");
 const metricNights = document.getElementById("metric-nights");
 const metricAvailableNights = document.getElementById("metric-available-nights");
 const metricOccupancy = document.getElementById("metric-occupancy");
+const metricOccupancySub = document.getElementById("metric-occupancy-sub");
 const metricAlos = document.getElementById("metric-alos");
 const metricAdr = document.getElementById("metric-adr");
 const metricRevPerBooking = document.getElementById("metric-rev-per-booking");
@@ -61,6 +95,7 @@ const roomTypeSeasonRows = document.getElementById("room-type-season-rows");
 const countryRows = document.getElementById("country-rows");
 const countryEmpty = document.getElementById("country-empty");
 
+// Bar Analytics elements
 const metricBarRevenue = document.getElementById("metric-bar-revenue");
 const metricBarUnits = document.getElementById("metric-bar-units");
 const metricBarDrinks = document.getElementById("metric-bar-drinks");
@@ -74,6 +109,81 @@ const number = new Intl.NumberFormat("da-DK");
 const decimalFmt = new Intl.NumberFormat("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (value) => `${decimalFmt.format(value)} %`;
 const rating = (count, avg) => (count > 0 ? `${decimalFmt.format(avg)} / 5` : "–");
+
+// ---------- Navigation & Tab Routing (TODOS.md, T071) ----------
+
+function setPrimaryView(viewName, updateHash = true) {
+  navState.view = viewName === "analytics" ? "analytics" : "bookings";
+  const isBookings = navState.view === "bookings";
+
+  if (tabBookings) {
+    tabBookings.classList.toggle("active", isBookings);
+    tabBookings.setAttribute("aria-selected", isBookings ? "true" : "false");
+  }
+  if (tabAnalytics) {
+    tabAnalytics.classList.toggle("active", !isBookings);
+    tabAnalytics.setAttribute("aria-selected", !isBookings ? "true" : "false");
+  }
+
+  if (viewBookings) viewBookings.hidden = !isBookings;
+  if (viewAnalytics) viewAnalytics.hidden = isBookings;
+
+  if (updateHash) {
+    const hash = isBookings ? "#bookings" : `#analytics/${navState.analyticsSubView}`;
+    if (window.location.hash !== hash) {
+      window.history.pushState(null, "", hash);
+    }
+  }
+
+  if (!isBookings) {
+    loadAnalytics();
+  }
+}
+
+function setAnalyticsSubView(subViewName, updateHash = true) {
+  navState.analyticsSubView = subViewName === "bar" ? "bar" : "hotel";
+  const isHotel = navState.analyticsSubView === "hotel";
+
+  if (subtabHotel) {
+    subtabHotel.classList.toggle("active", isHotel);
+    subtabHotel.setAttribute("aria-selected", isHotel ? "true" : "false");
+  }
+  if (subtabBar) {
+    subtabBar.classList.toggle("active", !isHotel);
+    subtabBar.setAttribute("aria-selected", !isHotel ? "true" : "false");
+  }
+
+  if (subviewHotel) subviewHotel.hidden = !isHotel;
+  if (subviewBar) subviewBar.hidden = isHotel;
+
+  if (updateHash && navState.view === "analytics") {
+    const hash = `#analytics/${navState.analyticsSubView}`;
+    if (window.location.hash !== hash) {
+      window.history.pushState(null, "", hash);
+    }
+  }
+}
+
+function handleHashChange() {
+  const hash = window.location.hash;
+  if (hash.startsWith("#analytics")) {
+    const parts = hash.split("/");
+    const sub = parts[1] === "bar" ? "bar" : "hotel";
+    setAnalyticsSubView(sub, false);
+    setPrimaryView("analytics", false);
+  } else {
+    setPrimaryView("bookings", false);
+  }
+}
+
+function renderTopRevenueSummary() {
+  const totalRev = Number(revenueState.roomRevenue || 0) + Number(revenueState.barRevenue || 0);
+  if (metricTopRoomRevenue) metricTopRoomRevenue.textContent = money.format(revenueState.roomRevenue);
+  if (metricTopRoomSub) metricTopRoomSub.textContent = `${number.format(revenueState.roomBookings)} bookings`;
+  if (metricTopBarRevenue) metricTopBarRevenue.textContent = money.format(revenueState.barRevenue);
+  if (metricTopBarSub) metricTopBarSub.textContent = `${number.format(revenueState.barUnits)} units sold`;
+  if (metricTopTotalRevenue) metricTopTotalRevenue.textContent = money.format(totalRev);
+}
 
 // ---------- messages ----------
 
@@ -143,6 +253,134 @@ function cell(text, className) {
   return td;
 }
 
+// ---------- Table Column Sorting ----------
+
+function parseCellValue(text) {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed === "–" || trimmed === "-" || trimmed === "N/A") {
+    return { type: "empty", value: null };
+  }
+
+  // ISO Date: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return { type: "date", value: trimmed };
+  }
+
+  // Rating: "3,74 / 5"
+  const ratingMatch = trimmed.match(/^(\d+(?:,\d+)?)\s*\/\s*5$/);
+  if (ratingMatch) {
+    return { type: "number", value: parseFloat(ratingMatch[1].replace(",", ".")) };
+  }
+
+  // Danish/European currency or unit: e.g. "126.025.150,00 kr.", "75,14 %", "3,25 nights", "18.062", "1.234,56 DKK"
+  const cleanNumCandidate = trimmed
+    .replace(/\s*(?:kr\.?|DKK|%|nights|rooms|days|bookings|units)\s*/gi, "")
+    .trim();
+
+  // Danish formatted number: optional minus, digits with optional '.' thousands, optional ',' decimals
+  if (/^-?\d{1,3}(?:\.\d{3})*(?:,\d+)?$/.test(cleanNumCandidate)) {
+    const normalized = cleanNumCandidate.replace(/\./g, "").replace(",", ".");
+    return { type: "number", value: parseFloat(normalized) };
+  }
+
+  // Standard float / integer
+  if (/^-?\d+(?:\.\d+)?$/.test(cleanNumCandidate)) {
+    return { type: "number", value: parseFloat(cleanNumCandidate) };
+  }
+
+  return { type: "string", value: trimmed };
+}
+
+function sortTable(table, colIndex, dir, markHeader = true) {
+  const tbody = table.querySelector("tbody");
+  if (!tbody) return;
+  const rowsArray = Array.from(tbody.querySelectorAll("tr"));
+
+  if (rowsArray.length > 1) {
+    rowsArray.sort((rowA, rowB) => {
+      const cellA = rowA.children[colIndex];
+      const cellB = rowB.children[colIndex];
+      const textA = cellA ? cellA.textContent : "";
+      const textB = cellB ? cellB.textContent : "";
+      const valA = parseCellValue(textA);
+      const valB = parseCellValue(textB);
+
+      if (valA.type === "empty" && valB.type === "empty") return 0;
+      if (valA.type === "empty") return 1;
+      if (valB.type === "empty") return -1;
+
+      let cmp = 0;
+      if (valA.type === "number" && valB.type === "number") {
+        cmp = valA.value - valB.value;
+      } else {
+        cmp = String(valA.value).localeCompare(String(valB.value), "da", { numeric: true, sensitivity: "base" });
+      }
+      return dir === "asc" ? cmp : -cmp;
+    });
+
+    tbody.replaceChildren(...rowsArray);
+  }
+
+  table.dataset.sortCol = String(colIndex);
+  table.dataset.sortDir = dir;
+
+  if (markHeader) {
+    const headers = table.querySelectorAll("thead th");
+    headers.forEach((th, idx) => {
+      if (idx === colIndex) {
+        th.classList.remove("sorted-asc", "sorted-desc");
+        th.classList.add(dir === "asc" ? "sorted-asc" : "sorted-desc");
+        th.setAttribute("aria-sort", dir === "asc" ? "ascending" : "descending");
+        th.setAttribute("title", dir === "asc" ? "Sorted ascending (click for descending)" : "Sorted descending (click for ascending)");
+      } else {
+        th.classList.remove("sorted-asc", "sorted-desc");
+        th.removeAttribute("aria-sort");
+        if (th.classList.contains("sortable")) {
+          th.setAttribute("title", "Click to sort");
+        }
+      }
+    });
+  }
+}
+
+function applyActiveSort(table) {
+  if (!table || table.dataset.sortCol === undefined) return;
+  const colIndex = parseInt(table.dataset.sortCol, 10);
+  const dir = table.dataset.sortDir || "asc";
+  sortTable(table, colIndex, dir, false);
+}
+
+function initTableSorting() {
+  document.querySelectorAll("table").forEach((table) => {
+    const ths = table.querySelectorAll("thead th");
+    ths.forEach((th, colIndex) => {
+      const text = th.textContent.trim();
+      if (!text || th.classList.contains("no-sort") || th.querySelector(".visually-hidden")?.textContent.trim() === "Actions") {
+        return;
+      }
+
+      th.classList.add("sortable");
+      th.setAttribute("tabindex", "0");
+      th.setAttribute("role", "button");
+      th.setAttribute("title", "Click to sort");
+
+      const handleSort = () => {
+        const isCurrentlyAsc = th.classList.contains("sorted-asc");
+        const nextDir = isCurrentlyAsc ? "desc" : "asc";
+        sortTable(table, colIndex, nextDir, true);
+      };
+
+      th.addEventListener("click", handleSort);
+      th.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleSort();
+        }
+      });
+    });
+  });
+}
+
 function renderBookings() {
   rows.replaceChildren();
   const shown = state.bookings.slice(0, state.visible);
@@ -179,6 +417,7 @@ function renderBookings() {
   emptyNote.hidden = state.bookings.length > 0;
   moreButton.hidden = state.bookings.length <= state.visible;
   countLabel.textContent = state.bookings.length ? `(${state.bookings.length})` : "";
+  applyActiveSort(rows.closest("table"));
 }
 
 // ---------- Hotel Analytics dashboard (FR-022) ----------
@@ -238,17 +477,24 @@ function formatPriceTierRange(row) {
 }
 
 function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, byCountry) {
-  metricRevenue.textContent = money.format(summary.total_revenue_dkk);
+  revenueState.roomRevenue = summary.total_revenue_dkk;
+  revenueState.roomBookings = summary.booking_count;
+  renderTopRevenueSummary();
+
+  if (metricRevenue) metricRevenue.textContent = money.format(summary.total_revenue_dkk);
   metricBookings.textContent = number.format(summary.booking_count);
   metricNights.textContent = number.format(summary.nights_sold);
   metricAvailableNights.textContent = number.format(summary.available_room_nights);
   metricOccupancy.textContent = pct(summary.occupancy_rate_pct);
+  if (metricOccupancySub) {
+    metricOccupancySub.textContent = `${number.format(summary.nights_sold)} / ${number.format(summary.available_room_nights)} nights`;
+  }
   if (metricAlos) metricAlos.textContent = `${decimalFmt.format(summary.average_length_of_stay_nights)} nights`;
   if (metricAdr) metricAdr.textContent = money.format(summary.average_daily_rate_dkk);
   if (metricRevPerBooking) metricRevPerBooking.textContent = money.format(summary.average_revenue_per_booking_dkk);
   metricReviews.textContent = number.format(summary.review_count);
   metricSatisfaction.textContent = rating(summary.review_count, summary.average_satisfaction);
-  metricSatisfiedShare.textContent = summary.review_count > 0 ? pct(summary.satisfied_share_pct) : "–";
+  metricSatisfiedShare.textContent = pct(summary.satisfied_share_pct);
 
   roomTypeRows.replaceChildren();
   for (const row of byRoomType) {
@@ -256,7 +502,7 @@ function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, b
     tr.append(
       cell(row.revenue_rank, "num"),
       cell(row.room_type),
-      cell(number.format(row.room_count), "num"),
+      cell(row.room_count, "num"),
       cell(number.format(row.booking_count), "num"),
       cell(number.format(row.nights_sold), "num"),
       cell(number.format(row.available_room_nights), "num"),
@@ -268,7 +514,7 @@ function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, b
       cell(pct(row.revenue_share_pct), "num"),
       cell(number.format(row.review_count), "num"),
       cell(rating(row.review_count, row.average_satisfaction), "num"),
-      cell(row.review_count > 0 ? pct(row.satisfied_share_pct) : "–", "num"),
+      cell(pct(row.satisfied_share_pct), "num"),
     );
     roomTypeRows.append(tr);
   }
@@ -278,7 +524,7 @@ function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, b
     const tr = document.createElement("tr");
     tr.append(
       cell(row.season),
-      cell(number.format(row.season_days), "num"),
+      cell(row.calendar_days, "num"),
       cell(number.format(row.booking_count), "num"),
       cell(number.format(row.nights_sold), "num"),
       cell(number.format(row.available_room_nights), "num"),
@@ -290,24 +536,24 @@ function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, b
       cell(pct(row.revenue_share_pct), "num"),
       cell(number.format(row.review_count), "num"),
       cell(rating(row.review_count, row.average_satisfaction), "num"),
-      cell(row.review_count > 0 ? pct(row.satisfied_share_pct) : "–", "num"),
+      cell(pct(row.satisfied_share_pct), "num"),
     );
     seasonRows.append(tr);
   }
 
   roomTypeSeasonRows.replaceChildren();
-  const byTypeMap = new Map();
-  for (const cellRow of byRoomTypeSeason) {
-    if (!byTypeMap.has(cellRow.room_type)) byTypeMap.set(cellRow.room_type, {});
-    byTypeMap.get(cellRow.room_type)[cellRow.season] = cellRow;
+  const byType = new Map();
+  for (const row of byRoomTypeSeason) {
+    if (!byType.has(row.room_type)) byType.set(row.room_type, {});
+    byType.get(row.room_type)[row.season] = row.revenue_dkk;
   }
-  for (const [roomTypeName, seasonsObj] of byTypeMap.entries()) {
+  for (const [roomType, seasons] of byType.entries()) {
     const tr = document.createElement("tr");
     tr.append(
-      cell(roomTypeName),
-      cell(seasonsObj.low ? money.format(seasonsObj.low.revenue_dkk) : "–", "num"),
-      cell(seasonsObj.mid ? money.format(seasonsObj.mid.revenue_dkk) : "–", "num"),
-      cell(seasonsObj.high ? money.format(seasonsObj.high.revenue_dkk) : "–", "num"),
+      cell(roomType),
+      cell(money.format(seasons.low ?? 0), "num"),
+      cell(money.format(seasons.mid ?? 0), "num"),
+      cell(money.format(seasons.high ?? 0), "num"),
     );
     roomTypeSeasonRows.append(tr);
   }
@@ -327,10 +573,17 @@ function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, b
     countryRows.append(tr);
   }
   countryEmpty.hidden = byCountry.length > 0;
+  applyActiveSort(roomTypeRows.closest("table"));
+  applyActiveSort(seasonRows.closest("table"));
+  applyActiveSort(roomTypeSeasonRows.closest("table"));
+  applyActiveSort(countryRows.closest("table"));
 }
 
 function renderBarAnalytics(barSummary, barByCategory, barByPriceTier, barByDrink) {
-  if (!metricBarRevenue) return;
+  revenueState.barRevenue = barSummary.total_revenue_dkk;
+  revenueState.barUnits = barSummary.units_sold;
+  renderTopRevenueSummary();
+
   metricBarRevenue.textContent = money.format(barSummary.total_revenue_dkk);
   metricBarUnits.textContent = number.format(barSummary.units_sold);
   metricBarDrinks.textContent = number.format(barSummary.drink_count);
@@ -382,6 +635,9 @@ function renderBarAnalytics(barSummary, barByCategory, barByPriceTier, barByDrin
     barDrinkRows.append(tr);
   }
   barDrinkEmpty.hidden = barByDrink.length > 0;
+  applyActiveSort(barCategoryRows.closest("table"));
+  if (barPriceTierRows) applyActiveSort(barPriceTierRows.closest("table"));
+  applyActiveSort(barDrinkRows.closest("table"));
 }
 
 async function loadAnalytics() {
@@ -450,72 +706,87 @@ function onPriceInput(kind) {
   refreshPrice();
 }
 
-/** Fills and locks the field that is not in use with the calculated counterpart of the one that is. */
-function syncPriceFields() {
+/**
+ * Live price preview (FR-018) and cross-fill between total and nightly price (FR-019).
+ *
+ * Runs on every keystroke. Derives season, standard rate and totals directly from the form inputs
+ * through price-preview.js (R15).
+ */
+function refreshPrice() {
   const nights = nightsValue();
-  if (state.priceMode === "total") {
-    const total = amount(totalInput);
-    nightlyInput.value = nights && Number.isFinite(total) ? String(nightlyFromTotal(total, nights)) : "";
-  } else if (state.priceMode === "nightly") {
-    const nightly = amount(nightlyInput);
-    totalInput.value = nights && Number.isFinite(nightly) ? String(totalFromNightly(nightly, nights)) : "";
-  }
-  totalInput.readOnly = state.priceMode === "nightly";
-  nightlyInput.readOnly = state.priceMode === "total";
-  totalInput.classList.toggle("computed", state.priceMode === "nightly");
-  nightlyInput.classList.toggle("computed", state.priceMode === "total");
-  clearPriceButton.hidden = state.priceMode === null;
-}
+  const roomTypeName = form.elements.room_type.value;
+  const checkInDate = form.elements.check_in_date.value;
+  const standard = standardPreview(roomTypeName, checkInDate, nights, state.roomTypes);
 
-/** The price breakdown under the price fields: standard rate, nights and standard total, then the typed price. */
-function renderPreview() {
-  const roomType = state.roomTypes.find((r) => r.name === form.elements.room_type.value);
-  const preview = standardPreview(roomType, form.elements.check_in_date.value, nightsValue());
-  previewBox.replaceChildren();
-  if (!preview) {
-    const note = document.createElement("p");
-    note.className = "preview-empty";
-    note.textContent = "Choose room type, check-in date and nights to see the price.";
-    previewBox.append(note);
+  // Cross-fill the other price field while one is being typed (FR-019).
+  if (state.priceMode === "total") {
+    const nightly = nightlyFromTotal(amount(totalInput), nights);
+    nightlyInput.value = nightly !== null ? nightly : "";
+    totalInput.readOnly = false;
+    nightlyInput.readOnly = true;
+  } else if (state.priceMode === "nightly") {
+    const total = totalFromNightly(amount(nightlyInput), nights);
+    totalInput.value = total !== null ? total : "";
+    totalInput.readOnly = true;
+    nightlyInput.readOnly = false;
+  } else {
+    totalInput.readOnly = false;
+    nightlyInput.readOnly = false;
+  }
+
+  // Preview box below the inputs.
+  if (standard === null) {
+    previewBox.replaceChildren();
+    const p = document.createElement("p");
+    p.className = "preview-empty";
+    p.textContent = "Choose room type, check-in date and nights to preview the price.";
+    previewBox.append(p);
     return;
   }
-  const list = document.createElement("dl");
-  list.className = "preview-list";
-  const line = (label, value, className) => {
-    const row = document.createElement("div");
-    if (className) row.className = className;
-    const term = document.createElement("dt");
-    term.textContent = label;
-    const detail = document.createElement("dd");
-    detail.textContent = value;
-    row.append(term, detail);
-    list.append(row);
+
+  const typedTotal = amount(totalInput);
+  const typedNightly = amount(nightlyInput);
+  const manual = state.priceMode === "total" ? typedTotal : state.priceMode === "nightly" ? typedNightly : null;
+  const usesManual = manual !== null && !Number.isNaN(manual);
+
+  const dl = document.createElement("dl");
+  dl.className = "preview-list";
+
+  const row = (label, value, isTotal = false) => {
+    const div = document.createElement("div");
+    if (isTotal) div.className = "total";
+    const dt = document.createElement("dt");
+    dt.textContent = label;
+    const dd = document.createElement("dd");
+    dd.textContent = value;
+    div.append(dt, dd);
+    return div;
   };
-  const { season, rate } = preview;
-  line("Season", season[0].toUpperCase() + season.slice(1));
-  line("Standard rate per night", money.format(rate.standard_nightly_dkk));
-  line("Nights", number.format(preview.nights));
-  line("Standard total", money.format(preview.total), state.priceMode ? undefined : "total");
-  if (state.priceMode) {
-    const nightly = amount(nightlyInput);
-    const total = amount(totalInput);
-    line("Your price per night", Number.isFinite(nightly) ? money.format(nightly) : "–");
-    line("Your total", Number.isFinite(total) ? money.format(total) : "–", "total");
+
+  dl.append(
+    row("Season", standard.season),
+    row(
+      "Standard rate",
+      `${number.format(standard.standard_nightly_dkk)} DKK / night (${number.format(standard.min_nightly_dkk)}–${number.format(standard.max_nightly_dkk)})`,
+    ),
+  );
+
+  if (usesManual) {
+    const totalDkk = state.priceMode === "total" ? typedTotal : totalFromNightly(typedNightly, nights);
+    const nightlyDkk = state.priceMode === "nightly" ? typedNightly : nightlyFromTotal(typedTotal, nights);
+    dl.append(
+      row("Manual rate", `${number.format(nightlyDkk ?? 0)} DKK / night`),
+      row("Total to pay", money.format(totalDkk ?? 0), true),
+    );
+  } else {
+    dl.append(row("Standard total", money.format(standard.standard_total_dkk), true));
   }
-  const band = document.createElement("p");
-  band.className = "hint";
-  band.textContent =
-    `Allowed per night in ${season} season: ${number.format(rate.min_nightly_dkk)}–` +
-    `${number.format(rate.max_nightly_dkk)} DKK. The server checks the price when you save.`;
-  previewBox.append(list, band);
+
+  previewBox.replaceChildren(dl);
 }
 
-function refreshPrice() {
-  syncPriceFields();
-  renderPreview();
-}
-
-/** Edit mode (FR-020): a banner, another colour scheme for page and form, and a clear way back. */
+/** Edit mode (FR-020): banner on top, warm border around the form, button says "Save changes", cancel button jumps
+back. */
 function setEditMode(on, booking) {
   document.body.classList.toggle("edit-mode", on);
   bannerText.textContent = on
@@ -555,6 +826,8 @@ function resetForm() {
 }
 
 function startEdit(booking) {
+  // If editing from another view, ensure bookings view is open
+  setPrimaryView("bookings");
   state.editingId = booking.id;
   clearErrors();
   for (const name of FIELDS) form.elements[name].value = booking[name] ?? "";
@@ -626,6 +899,21 @@ async function removeBooking(booking) {
 
 // ---------- wiring ----------
 
+if (tabBookings) {
+  tabBookings.addEventListener("click", () => setPrimaryView("bookings"));
+}
+if (tabAnalytics) {
+  tabAnalytics.addEventListener("click", () => setPrimaryView("analytics"));
+}
+if (subtabHotel) {
+  subtabHotel.addEventListener("click", () => setAnalyticsSubView("hotel"));
+}
+if (subtabBar) {
+  subtabBar.addEventListener("click", () => setAnalyticsSubView("bar"));
+}
+
+window.addEventListener("hashchange", handleHashChange);
+
 form.addEventListener("submit", onSubmit);
 cancelButton.addEventListener("click", () => {
   resetForm();
@@ -643,9 +931,6 @@ if (barForm) {
   barForm.addEventListener("change", () => loadAnalytics());
 }
 
-// Another room type or check-in date means another rate band, so a typed price no longer applies: clear it and
-// let the API price the stay. Another number of nights keeps a fixed price per night (the total follows) but
-// not a typed total. In every case the preview follows what is typed.
 for (const name of ["room_type", "check_in_date", "days_rented"]) {
   for (const type of ["input", "change"]) {
     form.elements[name].addEventListener(type, () => {
@@ -668,6 +953,8 @@ bannerCancel.addEventListener("click", () => {
 
 async function init() {
   try {
+    initTableSorting();
+    handleHashChange();
     state.roomTypes = await listRoomTypes();
     renderRoomTypes();
     await reload();

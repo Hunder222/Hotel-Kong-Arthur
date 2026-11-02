@@ -5,6 +5,8 @@
   --muted: #667085;
   --line: #dcd9d0;
   --accent: #1d4e5f;
+  --accent-light: #2a6f87;
+  --accent-dark: #12333e;
   --accent-text: #ffffff;
   --danger: #b42318;
   --ok: #1a6b3a;
@@ -23,9 +25,55 @@ body {
   font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-.page-header { background: var(--accent); color: var(--accent-text); padding: 1rem 1.5rem; }
-.page-header h1 { margin: 0; font-size: 1.4rem; }
-.page-header p { margin: 0; opacity: 0.8; }
+.page-header {
+  background: var(--accent);
+  color: var(--accent-text);
+  padding: 0.75rem 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+.header-content {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.branding h1 { margin: 0; font-size: 1.35rem; }
+.branding p { margin: 0.1rem 0 0; opacity: 0.85; font-size: 0.85rem; }
+
+/* ---------- Top Navigation Tabs (TODOS.md) ---------- */
+.topnav {
+  display: flex;
+  gap: 0.5rem;
+}
+.nav-tab {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  padding: 0.45rem 1.1rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+.nav-tab:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.nav-tab:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.nav-tab.active {
+  background: #ffffff;
+  color: var(--accent-dark);
+  border-color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
 
 main { max-width: 1100px; margin: 0 auto; padding: 1rem; }
 
@@ -49,43 +97,45 @@ input, select {
   background: #fff;
   color: var(--text);
 }
-input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--danger); }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-.hint, .muted { color: var(--muted); font-weight: 400; font-size: 0.8rem; }
-.field-error { color: var(--danger); font-weight: 400; font-size: 0.85rem; min-height: 0; }
-.field-error:empty { display: none; }
-.form-error { margin: 0.75rem 0 0; }
+.hint { margin: 0; color: var(--muted); font-size: 0.8rem; font-weight: normal; }
+.field-error { min-height: 1rem; color: var(--danger); font-size: 0.8rem; }
+input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--danger); background: #fef3f2; }
 
-.actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 button {
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--line);
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--accent);
   border-radius: 6px;
-  background: #fff;
-  color: var(--text);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
   cursor: pointer;
 }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-button.danger { color: var(--danger); border-color: var(--danger); }
-button:disabled { opacity: 0.6; cursor: progress; }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #7aa9ff; outline-offset: 1px; }
+button:hover:not(:disabled) { filter: brightness(1.1); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.secondary { background: transparent; color: var(--text); border-color: var(--line); }
+button.danger { background: transparent; color: var(--danger); border-color: transparent; padding: 0.25rem 0.5rem; }
+button.danger:hover { background: #fee4e2; }
 
-.status { min-height: 1.5rem; margin: 0 0 0.75rem; font-weight: 600; }
+.status { min-height: 1.4rem; margin: 0 0 0.5rem; font-weight: 600; }
 .status.ok { color: var(--ok); }
 .status.error { color: var(--danger); }
 
-.table-wrap { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
-th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
-th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
-.num { text-align: right; }
-td.row-actions { display: flex; gap: 0.35rem; }
-td.row-actions button { padding: 0.2rem 0.55rem; font-size: 0.85rem; }
-tr.editing { background: #ffe9cc; box-shadow: inset 4px 0 0 var(--edit); }
+.table-wrap { overflow-x: auto; margin-top: 0.5rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { padding: 0.45rem 0.6rem; text-align: left; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; background: #faf9f6; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr:hover td { background: #fafaf8; }
+tr.editing td { background: var(--edit-bg); }
+.row-actions { text-align: right; white-space: nowrap; }
 
+.muted { color: var(--muted); font-weight: normal; }
 .visually-hidden {
-  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
 /* ---------- price fields and live preview (FR-018, FR-019) ---------- */
@@ -130,7 +180,97 @@ body.edit-mode #booking-card h2 { color: var(--edit-dark); }
 body.edit-mode #submit-button { background: var(--edit); border-color: var(--edit); }
 body.edit-mode #cancel-button { border-color: var(--edit); color: var(--edit-dark); font-weight: 600; }
 
-/* ---------- Hotel Analytics (FR-022) ---------- */
+/* ---------- Hotel Analytics Top Executive Revenue Overview (TODOS.md) ---------- */
+
+.revenue-overview-card {
+  border-left: 5px solid var(--accent);
+  background: #ffffff;
+}
+
+.revenue-summary-cards {
+  margin: 0.75rem 0 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.highlight-room {
+  background: #f0f7f9;
+  border-color: #b8dbe6;
+}
+.highlight-bar {
+  background: #fdf6ec;
+  border-color: #f7dfbe;
+}
+.highlight-total {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.highlight-total strong {
+  color: #14532d;
+  font-size: 1.45rem;
+}
+
+.metric-sub {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+
+/* ---------- Analytics Sub-Navigation Toggle (TODOS.md) ---------- */
+
+.analytics-subnav-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0 1rem;
+  padding: 0.5rem 0.75rem;
+  background: #ecebe4;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.subnav-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.analytics-subnav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.subnav-btn {
+  background: #ffffff;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.subnav-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+.subnav-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.subnav-btn.active {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+  box-shadow: 0 2px 4px rgba(29, 78, 95, 0.25);
+}
+
+/* ---------- Hotel Analytics Metrics & Tables (FR-022) ---------- */
 
 .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem 1rem; }
 #analytics h3 { margin: 1.25rem 0 0.4rem; font-size: 0.95rem; }
@@ -139,9 +279,137 @@ body.edit-mode #cancel-button { border-color: var(--edit); color: var(--edit-dar
 .metric { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.75rem 1rem; background: #f1f7f9; border: 1px solid #c9dde4; border-radius: 8px; }
 .metric-label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
 .metric strong { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
-#analytics td.num { font-variant-numeric: tabular-nums; }
+#analytics td.num, .bar-card td.num { font-variant-numeric: tabular-nums; }
 
-.bar-section { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 2px solid var(--line); }
 .section-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; }
-.section-header h3 { margin: 0; font-size: 1.02rem; }
+.section-header h2, .section-header h3 { margin: 0; font-size: 1.05rem; }
 .section-header .filters { min-width: 360px; }
+
+/* ---------- Grouped KPI Sections ---------- */
+
+.kpi-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1.25rem 0 1.5rem;
+}
+
+.kpi-group {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.9rem 1.15rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.kpi-group-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.kpi-group-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+
+.kpi-group-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.kpi-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.kpi-group .metric {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.65rem 0.85rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.kpi-group .metric:hover {
+  background: #f1f5f9;
+}
+
+.kpi-group .metric.highlight-room {
+  background: #f0f7f9;
+  border-color: #b8dbe6;
+}
+
+.kpi-group .metric.highlight-occupancy {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.kpi-group .metric.highlight-occupancy strong {
+  color: #166534;
+}
+
+/* ---------- Table Column Sorting ---------- */
+
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  padding-right: 1.4rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+th.sortable:hover {
+  background: #edf3f7;
+  color: var(--accent-dark);
+}
+
+th.sortable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+th.sortable::after {
+  content: "↕";
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.35;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+th.sortable:hover::after {
+  opacity: 0.75;
+}
+
+th.sorted-asc {
+  background: #e1eef3 !important;
+  color: var(--accent-dark);
+}
+
+th.sorted-asc::after {
+  content: "▲";
+  opacity: 1;
+  color: var(--accent);
+}
+
+th.sorted-desc {
+  background: #e1eef3 !important;
+  color: var(--accent-dark);
+}
+
+th.sorted-desc::after {
+  content: "▼";
+  opacity: 1;
+  color: var(--accent);
+}

@@ -28,8 +28,9 @@ constitution is in [`.specify/memory/constitution.md`](.specify/memory/constitut
 You need Docker with Compose v2.
 
 ```bash
-docker compose up --build -d      # db (PostgreSQL), api, frontend, swagger-ui; healthy within about a minute
-docker compose run --rm seed      # optional: load the sample data (1,000 bookings, 500 reviews, 30 drink sales)
+docker compose up --build -d           # db (PostgreSQL), api, frontend, swagger-ui; healthy within about a minute
+docker compose run --rm seed           # Option A: load teacher sample data (1,000 bookings, ~6.9% occupancy)
+docker compose run --rm seed-realistic # Option B: load realistic full-year operations (~18,000 bookings, ~75% occupancy)
 ```
 
 | What | URL |

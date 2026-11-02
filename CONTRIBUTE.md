@@ -14,11 +14,12 @@ How to set up, run, test and change the system. For what the system is and how i
 ## 2. Run the system
 
 ```bash
-docker compose up --build -d      # db (PostgreSQL 17), api, frontend, swagger-ui
-docker compose ps                 # db, api, frontend should be "healthy"
-docker compose run --rm seed      # optional: load the sample data (1,000 bookings, 500 reviews, 30 drink sales)
-docker compose logs -f api        # follow the API logs
-docker compose down               # stop (keeps the data)
+docker compose up --build -d           # db (PostgreSQL 17), api, frontend, swagger-ui
+docker compose ps                      # db, api, frontend should be "healthy"
+docker compose run --rm seed           # seed A: teacher sample data (1,000 bookings, 500 reviews, 30 drink sales)
+docker compose run --rm seed-realistic # seed B: realistic full year (18,000 bookings, 5,500 reviews, 75% occupancy)
+docker compose logs -f api             # follow the API logs
+docker compose down                    # stop (keeps the data)
 ```
 
 | What | URL |

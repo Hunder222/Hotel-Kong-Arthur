@@ -2,7 +2,7 @@
 
 Research R15 keeps business rules out of the browser; the price preview is the one deliberate mirror. The API
 re-derives everything when a booking is saved, so this test only guards that the preview cannot show a season
-the server would not use.
+the server would not use. Also guards frontend accessibility attributes and structure for tabs.
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ pytestmark = pytest.mark.architecture
 
 REPO_ROOT = Path(__file__).resolve().parents[3]  # /repo, also in the tests container
 PRICE_PREVIEW = REPO_ROOT / "frontend" / "public" / "price-preview.js"
+INDEX_HTML = REPO_ROOT / "frontend" / "public" / "index.html"
+APP_JS = REPO_ROOT / "frontend" / "public" / "app.js"
 
 
 def test_the_frontend_season_table_matches_seasons_py():
@@ -33,3 +35,22 @@ def test_only_price_preview_js_knows_the_season_table():
     for name in ("app.js", "api.js"):
         text = (REPO_ROOT / "frontend" / "public" / name).read_text(encoding="utf-8")
         assert "SEASON_BY_MONTH =" not in text and '"low", "low"' not in text, f"{name} duplicates the season table"
+
+
+def test_frontend_navigation_accessibility_structure():
+    """Phase 9: Check semantic tabs, aria attributes and panels in index.html and app.js (T072)."""
+    html = INDEX_HTML.read_text(encoding="utf-8")
+    assert 'role="tablist"' in html
+    assert 'role="tab"' in html
+    assert 'role="tabpanel"' in html
+    assert 'id="tab-bookings"' in html and 'aria-controls="view-bookings"' in html
+    assert 'id="tab-analytics"' in html and 'aria-controls="view-analytics"' in html
+    assert 'id="subtab-hotel"' in html and 'aria-controls="analytics-subview-hotel"' in html
+    assert 'id="subtab-bar"' in html and 'aria-controls="analytics-subview-bar"' in html
+    assert 'id="metric-top-total-revenue"' in html
+
+    app_js = APP_JS.read_text(encoding="utf-8")
+    assert "setPrimaryView" in app_js
+    assert "setAnalyticsSubView" in app_js
+    assert "renderTopRevenueSummary" in app_js
+    assert "aria-selected" in app_js

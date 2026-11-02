@@ -9,311 +9,434 @@
 </head>
 <body>
   <header class="page-header">
-    <h1>Hotel Kong Arthur</h1>
-    <p>Bookings for reception and hotel analytics</p>
+    <div class="header-content">
+      <div class="branding">
+        <h1>Hotel Kong Arthur</h1>
+        <p>Operations &amp; Analytics Platform</p>
+      </div>
+      <nav class="topnav" role="tablist" aria-label="Main Navigation">
+        <button type="button" class="nav-tab active" role="tab" id="tab-bookings" aria-selected="true" aria-controls="view-bookings">
+          Bookings
+        </button>
+        <button type="button" class="nav-tab" role="tab" id="tab-analytics" aria-selected="false" aria-controls="view-analytics">
+          Hotel Analytics
+        </button>
+      </nav>
+    </div>
   </header>
 
   <main>
     <p id="status" class="status" role="status" aria-live="polite"></p>
 
-    <section class="card" id="booking-card" aria-labelledby="form-title">
-      <div class="edit-banner" role="status" aria-live="polite">
-        <span class="edit-badge">Edit mode</span>
-        <span id="edit-banner-text"></span>
-        <button type="button" id="banner-cancel" class="banner-cancel">Cancel edit</button>
-      </div>
-      <h2 id="form-title">New booking</h2>
-      <form id="booking-form" novalidate>
-        <div class="grid">
-          <label>First name
-            <input name="first_name" autocomplete="off" maxlength="100">
-            <span class="field-error" data-error-for="first_name"></span>
-          </label>
-          <label>Family name
-            <input name="family_name" autocomplete="off" maxlength="100">
-            <span class="field-error" data-error-for="family_name"></span>
-          </label>
-          <label>Country
-            <input name="country" autocomplete="off" maxlength="100">
-            <span class="field-error" data-error-for="country"></span>
-          </label>
-          <label>Room type
-            <select name="room_type"></select>
-            <span class="hint" id="rate-hint"></span>
-            <span class="field-error" data-error-for="room_type"></span>
-          </label>
-          <label>Check-in date
-            <input name="check_in_date" type="date" min="2000-01-01" max="2100-12-31">
-            <span class="field-error" data-error-for="check_in_date"></span>
-          </label>
-          <label>Nights
-            <input name="days_rented" type="number" min="1" max="365" step="1" inputmode="numeric">
-            <span class="field-error" data-error-for="days_rented"></span>
-          </label>
+    <!-- VIEW 1: RECEPTIONIST BOOKINGS MANAGEMENT -->
+    <div id="view-bookings" role="tabpanel" aria-labelledby="tab-bookings">
+      <section class="card" id="booking-card" aria-labelledby="form-title">
+        <div class="edit-banner" role="status" aria-live="polite">
+          <span class="edit-badge">Edit mode</span>
+          <span id="edit-banner-text"></span>
+          <button type="button" id="banner-cancel" class="banner-cancel">Cancel edit</button>
         </div>
-
-        <fieldset class="price-box">
-          <legend>Price</legend>
+        <h2 id="form-title">New booking</h2>
+        <form id="booking-form" novalidate>
           <div class="grid">
-            <label>Total price (DKK)
-              <input name="price_dkk" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Standard price">
-              <span class="field-error" data-error-for="price_dkk"></span>
+            <label>First name
+              <input name="first_name" autocomplete="off" maxlength="100">
+              <span class="field-error" data-error-for="first_name"></span>
             </label>
-            <label>Price per night (DKK)
-              <input name="price_per_night_dkk" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Standard rate">
-              <span class="field-error" data-error-for="price_per_night_dkk"></span>
+            <label>Family name
+              <input name="family_name" autocomplete="off" maxlength="100">
+              <span class="field-error" data-error-for="family_name"></span>
+            </label>
+            <label>Country
+              <input name="country" autocomplete="off" maxlength="100">
+              <span class="field-error" data-error-for="country"></span>
+            </label>
+            <label>Room type
+              <select name="room_type"></select>
+              <span class="hint" id="rate-hint"></span>
+              <span class="field-error" data-error-for="room_type"></span>
+            </label>
+            <label>Check-in date
+              <input name="check_in_date" type="date" min="2000-01-01" max="2100-12-31">
+              <span class="field-error" data-error-for="check_in_date"></span>
+            </label>
+            <label>Nights
+              <input name="days_rented" type="number" min="1" max="365" step="1" inputmode="numeric">
+              <span class="field-error" data-error-for="days_rented"></span>
             </label>
           </div>
-          <p class="hint">Leave both empty for the standard price. Fill in one of them and the other is calculated.
-            <button type="button" id="clear-price" class="link" hidden>Use standard price</button></p>
-          <div id="price-preview" class="price-preview" aria-live="polite"></div>
-        </fieldset>
-        <p class="field-error form-error" data-error-for="_form"></p>
-        <div class="actions">
-          <button type="submit" id="submit-button" class="primary">Create booking</button>
-          <button type="button" id="cancel-button" hidden>Cancel edit</button>
+
+          <fieldset class="price-box">
+            <legend>Price (DKK)</legend>
+            <div class="grid">
+              <label>Total price
+                <input name="price_dkk" type="number" min="0" step="0.01" inputmode="decimal">
+                <span class="field-error" data-error-for="price_dkk"></span>
+              </label>
+              <label>Price per night
+                <input name="price_per_night_dkk" type="number" min="0" step="0.01" inputmode="decimal">
+                <span class="field-error" data-error-for="price_per_night_dkk"></span>
+              </label>
+            </div>
+            <p class="hint">
+              Leave both empty for the room type's standard price.
+              <button type="button" id="clear-price" class="link">Reset to standard</button>
+            </p>
+            <div id="price-preview" class="price-preview" aria-live="polite"></div>
+          </fieldset>
+
+          <p class="field-error" data-error-for="_form"></p>
+          <div class="actions">
+            <button type="submit" id="submit-button">Create booking</button>
+            <button type="button" id="cancel-button" class="secondary" hidden>Cancel</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card" id="booking-list" aria-labelledby="list-title">
+        <h2 id="list-title">Bookings <span id="count" class="muted"></span></h2>
+        <div class="table-wrap">
+          <table>
+            <caption class="visually-hidden">Bookings, newest first</caption>
+            <thead>
+              <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Guest</th>
+                <th scope="col">Country</th>
+                <th scope="col">Room type</th>
+                <th scope="col">Check-in</th>
+                <th scope="col" class="num">Nights</th>
+                <th scope="col">Season</th>
+                <th scope="col" class="num">Price</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="booking-rows"></tbody>
+          </table>
         </div>
-      </form>
-    </section>
+        <p id="empty" class="muted" hidden>No bookings yet.</p>
+        <button type="button" id="more-button" hidden>Show more</button>
+      </section>
+    </div>
 
-    <section class="card" aria-labelledby="list-title">
-      <h2 id="list-title">Bookings <span id="count" class="muted"></span></h2>
-      <div class="table-wrap">
-        <table>
-          <caption class="visually-hidden">Bookings, newest first</caption>
-          <thead>
-            <tr>
-              <th scope="col">ID</th>
-              <th scope="col">Guest</th>
-              <th scope="col">Country</th>
-              <th scope="col">Room type</th>
-              <th scope="col">Check-in</th>
-              <th scope="col" class="num">Nights</th>
-              <th scope="col">Season</th>
-              <th scope="col" class="num">Price</th>
-              <th scope="col"><span class="visually-hidden">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody id="booking-rows"></tbody>
-        </table>
-      </div>
-      <p id="empty" class="muted" hidden>No bookings yet.</p>
-      <button type="button" id="more-button" hidden>Show more</button>
-    </section>
-
-    <section class="card" id="analytics" aria-labelledby="analytics-title">
-      <h2 id="analytics-title">Hotel Analytics <span class="muted">revenue, occupancy, satisfaction &amp; bar sales calculated by the API</span></h2>
-      <form id="analytics-filters" class="filters" aria-label="Analytics filters">
-        <label>Year
-          <select name="year"><option value="">All years</option></select>
-        </label>
-        <label>Season
-          <select name="season">
-            <option value="">All seasons</option>
-            <option value="low">Low</option>
-            <option value="mid">Mid</option>
-            <option value="high">High</option>
-          </select>
-        </label>
-        <label>Room type
-          <select name="room_type"><option value="">All room types</option></select>
-        </label>
-        <label>Country
-          <select name="country"><option value="">All countries</option></select>
-        </label>
-      </form>
-      <p id="analytics-status" class="status" role="status" aria-live="polite"></p>
-
-      <div class="metric-cards">
-        <div class="metric"><span class="metric-label">Total revenue</span><strong id="metric-revenue">–</strong></div>
-        <div class="metric"><span class="metric-label">Bookings</span><strong id="metric-bookings">–</strong></div>
-        <div class="metric"><span class="metric-label">Nights sold</span><strong id="metric-nights">–</strong></div>
-        <div class="metric"><span class="metric-label">Available room-nights</span><strong id="metric-available-nights">–</strong></div>
-        <div class="metric"><span class="metric-label">Occupancy rate</span><strong id="metric-occupancy">–</strong></div>
-        <div class="metric"><span class="metric-label">Avg. stay (ALOS)</span><strong id="metric-alos">–</strong></div>
-        <div class="metric"><span class="metric-label">Avg. daily rate (ADR)</span><strong id="metric-adr">–</strong></div>
-        <div class="metric"><span class="metric-label">Avg. rev. / booking</span><strong id="metric-rev-per-booking">–</strong></div>
-        <div class="metric"><span class="metric-label">Guest reviews</span><strong id="metric-reviews">–</strong></div>
-        <div class="metric"><span class="metric-label">Avg. satisfaction</span><strong id="metric-satisfaction">–</strong></div>
-        <div class="metric"><span class="metric-label">Satisfied share (4–5)</span><strong id="metric-satisfied-share">–</strong></div>
-      </div>
-
-      <h3>Revenue, occupancy, stay metrics and satisfaction by room type</h3>
-      <div class="table-wrap">
-        <table>
-          <caption class="visually-hidden">KPIs by room type, ranked by revenue</caption>
-          <thead>
-            <tr>
-              <th scope="col" class="num">Rank</th>
-              <th scope="col">Room type</th>
-              <th scope="col" class="num">Rooms</th>
-              <th scope="col" class="num">Bookings</th>
-              <th scope="col" class="num">Nights</th>
-              <th scope="col" class="num">Avail. nights</th>
-              <th scope="col" class="num">Occupancy</th>
-              <th scope="col" class="num">ALOS</th>
-              <th scope="col" class="num">ADR</th>
-              <th scope="col" class="num">Rev. / booking</th>
-              <th scope="col" class="num">Revenue</th>
-              <th scope="col" class="num">Share</th>
-              <th scope="col" class="num">Reviews</th>
-              <th scope="col" class="num">Satisfaction</th>
-              <th scope="col" class="num">Satisfied</th>
-            </tr>
-          </thead>
-          <tbody id="room-type-rows"></tbody>
-        </table>
-      </div>
-
-      <h3>Revenue, occupancy, stay metrics and satisfaction by season</h3>
-      <div class="table-wrap">
-        <table>
-          <caption class="visually-hidden">KPIs by season</caption>
-          <thead>
-            <tr>
-              <th scope="col">Season</th>
-              <th scope="col" class="num">Days</th>
-              <th scope="col" class="num">Bookings</th>
-              <th scope="col" class="num">Nights</th>
-              <th scope="col" class="num">Avail. nights</th>
-              <th scope="col" class="num">Occupancy</th>
-              <th scope="col" class="num">ALOS</th>
-              <th scope="col" class="num">ADR</th>
-              <th scope="col" class="num">Rev. / booking</th>
-              <th scope="col" class="num">Revenue</th>
-              <th scope="col" class="num">Share</th>
-              <th scope="col" class="num">Reviews</th>
-              <th scope="col" class="num">Satisfaction</th>
-              <th scope="col" class="num">Satisfied</th>
-            </tr>
-          </thead>
-          <tbody id="season-rows"></tbody>
-        </table>
-      </div>
-
-      <h3>Revenue by room type and season</h3>
-      <div class="table-wrap">
-        <table>
-          <caption class="visually-hidden">Revenue by room type and season</caption>
-          <thead>
-            <tr>
-              <th scope="col">Room type</th>
-              <th scope="col" class="num">Low</th>
-              <th scope="col" class="num">Mid</th>
-              <th scope="col" class="num">High</th>
-            </tr>
-          </thead>
-          <tbody id="room-type-season-rows"></tbody>
-        </table>
-      </div>
-
-      <h3>Guest origin and revenue by country</h3>
-      <div class="table-wrap">
-        <table>
-          <caption class="visually-hidden">Guest origin and revenue by country, ranked by revenue</caption>
-          <thead>
-            <tr>
-              <th scope="col" class="num">Rank</th>
-              <th scope="col">Country</th>
-              <th scope="col" class="num">Bookings</th>
-              <th scope="col" class="num">Booking share</th>
-              <th scope="col" class="num">Nights</th>
-              <th scope="col" class="num">Revenue</th>
-              <th scope="col" class="num">Revenue share</th>
-            </tr>
-          </thead>
-          <tbody id="country-rows"></tbody>
-        </table>
-      </div>
-      <p id="country-empty" class="muted" hidden>No bookings match these filters.</p>
-
-      <div class="bar-section">
+    <!-- VIEW 2: HOTEL & BAR ANALYTICS -->
+    <div id="view-analytics" role="tabpanel" aria-labelledby="tab-analytics" hidden>
+      <!-- Top Combined Revenue Summary (TODOS.md) -->
+      <section class="card revenue-overview-card" aria-labelledby="overview-title">
         <div class="section-header">
-          <h3>Cocktail bar analytics <span class="muted">Helene Christine’s lobby bar sales &amp; price-tier demand (B1–B3, A7)</span></h3>
-          <form id="bar-filters" class="filters" aria-label="Bar analytics filters">
-            <label>Category
-              <select name="category">
-                <option value="">All categories</option>
-                <option value="Cocktail">Cocktail</option>
-                <option value="Coffee">Coffee</option>
+          <h2 id="overview-title">Executive Revenue Overview <span class="muted">Total hotel turnover across operations</span></h2>
+        </div>
+        <div class="metric-cards revenue-summary-cards">
+          <div class="metric highlight-room">
+            <span class="metric-label">Room Bookings Revenue</span>
+            <strong id="metric-top-room-revenue">–</strong>
+            <span class="metric-sub" id="metric-top-room-sub">0 bookings</span>
+          </div>
+          <div class="metric highlight-bar">
+            <span class="metric-label">Bar Sales Revenue</span>
+            <strong id="metric-top-bar-revenue">–</strong>
+            <span class="metric-sub" id="metric-top-bar-sub">0 units sold</span>
+          </div>
+          <div class="metric highlight-total">
+            <span class="metric-label">Combined Total Revenue</span>
+            <strong id="metric-top-total-revenue">–</strong>
+            <span class="metric-sub">Rooms + Cocktail Bar</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Subnav switch between Room Booking Analytics and Bar Sales Analytics (TODOS.md) -->
+      <nav class="analytics-subnav-container" aria-label="Analytics Domain Switch">
+        <span class="subnav-title">Select Analytics View:</span>
+        <div class="analytics-subnav" role="tablist">
+          <button type="button" class="subnav-btn active" role="tab" id="subtab-hotel" aria-selected="true" aria-controls="analytics-subview-hotel">
+            Room Booking Analytics
+          </button>
+          <button type="button" class="subnav-btn" role="tab" id="subtab-bar" aria-selected="false" aria-controls="analytics-subview-bar">
+            Bar Sales Analytics
+          </button>
+        </div>
+      </nav>
+
+      <!-- SUBVIEW 1: ROOM BOOKINGS ANALYTICS -->
+      <div id="analytics-subview-hotel" role="tabpanel" aria-labelledby="subtab-hotel">
+        <section class="card" id="analytics" aria-labelledby="analytics-title">
+          <h2 id="analytics-title">Room Bookings Analytics <span class="muted">revenue, occupancy &amp; guest satisfaction calculated by the API</span></h2>
+          <form id="analytics-filters" class="filters" aria-label="Analytics filters">
+            <label>Year
+              <select name="year"><option value="">All years</option></select>
+            </label>
+            <label>Season
+              <select name="season">
+                <option value="">All seasons</option>
+                <option value="low">Low</option>
+                <option value="mid">Mid</option>
+                <option value="high">High</option>
               </select>
             </label>
-            <label>Price tier
-              <select name="price_tier">
-                <option value="">All price tiers</option>
-                <option value="budget">Budget (&lt; 70 DKK)</option>
-                <option value="standard">Standard (70–109.99 DKK)</option>
-                <option value="premium">Premium (≥ 110 DKK)</option>
-              </select>
+            <label>Room type
+              <select name="room_type"><option value="">All room types</option></select>
+            </label>
+            <label>Country
+              <select name="country"><option value="">All countries</option></select>
             </label>
           </form>
-        </div>
+          <p id="analytics-status" class="status" role="status" aria-live="polite"></p>
 
-        <div class="metric-cards">
-          <div class="metric"><span class="metric-label">Bar revenue</span><strong id="metric-bar-revenue">–</strong></div>
-          <div class="metric"><span class="metric-label">Units sold</span><strong id="metric-bar-units">–</strong></div>
-          <div class="metric"><span class="metric-label">Drinks on menu</span><strong id="metric-bar-drinks">–</strong></div>
-        </div>
+          <div class="kpi-groups">
+            <!-- Group 1: Occupancy & Volume -->
+            <div class="kpi-group">
+              <div class="kpi-group-header">
+                <h3 class="kpi-group-title">Occupancy &amp; Volume</h3>
+                <span class="kpi-group-desc">Capacity, bookings &amp; room-nights</span>
+              </div>
+              <div class="kpi-group-grid">
+                <div class="metric">
+                  <span class="metric-label">Bookings</span>
+                  <strong id="metric-bookings">–</strong>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Nights sold</span>
+                  <strong id="metric-nights">–</strong>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Available room-nights</span>
+                  <strong id="metric-available-nights">–</strong>
+                </div>
+                <div class="metric highlight-occupancy">
+                  <span class="metric-label">Occupancy rate</span>
+                  <strong id="metric-occupancy">–</strong>
+                  <span class="metric-sub" id="metric-occupancy-sub">–</span>
+                </div>
+              </div>
+            </div>
 
-        <h3>Cocktail vs. coffee split</h3>
-        <div class="table-wrap">
-          <table>
-            <caption class="visually-hidden">Bar sales split by drink category</caption>
-            <thead>
-              <tr>
-                <th scope="col">Category</th>
-                <th scope="col" class="num">Drinks</th>
-                <th scope="col" class="num">Units sold</th>
-                <th scope="col" class="num">Unit share</th>
-                <th scope="col" class="num">Revenue</th>
-                <th scope="col" class="num">Revenue share</th>
-              </tr>
-            </thead>
-            <tbody id="bar-category-rows"></tbody>
-          </table>
-        </div>
+            <!-- Group 2: Stay & Pricing Efficiency -->
+            <div class="kpi-group">
+              <div class="kpi-group-header">
+                <h3 class="kpi-group-title">Stay &amp; Pricing Efficiency</h3>
+                <span class="kpi-group-desc">Length of stay &amp; pricing yield</span>
+              </div>
+              <div class="kpi-group-grid">
+                <div class="metric">
+                  <span class="metric-label">Avg. stay (ALOS)</span>
+                  <strong id="metric-alos">–</strong>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Avg. daily rate (ADR)</span>
+                  <strong id="metric-adr">–</strong>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Avg. rev. / booking</span>
+                  <strong id="metric-rev-per-booking">–</strong>
+                </div>
+              </div>
+            </div>
 
-        <h3>Demand and revenue by price tier</h3>
-        <div class="table-wrap">
-          <table>
-            <caption class="visually-hidden">Bar demand and revenue split by price tier</caption>
-            <thead>
-              <tr>
-                <th scope="col">Price tier</th>
-                <th scope="col">Unit price range</th>
-                <th scope="col" class="num">Drinks</th>
-                <th scope="col" class="num">Units sold</th>
-                <th scope="col" class="num">Unit share</th>
-                <th scope="col" class="num">Revenue</th>
-                <th scope="col" class="num">Revenue share</th>
-              </tr>
-            </thead>
-            <tbody id="bar-price-tier-rows"></tbody>
-          </table>
-        </div>
+            <!-- Group 3: Guest Satisfaction -->
+            <div class="kpi-group">
+              <div class="kpi-group-header">
+                <h3 class="kpi-group-title">Guest Satisfaction</h3>
+                <span class="kpi-group-desc">Reviews &amp; rating distribution</span>
+              </div>
+              <div class="kpi-group-grid">
+                <div class="metric">
+                  <span class="metric-label">Guest reviews</span>
+                  <strong id="metric-reviews">–</strong>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Avg. satisfaction</span>
+                  <strong id="metric-satisfaction">–</strong>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Satisfied share (4–5)</span>
+                  <strong id="metric-satisfied-share">–</strong>
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <h3>Revenue and popularity per drink</h3>
-        <div class="table-wrap">
-          <table>
-            <caption class="visually-hidden">Drink sales ranked by revenue</caption>
-            <thead>
-              <tr>
-                <th scope="col" class="num">Rev. rank</th>
-                <th scope="col">Drink</th>
-                <th scope="col">Category</th>
-                <th scope="col">Price tier</th>
-                <th scope="col" class="num">Unit price</th>
-                <th scope="col" class="num">Units sold</th>
-                <th scope="col" class="num">Units rank</th>
-                <th scope="col" class="num">Revenue</th>
-              </tr>
-            </thead>
-            <tbody id="bar-drink-rows"></tbody>
-          </table>
-        </div>
-        <p id="bar-drink-empty" class="muted" hidden>No drink sales match these filters.</p>
+          <h3>Revenue, occupancy, stay metrics and satisfaction by room type</h3>
+          <div class="table-wrap">
+            <table>
+              <caption class="visually-hidden">KPIs by room type, ranked by revenue</caption>
+              <thead>
+                <tr>
+                  <th scope="col" class="num">Rank</th>
+                  <th scope="col">Room type</th>
+                  <th scope="col" class="num">Rooms</th>
+                  <th scope="col" class="num">Bookings</th>
+                  <th scope="col" class="num">Nights</th>
+                  <th scope="col" class="num">Avail. nights</th>
+                  <th scope="col" class="num">Occupancy</th>
+                  <th scope="col" class="num">ALOS</th>
+                  <th scope="col" class="num">ADR</th>
+                  <th scope="col" class="num">Rev. / booking</th>
+                  <th scope="col" class="num">Revenue</th>
+                  <th scope="col" class="num">Share</th>
+                  <th scope="col" class="num">Reviews</th>
+                  <th scope="col" class="num">Satisfaction</th>
+                  <th scope="col" class="num">Satisfied</th>
+                </tr>
+              </thead>
+              <tbody id="room-type-rows"></tbody>
+            </table>
+          </div>
+
+          <h3>Revenue, occupancy, stay metrics and satisfaction by season</h3>
+          <div class="table-wrap">
+            <table>
+              <caption class="visually-hidden">KPIs by season</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Season</th>
+                  <th scope="col" class="num">Days</th>
+                  <th scope="col" class="num">Bookings</th>
+                  <th scope="col" class="num">Nights</th>
+                  <th scope="col" class="num">Avail. nights</th>
+                  <th scope="col" class="num">Occupancy</th>
+                  <th scope="col" class="num">ALOS</th>
+                  <th scope="col" class="num">ADR</th>
+                  <th scope="col" class="num">Rev. / booking</th>
+                  <th scope="col" class="num">Revenue</th>
+                  <th scope="col" class="num">Share</th>
+                  <th scope="col" class="num">Reviews</th>
+                  <th scope="col" class="num">Satisfaction</th>
+                  <th scope="col" class="num">Satisfied</th>
+                </tr>
+              </thead>
+              <tbody id="season-rows"></tbody>
+            </table>
+          </div>
+
+          <h3>Revenue by room type and season</h3>
+          <div class="table-wrap">
+            <table>
+              <caption class="visually-hidden">Revenue by room type and season</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Room type</th>
+                  <th scope="col" class="num">Low</th>
+                  <th scope="col" class="num">Mid</th>
+                  <th scope="col" class="num">High</th>
+                </tr>
+              </thead>
+              <tbody id="room-type-season-rows"></tbody>
+            </table>
+          </div>
+
+          <h3>Guest origin and revenue by country</h3>
+          <div class="table-wrap">
+            <table>
+              <caption class="visually-hidden">Guest origin and revenue by country, ranked by revenue</caption>
+              <thead>
+                <tr>
+                  <th scope="col" class="num">Rank</th>
+                  <th scope="col">Country</th>
+                  <th scope="col" class="num">Bookings</th>
+                  <th scope="col" class="num">Booking share</th>
+                  <th scope="col" class="num">Nights</th>
+                  <th scope="col" class="num">Revenue</th>
+                  <th scope="col" class="num">Revenue share</th>
+                </tr>
+              </thead>
+              <tbody id="country-rows"></tbody>
+            </table>
+          </div>
+          <p id="country-empty" class="muted" hidden>No bookings match these filters.</p>
+        </section>
       </div>
-    </section>
+
+      <!-- SUBVIEW 2: COCKTAIL BAR SALES ANALYTICS -->
+      <div id="analytics-subview-bar" role="tabpanel" aria-labelledby="subtab-bar" hidden>
+        <section class="card bar-card" aria-labelledby="bar-title">
+          <div class="section-header">
+            <h2 id="bar-title">Cocktail Bar Sales Analytics <span class="muted">Helene Christine’s lobby bar sales &amp; price-tier demand (B1–B3, A7)</span></h2>
+            <form id="bar-filters" class="filters" aria-label="Bar analytics filters">
+              <label>Category
+                <select name="category">
+                  <option value="">All categories</option>
+                  <option value="Cocktail">Cocktail</option>
+                  <option value="Coffee">Coffee</option>
+                </select>
+              </label>
+              <label>Price tier
+                <select name="price_tier">
+                  <option value="">All price tiers</option>
+                  <option value="budget">Budget (&lt; 70 DKK)</option>
+                  <option value="standard">Standard (70–109.99 DKK)</option>
+                  <option value="premium">Premium (≥ 110 DKK)</option>
+                </select>
+              </label>
+            </form>
+          </div>
+
+          <div class="metric-cards">
+            <div class="metric"><span class="metric-label">Bar revenue</span><strong id="metric-bar-revenue">–</strong></div>
+            <div class="metric"><span class="metric-label">Units sold</span><strong id="metric-bar-units">–</strong></div>
+            <div class="metric"><span class="metric-label">Drinks on menu</span><strong id="metric-bar-drinks">–</strong></div>
+          </div>
+
+          <h3>Cocktail vs. coffee split</h3>
+          <div class="table-wrap">
+            <table>
+              <caption class="visually-hidden">Bar sales split by drink category</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Category</th>
+                  <th scope="col" class="num">Drinks</th>
+                  <th scope="col" class="num">Units sold</th>
+                  <th scope="col" class="num">Unit share</th>
+                  <th scope="col" class="num">Revenue</th>
+                  <th scope="col" class="num">Revenue share</th>
+                </tr>
+              </thead>
+              <tbody id="bar-category-rows"></tbody>
+            </table>
+          </div>
+
+          <h3>Demand and revenue by price tier</h3>
+          <div class="table-wrap">
+            <table>
+              <caption class="visually-hidden">Bar demand and revenue split by price tier</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Price tier</th>
+                  <th scope="col">Unit price range</th>
+                  <th scope="col" class="num">Drinks</th>
+                  <th scope="col" class="num">Units sold</th>
+                  <th scope="col" class="num">Unit share</th>
+                  <th scope="col" class="num">Revenue</th>
+                  <th scope="col" class="num">Revenue share</th>
+                </tr>
+              </thead>
+              <tbody id="bar-price-tier-rows"></tbody>
+            </table>
+          </div>
+
+          <h3>Revenue and popularity per drink</h3>
+          <div class="table-wrap">
+            <table>
+              <caption class="visually-hidden">Drink sales ranked by revenue</caption>
+              <thead>
+                <tr>
+                  <th scope="col" class="num">Rev. rank</th>
+                  <th scope="col">Drink</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Price tier</th>
+                  <th scope="col" class="num">Unit price</th>
+                  <th scope="col" class="num">Units sold</th>
+                  <th scope="col" class="num">Units rank</th>
+                  <th scope="col" class="num">Revenue</th>
+                </tr>
+              </thead>
+              <tbody id="bar-drink-rows"></tbody>
+            </table>
+          </div>
+          <p id="bar-drink-empty" class="muted" hidden>No drink sales match these filters.</p>
+        </section>
+      </div>
+    </div>
   </main>
 
   <script type="module" src="app.js"></script>

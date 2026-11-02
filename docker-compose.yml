@@ -72,7 +72,7 @@ services:
     ports:
       - "8081:8080"
 
-  # `docker compose run --rm seed`: idempotent reset/replace with the sample data (R13).
+  # `docker compose run --rm seed`: idempotent reset/replace with the teacher sample data (1,000 bookings, R13).
   seed:
     profiles: ["tools"]
     build:
@@ -84,6 +84,23 @@ services:
       SAMPLE_DATA_DIR: /repo/context/teacher
     volumes:
       - ./context/teacher:/repo/context/teacher:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # `docker compose run --rm seed-realistic`: realistic full-year operations (Copenhagen 72% occupancy, ~115M DKK revenue).
+  seed-realistic:
+    profiles: ["tools"]
+    build:
+      context: ./backend
+      target: runtime
+    command: ["python", "-m", "hotel_api.presentation.cli.seed_realistic"]
+    environment:
+      <<: *db-env
+      SAMPLE_DATA_DIR: /repo/context/teacher
+    volumes:
+      - ./context/teacher:/repo/context/teacher:ro
+      - ./backend/src/hotel_api:/app/src/hotel_api:ro
     depends_on:
       db:
         condition: service_healthy
