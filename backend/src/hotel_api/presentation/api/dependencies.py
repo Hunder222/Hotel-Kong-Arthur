@@ -12,7 +12,15 @@ from typing import Annotated
 from fastapi import Depends, Query
 from fastapi.exceptions import RequestValidationError
 
-from hotel_api.business.domain.models import ROOM_TYPE_NAMES, HotelFilters, ReportYear, Season
+from hotel_api.business.domain.models import (
+    ROOM_TYPE_NAMES,
+    BarFilters,
+    DrinkCategory,
+    HotelFilters,
+    PriceTier,
+    ReportYear,
+    Season,
+)
 from hotel_api.business.services.bar_service import BarService
 from hotel_api.business.services.booking_service import BookingService
 from hotel_api.business.services.health_service import HealthService
@@ -39,7 +47,6 @@ def get_review_service() -> ReviewService:
 
 def get_bar_service() -> BarService:
     raise NotImplementedError("bound by the composition root (main.py)")
-
 
 
 def get_kpi_service() -> KpiService:
@@ -90,3 +97,21 @@ def hotel_filters(
     country: str | None = Depends(country_filter),
 ) -> HotelFilters:
     return HotelFilters(year=year, season=season, room_type=room_type, country=country)
+
+
+def category_filter(category: DrinkCategory | None = None) -> DrinkCategory | None:
+    """`category` is validated against the enum (Cocktail, Coffee) by FastAPI."""
+    return category
+
+
+def price_tier_filter(price_tier: PriceTier | None = None) -> PriceTier | None:
+    """`price_tier` is validated against the enum (budget, standard, premium) by FastAPI."""
+    return price_tier
+
+
+def bar_filters(
+    year: ReportYear = Depends(report_year),
+    category: DrinkCategory | None = Depends(category_filter),
+    price_tier: PriceTier | None = Depends(price_tier_filter),
+) -> BarFilters:
+    return BarFilters(year=year, category=category, price_tier=price_tier)

@@ -69,3 +69,16 @@ export function getHotelKpis(kind, filters = {}) {
     r && r.items !== undefined ? r.items : r,
   );
 }
+
+/** Cocktail bar KPI summary (`GET /api/v1/kpis/bar/summary`). */
+export const getBarSummary = (filters = {}) => request("GET", `/kpis/bar/summary${queryString(filters)}`);
+
+/**
+ * Cocktail bar KPI breakdowns calculated by the API (`Hotel Analytics`). `kind` is one of `by-drink`,
+ * `by-category` or `by-price-tier`; `filters` holds the optional year, category and price_tier.
+ */
+export function getBarKpis(kind, filters = {}) {
+  return request("GET", `/kpis/bar/${kind}${queryString(filters)}`).then((r) =>
+    r && r.items !== undefined ? r.items : r,
+  );
+}

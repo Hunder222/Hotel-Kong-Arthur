@@ -32,7 +32,15 @@ from hotel_api.data.repositories.reviews import PostgresReviewRepository
 from hotel_api.data.repositories.room_types import PostgresRoomTypeRepository
 from hotel_api.presentation.api import dependencies as deps
 from hotel_api.presentation.api.errors import register_error_handlers
-from hotel_api.presentation.api.routers import bar, bookings, health, kpis_hotel, reviews, room_types
+from hotel_api.presentation.api.routers import (
+    bar,
+    bookings,
+    health,
+    kpis_bar,
+    kpis_hotel,
+    reviews,
+    room_types,
+)
 
 
 @contextmanager
@@ -103,13 +111,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return BookingService(PostgresBookingRepository(conn), PostgresRoomTypeRepository(conn))
 
     def review_service(conn: Connection = connection) -> ReviewService:
-        return ReviewService(PostgresReviewRepository(conn), PostgresBookingRepository(conn), PostgresRoomTypeRepository(conn))
+        return ReviewService(
+            PostgresReviewRepository(conn), PostgresBookingRepository(conn), PostgresRoomTypeRepository(conn)
+        )
 
     def bar_service(conn: Connection = connection) -> BarService:
         return BarService(PostgresBarSalesRepository(conn))
 
     def kpi_service(conn: Connection = connection) -> KpiService:
-        return KpiService(PostgresBookingRepository(conn), PostgresReviewRepository(conn), PostgresRoomTypeRepository(conn))
+        return KpiService(
+            PostgresBookingRepository(conn),
+            PostgresReviewRepository(conn),
+            PostgresRoomTypeRepository(conn),
+            PostgresBarSalesRepository(conn),
+        )
 
     app.dependency_overrides[deps.get_health_service] = health_service
     app.dependency_overrides[deps.get_kpi_service] = kpi_service
@@ -124,6 +139,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(reviews.router)
     app.include_router(bar.router)
     app.include_router(kpis_hotel.router)
+    app.include_router(kpis_bar.router)
     return app
 
 

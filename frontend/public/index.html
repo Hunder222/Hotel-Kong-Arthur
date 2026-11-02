@@ -102,7 +102,7 @@
     </section>
 
     <section class="card" id="analytics" aria-labelledby="analytics-title">
-      <h2 id="analytics-title">Hotel Analytics <span class="muted">revenue, occupancy &amp; satisfaction calculated by the API</span></h2>
+      <h2 id="analytics-title">Hotel Analytics <span class="muted">revenue, occupancy, satisfaction &amp; bar sales calculated by the API</span></h2>
       <form id="analytics-filters" class="filters" aria-label="Analytics filters">
         <label>Year
           <select name="year"><option value="">All years</option></select>
@@ -217,6 +217,66 @@
         </table>
       </div>
       <p id="country-empty" class="muted" hidden>No bookings match these filters.</p>
+
+      <div class="bar-section">
+        <div class="section-header">
+          <h3>Cocktail bar analytics <span class="muted">Helene Christine’s lobby bar sales (B1–B3)</span></h3>
+          <form id="bar-filters" class="filters" aria-label="Bar analytics filters">
+            <label>Category
+              <select name="category">
+                <option value="">All categories</option>
+                <option value="Cocktail">Cocktail</option>
+                <option value="Coffee">Coffee</option>
+              </select>
+            </label>
+          </form>
+        </div>
+
+        <div class="metric-cards">
+          <div class="metric"><span class="metric-label">Bar revenue</span><strong id="metric-bar-revenue">–</strong></div>
+          <div class="metric"><span class="metric-label">Units sold</span><strong id="metric-bar-units">–</strong></div>
+          <div class="metric"><span class="metric-label">Drinks on menu</span><strong id="metric-bar-drinks">–</strong></div>
+        </div>
+
+        <h3>Cocktail vs. coffee split</h3>
+        <div class="table-wrap">
+          <table>
+            <caption class="visually-hidden">Bar sales split by drink category</caption>
+            <thead>
+              <tr>
+                <th scope="col">Category</th>
+                <th scope="col" class="num">Drinks</th>
+                <th scope="col" class="num">Units sold</th>
+                <th scope="col" class="num">Unit share</th>
+                <th scope="col" class="num">Revenue</th>
+                <th scope="col" class="num">Revenue share</th>
+              </tr>
+            </thead>
+            <tbody id="bar-category-rows"></tbody>
+          </table>
+        </div>
+
+        <h3>Revenue and popularity per drink</h3>
+        <div class="table-wrap">
+          <table>
+            <caption class="visually-hidden">Drink sales ranked by revenue</caption>
+            <thead>
+              <tr>
+                <th scope="col" class="num">Rev. rank</th>
+                <th scope="col">Drink</th>
+                <th scope="col">Category</th>
+                <th scope="col">Price tier</th>
+                <th scope="col" class="num">Unit price</th>
+                <th scope="col" class="num">Units sold</th>
+                <th scope="col" class="num">Units rank</th>
+                <th scope="col" class="num">Revenue</th>
+              </tr>
+            </thead>
+            <tbody id="bar-drink-rows"></tbody>
+          </table>
+        </div>
+        <p id="bar-drink-empty" class="muted" hidden>No drink sales match these filters.</p>
+      </div>
     </section>
   </main>
 

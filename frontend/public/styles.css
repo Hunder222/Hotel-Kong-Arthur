@@ -140,3 +140,8 @@ body.edit-mode #cancel-button { border-color: var(--edit); color: var(--edit-dar
 .metric-label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
 .metric strong { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
 #analytics td.num { font-variant-numeric: tabular-nums; }
+
+.bar-section { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 2px solid var(--line); }
+.section-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; }
+.section-header h3 { margin: 0; font-size: 1.02rem; }
+.section-header .filters { min-width: 200px; }

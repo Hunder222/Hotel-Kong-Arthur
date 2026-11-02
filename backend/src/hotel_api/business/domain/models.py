@@ -39,6 +39,12 @@ class DrinkCategory(str, Enum):
     COFFEE = "Coffee"
 
 
+class PriceTier(str, Enum):
+    BUDGET = "budget"
+    STANDARD = "standard"
+    PREMIUM = "premium"
+
+
 @dataclass(frozen=True)
 class SeasonRate:
     season: Season
@@ -133,6 +139,16 @@ class BarDrinkSale:
     unit_price_dkk: Decimal
     units_sold: int
 
+    @property
+    def revenue_dkk(self) -> Decimal:
+        return self.unit_price_dkk * self.units_sold
+
+    @property
+    def price_tier(self) -> PriceTier:
+        from hotel_api.business.rules.price_tiers import classify_price_tier
+
+        return classify_price_tier(self.unit_price_dkk)
+
 
 @dataclass(frozen=True)
 class HotelFilters:
@@ -142,6 +158,15 @@ class HotelFilters:
     season: Season | None = None
     room_type: str | None = None
     country: str | None = None
+
+
+@dataclass(frozen=True)
+class BarFilters:
+    """The optional filter attributes of the `Hotel Analytics` bar endpoints."""
+
+    year: ReportYear = "all"
+    category: DrinkCategory | None = None
+    price_tier: PriceTier | None = None
 
 
 @dataclass(frozen=True)
@@ -257,5 +282,84 @@ class CountryKpi:
     booking_count: int
     booking_share_pct: Decimal
     nights_sold: int
+    revenue_dkk: Decimal
+    revenue_share_pct: Decimal
+
+
+@dataclass(frozen=True)
+class BarSummary:
+    """Helene Christine's total lobby bar sales for the requested filter scope (B1)."""
+
+    year: ReportYear
+    drink_count: int
+    units_sold: int
+    total_revenue_dkk: Decimal
+
+
+@dataclass(frozen=True)
+class RankedDrinkSale:
+    """A bar drink sale enriched with calculated revenue, popularity ranks and price tier (B2, FR-016)."""
+
+    sale: BarDrinkSale
+    revenue_rank: int
+    units_rank: int
+
+    @property
+    def id(self) -> int:
+        return self.sale.id
+
+    @property
+    def year(self) -> int:
+        return self.sale.sales_year
+
+    @property
+    def drink_name(self) -> str:
+        return self.sale.drink_name
+
+    @property
+    def category(self) -> DrinkCategory:
+        return self.sale.category
+
+    @property
+    def unit_price_dkk(self) -> Decimal:
+        return self.sale.unit_price_dkk
+
+    @property
+    def units_sold(self) -> int:
+        return self.sale.units_sold
+
+    @property
+    def revenue_dkk(self) -> Decimal:
+        return self.sale.revenue_dkk
+
+    @property
+    def price_tier(self) -> PriceTier:
+        return self.sale.price_tier
+
+
+@dataclass(frozen=True)
+class BarCategoryKpi:
+    """Category-level bar sales and percentage split for Cocktail vs. Coffee (B3)."""
+
+    year: ReportYear
+    category: DrinkCategory
+    drink_count: int
+    units_sold: int
+    unit_share_pct: Decimal
+    revenue_dkk: Decimal
+    revenue_share_pct: Decimal
+
+
+@dataclass(frozen=True)
+class BarPriceTierKpi:
+    """Price-tier bar demand for budget, standard and premium drinks (A7 / US4, FR-016)."""
+
+    year: ReportYear
+    price_tier: PriceTier
+    price_from_dkk: Decimal
+    price_to_dkk: Decimal | None
+    drink_count: int
+    units_sold: int
+    unit_share_pct: Decimal
     revenue_dkk: Decimal
     revenue_share_pct: Decimal

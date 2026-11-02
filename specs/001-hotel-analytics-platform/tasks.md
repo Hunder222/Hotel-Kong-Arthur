@@ -160,18 +160,18 @@
 
 ### Tests for User Story 4
 
-- [ ] T044 [P] [US4] Unit tests in `backend/tests/unit/test_bar_kpis.py`: verify pure calculations for bar total revenue (B1), exact Decimal revenue per drink (`unit_price_dkk * units_sold`, B2), competition ranking by revenue and by units, and category split percentages with largest-remainder rounding summing to 100.00 (B3), testing empty years and filter slices
-- [ ] T045 [P] [US4] Contract tests in `backend/tests/contract/test_bar_analytics.py`: validate `GET /api/v1/kpis/bar/summary`, `GET /api/v1/kpis/bar/by-drink`, and `GET /api/v1/kpis/bar/by-category` under tag `Hotel Analytics` with optional `year`, `category`, and `price_tier` filters, verifying 200 responses and 400 Problem Details for invalid filter values
-- [ ] T046 [P] [US4] Golden-value integration test in `backend/tests/integration/test_golden_bar.py`: against seeded PostgreSQL data, assert exact bar revenue (13,448,640.34 DKK, Espresso 1,012,729.60 DKK, Cocktail revenue 7,104,755.43 DKK / 52.83%, Coffee revenue 6,343,884.91 DKK / 47.17%) within 0.01 tolerance (SC-003)
+- [X] T044 [P] [US4] Unit tests in `backend/tests/unit/test_bar_kpis.py`: verify pure calculations for bar total revenue (B1), exact Decimal revenue per drink (`unit_price_dkk * units_sold`, B2), competition ranking by revenue and by units, and category split percentages with largest-remainder rounding summing to 100.00 (B3), testing empty years and filter slices
+- [X] T045 [P] [US4] Contract tests in `backend/tests/contract/test_bar_analytics.py`: validate `GET /api/v1/kpis/bar/summary`, `GET /api/v1/kpis/bar/by-drink`, and `GET /api/v1/kpis/bar/by-category` under tag `Hotel Analytics` with optional `year`, `category`, and `price_tier` filters, verifying 200 responses and 400 Problem Details for invalid filter values
+- [X] T046 [P] [US4] Golden-value integration test in `backend/tests/integration/test_golden_bar.py`: against seeded PostgreSQL data, assert exact bar revenue (13,448,640.34 DKK, Espresso 1,012,729.60 DKK, Cocktail revenue 7,104,755.43 DKK / 52.83%, Coffee revenue 6,343,884.91 DKK / 47.17%) within 0.01 tolerance (SC-003)
 
 ### Implementation for User Story 4
 
-- [ ] T047 [US4] Implement `SRC/business/kpis/bar.py`: pure functions calculating bar summary totals, per-drink revenue and ranks, and category split shares
-- [ ] T048 [US4] Implement bar analytics methods in `SRC/business/services/kpi_service.py`: fetch drink sales from `BarSalesRepository` matching filter scope (`year`, `category`, `price_tier`) and compute bar KPIs
-- [ ] T049 [P] [US4] Implement bar KPI DTOs in `SRC/presentation/api/schemas/bar.py`: `BarSummary`, `RankedDrinkSale`, `RankedDrinkSaleList`, `BarCategoryKpi`, `BarCategoryKpiList` matching `openapi.yaml`
-- [ ] T050 [US4] Implement filter dependencies in `SRC/presentation/api/dependencies.py`: `category_filter` (Cocktail, Coffee) and `price_tier_filter` (budget, standard, premium); raise 400 on invalid query values
-- [ ] T051 [US4] Create router `SRC/presentation/api/routers/kpis_bar.py`: implement `GET /api/v1/kpis/bar/summary`, `GET /api/v1/kpis/bar/by-drink`, and `GET /api/v1/kpis/bar/by-category` with filter parameters under tag `Hotel Analytics`, and register in `SRC/main.py`
-- [ ] T052 [US4] Add cocktail bar analytics section to `frontend/public/index.html`, `frontend/public/app.js`, `frontend/public/api.js`, and `frontend/public/styles.css`: display total bar sales, category unit/revenue split, and ranked drink sales table with category filter controls (FR-022)
+- [X] T047 [US4] Implement `SRC/business/kpis/bar.py`: pure functions calculating bar summary totals, per-drink revenue and ranks, and category split shares
+- [X] T048 [US4] Implement bar analytics methods in `SRC/business/services/kpi_service.py`: fetch drink sales from `BarSalesRepository` matching filter scope (`year`, `category`, `price_tier`) and compute bar KPIs
+- [X] T049 [P] [US4] Implement bar KPI DTOs in `SRC/presentation/api/schemas/bar.py`: `BarSummary`, `RankedDrinkSale`, `RankedDrinkSaleList`, `BarCategoryKpi`, `BarCategoryKpiList` matching `openapi.yaml`
+- [X] T050 [US4] Implement filter dependencies in `SRC/presentation/api/dependencies.py`: `category_filter` (Cocktail, Coffee) and `price_tier_filter` (budget, standard, premium); raise 400 on invalid query values
+- [X] T051 [US4] Create router `SRC/presentation/api/routers/kpis_bar.py`: implement `GET /api/v1/kpis/bar/summary`, `GET /api/v1/kpis/bar/by-drink`, and `GET /api/v1/kpis/bar/by-category` with filter parameters under tag `Hotel Analytics`, and register in `SRC/main.py`
+- [X] T052 [US4] Add cocktail bar analytics section to `frontend/public/index.html`, `frontend/public/app.js`, `frontend/public/api.js`, and `frontend/public/styles.css`: display total bar sales, category unit/revenue split, and ranked drink sales table with category filter controls (FR-022)
 
 **Checkpoint**: User Story 4 is complete. Helene Christine's bar sales (B1–B3) are calculated in the backend API and displayed in the frontend prototype.
 

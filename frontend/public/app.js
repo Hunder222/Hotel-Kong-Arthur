@@ -6,6 +6,8 @@ import {
   ApiError,
   createBooking,
   deleteBooking,
+  getBarKpis,
+  getBarSummary,
   getHotelKpis,
   getHotelSummary,
   listBookings,
@@ -40,6 +42,7 @@ const bannerText = document.getElementById("edit-banner-text");
 const bannerCancel = document.getElementById("banner-cancel");
 
 const analyticsForm = document.getElementById("analytics-filters");
+const barForm = document.getElementById("bar-filters");
 const analyticsStatus = document.getElementById("analytics-status");
 const metricRevenue = document.getElementById("metric-revenue");
 const metricBookings = document.getElementById("metric-bookings");
@@ -54,6 +57,13 @@ const seasonRows = document.getElementById("season-rows");
 const roomTypeSeasonRows = document.getElementById("room-type-season-rows");
 const countryRows = document.getElementById("country-rows");
 const countryEmpty = document.getElementById("country-empty");
+
+const metricBarRevenue = document.getElementById("metric-bar-revenue");
+const metricBarUnits = document.getElementById("metric-bar-units");
+const metricBarDrinks = document.getElementById("metric-bar-drinks");
+const barCategoryRows = document.getElementById("bar-category-rows");
+const barDrinkRows = document.getElementById("bar-drink-rows");
+const barDrinkEmpty = document.getElementById("bar-drink-empty");
 
 const money = new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK" });
 const number = new Intl.NumberFormat("da-DK");
@@ -208,6 +218,13 @@ function currentAnalyticsFilters() {
   };
 }
 
+function currentBarFilters() {
+  return {
+    year: (analyticsForm && analyticsForm.elements.year.value) || "all",
+    category: (barForm && barForm.elements.category.value) || undefined,
+  };
+}
+
 function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, byCountry) {
   metricRevenue.textContent = money.format(summary.total_revenue_dkk);
   metricBookings.textContent = number.format(summary.booking_count);
@@ -291,20 +308,72 @@ function renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, b
   countryEmpty.hidden = byCountry.length > 0;
 }
 
+function renderBarAnalytics(barSummary, barByCategory, barByDrink) {
+  if (!metricBarRevenue) return;
+  metricBarRevenue.textContent = money.format(barSummary.total_revenue_dkk);
+  metricBarUnits.textContent = number.format(barSummary.units_sold);
+  metricBarDrinks.textContent = number.format(barSummary.drink_count);
+
+  barCategoryRows.replaceChildren();
+  for (const row of barByCategory) {
+    const tr = document.createElement("tr");
+    tr.append(
+      cell(row.category),
+      cell(number.format(row.drink_count), "num"),
+      cell(number.format(row.units_sold), "num"),
+      cell(pct(row.unit_share_pct), "num"),
+      cell(money.format(row.revenue_dkk), "num"),
+      cell(pct(row.revenue_share_pct), "num"),
+    );
+    barCategoryRows.append(tr);
+  }
+
+  barDrinkRows.replaceChildren();
+  for (const row of barByDrink) {
+    const tr = document.createElement("tr");
+    tr.append(
+      cell(row.revenue_rank, "num"),
+      cell(row.drink_name),
+      cell(row.category),
+      cell(row.price_tier),
+      cell(money.format(row.unit_price_dkk), "num"),
+      cell(number.format(row.units_sold), "num"),
+      cell(row.units_rank, "num"),
+      cell(money.format(row.revenue_dkk), "num"),
+    );
+    barDrinkRows.append(tr);
+  }
+  barDrinkEmpty.hidden = barByDrink.length > 0;
+}
+
 async function loadAnalytics() {
   if (!analyticsForm) return;
   analyticsStatus.textContent = "";
   analyticsStatus.className = "status";
-  const filters = currentAnalyticsFilters();
+  const hotelFilters = currentAnalyticsFilters();
+  const barFilters = currentBarFilters();
   try {
-    const [summary, byRoomType, bySeason, byRoomTypeSeason, byCountry] = await Promise.all([
-      getHotelSummary(filters),
-      getHotelKpis("by-room-type", filters),
-      getHotelKpis("by-season", filters),
-      getHotelKpis("by-room-type-and-season", filters),
-      getHotelKpis("by-country", filters),
+    const [
+      summary,
+      byRoomType,
+      bySeason,
+      byRoomTypeSeason,
+      byCountry,
+      barSummary,
+      barByCategory,
+      barByDrink,
+    ] = await Promise.all([
+      getHotelSummary(hotelFilters),
+      getHotelKpis("by-room-type", hotelFilters),
+      getHotelKpis("by-season", hotelFilters),
+      getHotelKpis("by-room-type-and-season", hotelFilters),
+      getHotelKpis("by-country", hotelFilters),
+      getBarSummary(barFilters),
+      getBarKpis("by-category", barFilters),
+      getBarKpis("by-drink", barFilters),
     ]);
     renderHotelAnalytics(summary, byRoomType, bySeason, byRoomTypeSeason, byCountry);
+    renderBarAnalytics(barSummary, barByCategory, barByDrink);
   } catch (error) {
     analyticsStatus.textContent = error instanceof ApiError ? error.message : "Failed to load analytics.";
     analyticsStatus.className = "status error";
@@ -529,6 +598,9 @@ moreButton.addEventListener("click", () => {
 form.elements.room_type.addEventListener("change", showRateHint);
 if (analyticsForm) {
   analyticsForm.addEventListener("change", () => loadAnalytics());
+}
+if (barForm) {
+  barForm.addEventListener("change", () => loadAnalytics());
 }
 
 // Another room type or check-in date means another rate band, so a typed price no longer applies: clear it and
