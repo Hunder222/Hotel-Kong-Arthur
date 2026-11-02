@@ -1,13 +1,13 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.0 → 1.2.0 (MINOR: updated Principle VII and Gate VII to reflect the 2026-10-29 architectural correction for Tableau)
-- Modified principles: VII. Business Rules & Tableau Data Handover (formerly KPIs Are Business Logic).
-  The backend business layer owns operational domain rules (season derivation, seasonal price bands,
-  standard pricing, booking/review validation), while the REST API exposes the raw operational and
-  reference datasets (`GET /api/v1/bookings`, `GET /api/v1/room-types`, `GET /api/v1/reviews`,
-  `GET /api/v1/bar/drink-sales`) with no query parameters so the team can manually build dashboards
-  and calculate KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) in Tableau.
-- Modified gates: Constitution Check gate VII updated accordingly.
+- Version change: 1.2.0 → 2.0.0 (MAJOR: incorporates binding Week 2 teacher requirements from `context/teacher/Tillægsopgave_uge_2.md` [T4])
+- Added binding source: T4 (`context/teacher/Tillægsopgave_uge_2.md`).
+- Modified principles:
+  - III. Three-Layer Backend: updated database references from MySQL to PostgreSQL, noting that the Week 2 migration from MySQL (v1.0.0) to PostgreSQL directly demonstrates layer isolation (T2 › Q5).
+  - VI. PostgreSQL Holds the Data, and the Data Is Live (formerly MySQL Holds the Data): database changed from MySQL to PostgreSQL per T4 and team decision; prior MySQL milestone preserved as Git release `v1.0.0`.
+  - VII. Authoritative KPIs in the Business Layer & Dual Analytics Delivery (formerly Business Rules & Tableau Data Handover): backend business layer computes all hotel and bar KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) and exposes them via filtered `GET` endpoints under the `"Hotel Analytics"` Swagger UI tag while keeping existing parameterless raw data endpoints intact for Tableau, and displaying the API-calculated analytics in the browser frontend prototype (T4).
+- Modified Mandatory Scope & Technology Stack: added `F2` (frontend displays KPI calculations from REST API) and `G1` (Git preservation of Week 1 work as `v1.0.0`); updated database to PostgreSQL (`psycopg`).
+- Modified gates: Constitution Check gates VI and VII updated accordingly.
 -->
 # Hotel Kong Arthur Constitution
 
@@ -15,17 +15,20 @@ This constitution governs every spec, plan, task and line of code in this reposi
 analyses and presents operational data from Hotel Kong Arthur to decision makers
 (T1 › Systemkrav › Formål). Teacher requirements are binding; team agreements apply wherever they
 do not conflict with them (TM › Planen: "Vi skal overholde alle krav beskrevet i filerne i
-context/teacher/"). MUST, SHOULD and MAY are used as in RFC 2119.
+context/teacher/"). Where Week 2 teacher requirements (`T4`) amend Week 1 requirements (`T1`),
+`T4` takes precedence while prior work remains preserved in Git (`v1.0.0`). MUST, SHOULD and MAY
+are used as in RFC 2119.
 
 Every rule cites its source with the IDs below, followed by the section headings of that file:
 
 | ID | Source | Status |
 |----|--------|--------|
-| T1 | `context/teacher/tværfaglig_opgave_hotel_kong_arthur.md` (assignment) | Binding |
+| T1 | `context/teacher/tværfaglig_opgave_hotel_kong_arthur.md` (Week 1 assignment) | Binding (amended by T4 in Week 2) |
 | T2 | `context/teacher/tillægsspørgsmål_swa.md` (SWA questions for the presentation) | Binding |
 | T3 | `context/teacher/*.csv` (sample data from the hotel's current systems) | Sample data; T1 calls it inspiration |
+| T4 | `context/teacher/Tillægsopgave_uge_2.md` (Week 2 assignment amendments) | Binding (supersedes conflicting T1 clauses) |
 | TM | `context/team/project-plan.md` (team plan) | Team agreement |
-| TD | Team decisions given in the constitution session on 2026-10-27: conflict rule, commit flow, amendments, testing, language. Not yet written in `context/team/` | Team agreement |
+| TD | Team decisions given in the constitution session on 2026-10-27 and Week 2 update on 2026-11-02 | Team agreement |
 
 Each principle ends with its sources and whom it binds (teacher or team). Governance explains what
 that means for waivers and amendments.
@@ -45,11 +48,13 @@ that means for waivers and amendments.
   occupancy rate (belægningsgrad) is calculated.
 - Implement → Converge MUST repeat until the code matches spec, plan and tasks. Every gap found in
   Converge becomes a new task.
+- Before implementing Week 2 changes (`T4`), the completed Week 1 milestone MUST be preserved and
+  accessible via Git (`v1.0.0` release/tag) for the presentation (`T4 › Pointer › Sikring af hidtidigt arbejde via Git`).
 
 **Rationale:** This is the required working method, and the spec is the yardstick the result is
 assessed against.
 
-**Sources:** T1 › Krav: Systemudvikling › Workflowet · TM › Krav Systemudvikling ·
+**Sources:** T1 › Krav: Systemudvikling › Workflowet · T4 › Pointer · TM › Krav Systemudvikling ·
 **Binding:** teacher
 
 ### II. User Stories with Acceptance Criteria
@@ -59,14 +64,15 @@ assessed against.
 - Every story MUST have acceptance criteria (the *Confirmation* of "The Three Cs"). Converge uses
   them to decide whether the story is done.
 - Primary roles: the **Receptionist** creates, edits and deletes bookings in the web frontend; the
-  **Hotel CFO** uses the Tableau dashboard. The spec MAY add a role when a requirement needs one.
+  **Hotel CFO** inspects analytics and KPIs both directly via the REST API / web frontend prototype
+  and via the Tableau dashboard. The spec MAY add a role when a requirement needs one.
 - The team's stories US1–US4 are the starting backlog and MUST be refined to meet this principle
   (see OQ-2 and OQ-3).
 
 **Rationale:** Acceptance criteria are what Converge checks; without them "done" is a matter of
 opinion.
 
-**Sources:** T1 › Krav: Systemudvikling › User Stories · TM › Overordnet arkitektur (Brugere),
+**Sources:** T1 › Krav: Systemudvikling › User Stories · T4 › Pointer · TM › Overordnet arkitektur (Brugere),
 User stories · **Binding:** teacher (format, INVEST, criteria); team (roles, backlog)
 
 ### III. Three-Layer Backend
@@ -74,54 +80,60 @@ User stories · **Binding:** teacher (format, INVEST, criteria); team (roles, ba
 The backend MUST have exactly three layers, each in its own package or module so the boundaries
 can be pointed to in the code:
 
-1. **Presentation**: REST endpoints and DTOs (input validation, JSON serialisation). No business
-   rules and no SQL.
-2. **Business**: services/use cases (KPI calculation, seasonal pricing, booking validation) and
-   domain models (Booking, Room, Sale). No HTTP and no SQL.
+1. **Presentation**: REST endpoints and DTOs (input validation, query filter parsing, JSON serialisation).
+   No business rules and no SQL.
+2. **Business**: services/use cases (authoritative KPI calculation, seasonal pricing, booking and review
+   validation) and domain models (`Booking`, `RoomType`, `BarDrinkSale`, KPI models). No HTTP and no SQL.
 3. **Data**: repositories with SQL queries, mapping between rows and domain models, and database
-   connections. The only layer that talks to MySQL.
+   connections. The only layer that talks to PostgreSQL.
 
 - Calls go one way: presentation → business → data. A layer MUST NOT call the layer above it or
   skip the layer below it.
-- Replacing MySQL MUST require changes only in the data layer and the deployment configuration.
-  Replacing the web frontend with the hotel's own booking system MUST NOT require changes in the
-  business or data layer.
+- Replacing the database (as demonstrated in Week 2 by migrating from MySQL in `v1.0.0` to PostgreSQL)
+  MUST require changes only in the data layer and deployment/bootstrap configuration (`data/`, `db/init/`,
+  `pyproject.toml`, `docker-compose.yml`). Replacing the web frontend with the hotel's own booking system
+  MUST NOT require changes in the business or data layer.
 - Every plan MUST state which layer each new component belongs to.
 
 **Rationale:** Required architecture. Q3 asks where the layer boundaries are in the code and for a
-deliberate placement choice; Q5 asks what a database or frontend swap would touch.
+deliberate placement choice; Q5 asks what a database or frontend swap would touch, which the Week 2
+MySQL → PostgreSQL swap proves directly.
 
-**Sources:** T1 › Systemkrav › Teknologistak; Krav: Softwarearkitektur · T2 › Q3, Q5 ·
-TM › Overordnet arkitektur · **Binding:** teacher (three layers); team (what each layer contains)
+**Sources:** T1 › Systemkrav › Teknologistak; Krav: Softwarearkitektur · T4 › Pointer › Databasen skal skiftes ·
+T2 › Q3, Q5 · TM › Overordnet arkitektur · **Binding:** teacher (three layers, DB swap); team (PostgreSQL, what each layer contains)
 
 ### IV. The REST/JSON API Is the Only Way In
 
 - The presentation layer MUST expose a REST API with JSON request and response bodies.
-- Every client (the browser frontend, the Tableau dashboard and the hotel's existing booking
-  system) MUST read and change data only through this API. Clients MUST NOT connect to MySQL.
+- Every client (the browser frontend, the Tableau dashboard, direct API analytics consumers and the
+  hotel's existing booking system) MUST read and change data only through this API. Clients MUST NOT
+  connect directly to PostgreSQL.
 - Creating, updating and deleting bookings MUST be possible through POST, PUT and DELETE
   endpoints that any client can call, not only the web frontend.
-- Resources MUST mirror the domain (e.g. bookings, rooms, bar sales, KPIs), and HTTP methods and
-  status codes MUST follow HTTP semantics. The plan MUST explain the URL structure, methods and
-  status codes of at least one endpoint as a worked example.
+- Resources MUST mirror the domain (e.g. bookings, rooms, bar sales, and analytics/KPIs), and HTTP
+  methods and status codes MUST follow HTTP semantics. The plan MUST explain the URL structure,
+  methods and status codes of at least one endpoint as a worked example.
 
-**Rationale:** The dashboard must be built "med udgangspunkt i backendens REST API", and the
-hotel's booking system will write to the same API. Q6 asks the team to defend its REST design on a
-concrete endpoint.
+**Rationale:** Both Tableau and the frontend/direct API consumers must read data and analytics
+through the backend's REST API, and the hotel's booking system writes to the same API. Q6 asks the
+team to defend its REST design on a concrete endpoint.
 
 **Sources:** T1 › Systemkrav › Teknologistak; Krav: Forretningsdesign og Analytics; Krav:
-Softwarearkitektur · T2 › Q6, Q9 · TM › Overordnet arkitektur · **Binding:** teacher
+Softwarearkitektur · T4 › Nye krav til applikationen; Pointer · T2 › Q6, Q9 · TM › Overordnet arkitektur · **Binding:** teacher
 
 ### V. The OpenAPI Contract Matches the Code
 
 - The API contract MUST be delivered as an OpenAPI document in the repository. Team choice:
   OpenAPI 3.0.
 - Swagger UI MUST serve that contract from a Docker container started by `docker-compose up`.
+- In Swagger UI, the existing 5 tags (`Health`, `Reference data`, `Bookings`, `Reviews`, `Bar`) MUST
+  be preserved as-is, and a new tag **`Hotel Analytics`** MUST group all `GET` analytics and KPI
+  endpoints (with filter attributes).
 - Contract and code MUST NOT drift: every implemented endpoint is in the contract, every contract
   endpoint is implemented, and request and response schemas match. The plan MUST name the
   mechanism that keeps them in sync; the contract tests in Principle IX verify it.
-- A contract change MUST be checked against all three consumers: the web frontend, Tableau and the
-  hotel's booking system.
+- A contract change MUST be checked against all consumers: the web frontend (bookings + analytics),
+  Tableau (raw data endpoints) and the hotel's booking system.
 - If the chosen framework generates OpenAPI 3.1 (FastAPI does by default), the plan MUST record
   whether 3.0 or 3.1 is authoritative.
 
@@ -129,42 +141,51 @@ Softwarearkitektur · T2 › Q6, Q9 · TM › Overordnet arkitektur · **Binding
 knows the contract and the code agree.
 
 **Sources:** T1 › Systemkrav › Teknologistak; Krav: Softwarearkitektur (incl. Hvad skal
-afleveres) · T2 › Q7 · TM › Overordnet arkitektur · **Binding:** teacher; team (version 3.0)
+afleveres) · T4 › Pointer · T2 › Q7 · TM › Overordnet arkitektur · **Binding:** teacher; team (version 3.0, `"Hotel Analytics"` tag)
 
-### VI. MySQL Holds the Data, and the Data Is Live
+### VI. PostgreSQL Holds the Data, and the Data Is Live
 
-- The database MUST be MySQL. All runtime data (bookings, rooms, bar sales and everything a KPI is
+- Per `T4` ("Hotellet har desuden ønsket, at vi **ikke** bruger MySQL i vores løsninger. Databasen
+  skal skiftes til en anden type end den nuværende MySQL") and team decision, the database MUST be
+  **PostgreSQL**. All runtime data (bookings, rooms, reviews, bar sales and everything a KPI is
   calculated from) MUST be stored there.
 - The CSV files are static, historical samples. They MAY seed the database and inspire the data
-  model, but clients MUST NOT read them at runtime and the dashboard MUST NOT be built on them.
+  model, but clients MUST NOT read them at runtime and dashboards/views MUST NOT be built on them.
 - The system MUST accept continuous updates at runtime, at minimum creating, updating and deleting
-  bookings through the API. The dashboard MUST show the current state of the database through the
-  API, not a historical snapshot.
+  bookings through the API. Both the API analytics endpoints (and frontend analytics view) and the
+  Tableau dashboard MUST show the current state of the database through the API, not a historical snapshot.
 - The meaning of "live" (mechanism and acceptable delay) MUST be settled in Clarify. The plan MUST
-  describe how Tableau gets current data through the REST API.
-- The schema and any seed data MUST be created automatically by `docker-compose up`.
+  describe how both direct API/frontend analytics and Tableau get current data through the REST API.
+- The schema and reference data MUST be created automatically by `docker-compose up`.
 - What happens to the data when the containers stop MUST be a deliberate choice, documented in
   `README.md`.
 
-**Rationale:** The brief explicitly moves the system from static CSV files to live data (Q9), and
-Q8 asks what happens to the data when the containers shut down.
+**Rationale:** The brief moves the system from static CSV files to live data (Q9), `T4` mandates
+replacing MySQL with another database (team choice: PostgreSQL), and Q8 asks what happens to the
+data when the containers shut down.
 
 **Sources:** T1 › Systemkrav; Datagrundlag; Krav: Softwarearkitektur; Krav: Systemudvikling ›
-Workflowet (Clarify) · T2 › Q8, Q9 · T3 · TM › Overordnet arkitektur · **Binding:** teacher
+Workflowet (Clarify) · T4 › Nye krav til applikationen; Pointer · T2 › Q8, Q9 · T3 · TM › Overordnet arkitektur ·
+**Binding:** teacher (non-MySQL live DB); team (PostgreSQL)
 
-### VII. Business Rules & Tableau Data Handover
+### VII. Authoritative KPIs in the Business Layer & Dual Analytics Delivery
 
-- Operational business rules MUST live in the business layer (`business/`) and be enforced on every
-  API write and read. This covers season derivation (`low`, `mid`, `high`), seasonal pricing bands,
-  default standard pricing, and booking and review validation.
-- **Tableau calculates KPIs over raw API datasets (2026-10-29 correction).** The REST API exposes
-  a basic, parameterless connection to the raw operational and reference datasets
-  (`GET /api/v1/bookings`, `GET /api/v1/room-types`, `GET /api/v1/reviews`,
-  `GET /api/v1/bar/drink-sales`, with no query parameters). Each booking and review includes its
-  derived `season` and `year`. Pre-aggregated `/api/v1/kpis/*` endpoints are not exposed; instead,
-  the team connects Tableau to the raw REST endpoints and manually builds the dashboards and KPI
-  calculations (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) in Tableau.
-- **One display-only exception in the browser frontend.** For the live price preview and the
+- Every business rule and every KPI formula (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) MUST be defined
+  **once**, in the backend business layer (`business/rules/` and `business/kpis/`).
+- **Direct API Analytics (`Hotel Analytics`) + Raw Tableau Compatibility (`T4`):**
+  - The REST API MUST keep the existing parameterless raw data endpoints (`GET /api/v1/bookings`,
+    `GET /api/v1/room-types`, `GET /api/v1/reviews`, `GET /api/v1/bar/drink-sales`) working as-is so
+    Tableau can continue to ingest raw data without breaking.
+  - In addition, the REST API MUST expose pre-calculated analytics `GET` endpoints under the
+    **`Hotel Analytics`** Swagger UI tag (`/api/v1/kpis/hotel/*` and `/api/v1/kpis/bar/*`) with
+    filter query parameters (`year`, `season`, `room_type`, `country`, `category`, `price_tier`),
+    allowing clients and the frontend prototype to read all analytics directly from the API without
+    needing Tableau.
+- **Frontend Prototype Displays API Analytics (`T4`):**
+  - The browser frontend prototype (`frontend/`) MUST display the calculated hotel and bar analytics
+    (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) read directly from the **`Hotel Analytics`** REST API endpoints.
+  - The frontend MUST NOT calculate KPIs itself.
+- **One display-only exception in the browser frontend.** For the live booking price preview and the
   price-per-night/total convenience fields (FR-018, FR-019), the frontend MAY mirror exactly two
   things: the month → season table and the standard-price arithmetic (standard nightly rate ×
   nights, and nightly ↔ total conversion). The mirror MUST live in one file,
@@ -175,23 +196,21 @@ Workflowet (Clarify) · T2 › Q8, Q9 · T3 · TM › Overordnet arkitektur · *
 - An automated test MUST fail if the mirrored season table differs from
   `business/rules/seasons.py` (`backend/tests/architecture/test_frontend_price_mirror.py`).
 - The hotel facts in T1 are binding inputs to the spec: 214 rooms; 1–4 guests per room and about
-  428 guests at most (see the Clarify list); 8 room types with seasonal price ranges; low, mid and
-  high season; a lobby bar where Helene Christine makes 20 cocktails and 10 coffee types.
+  428 guests at most; 8 room types with seasonal price ranges; low, mid and high season; a lobby bar
+  where Helene Christine makes 20 cocktails and 10 coffee types.
 
-**Rationale:** Centralising operational rules (season mapping, pricing, validation) in the backend
-business layer ensures every booking and review is validated and priced identically regardless of
-client, while serving clean, parameterless raw tables lets the team build and customise all KPIs
-directly in Tableau.
+**Rationale:** Centralising operational rules and KPI calculations in the backend business layer
+ensures every consumer (frontend analytics view, direct API client, and Tableau) sees identical
+authoritative figures, while keeping the raw endpoints intact preserves full backward compatibility
+with `v1.0.0` and Tableau.
 
 **Sources:** T1 › Systemkrav › Beregninger; Data om Hotel Kong Arthur; Krav: Forretningsdesign og
-Analytics · T2 › Q4 · TM › Overordnet arkitektur (Service Layer) · team decision of 2026-10-29
-(`specs/001-hotel-analytics-platform/spec.md` FR-018, FR-019; `tasks.md` T114, T115;
-`research.md` R15, amended) · **Binding:** teacher (KPIs, hotel facts); team (placement in the
-business layer, the display-only exception)
+Analytics · T4 › Nye krav til applikationen; Pointer · T2 › Q4 · TM › Overordnet arkitektur (Service Layer) ·
+**Binding:** teacher (KPIs in API and frontend, hotel facts); team (placement in business layer, `"Hotel Analytics"` tag, display-only price preview exception)
 
 ### VIII. One Command: `docker-compose up`
 
-- Everything the team builds or runs (MySQL, the backend API, Swagger UI and the browser frontend)
+- Everything the team builds or runs (PostgreSQL, the backend API, Swagger UI and the browser frontend)
   MUST run in Docker containers defined in one compose file.
 - From a fresh clone, one `docker-compose up` (or the Compose V2 form `docker compose up`) MUST
   start the whole system with no other manual step: no manual database import and no hand-made
@@ -212,8 +231,9 @@ TM › Overordnet arkitektur (conflict, see OQ-1) · **Binding:** teacher
 ### IX. Tested Business Rules and API Contract
 
 - Every KPI formula and business rule in the business layer MUST have automated unit tests.
-- Every API endpoint MUST have an automated test that checks its status codes and JSON responses
-  against the OpenAPI contract.
+- Every API endpoint (both raw resource endpoints and `"Hotel Analytics"` KPI endpoints) MUST have an
+  automated test that checks its status codes, filter parameters, and JSON responses against the
+  OpenAPI contract.
 - Tests MUST pass before code is pushed to `main`, and Converge MUST NOT mark a story done while
   its tests fail. How to run the tests MUST be documented in `CONTRIBUTE.md`.
 - Test-first (TDD) is not required. Tests MAY be written in the same task as the code, but the
@@ -232,10 +252,10 @@ that the contract matches the code (Q7).
 - Every member MUST be able to explain and assess any part of the system, including parts written
   by AI.
 - The plan MUST record each architecture decision with its rationale and rejected alternatives: at
-  least language and framework, KPI placement, the contract sync mechanism, data persistence and
-  the Tableau connection. The record MUST include at least one decision the AI proposed that the
-  team changed or deliberately kept, and the biggest weakness of the architecture if it went to
-  production.
+  least language and framework, database migration (MySQL → PostgreSQL), KPI placement, the contract
+  sync mechanism, data persistence and the Tableau/API analytics connection. The record MUST include
+  at least one decision the AI proposed that the team changed or deliberately kept, and the biggest
+  weakness of the architecture if it went to production.
 - The team MUST be able to answer all ten T2 questions from artefacts in the repository.
 - Every member MUST author commits to the system's source code. Code written by an agent is
   committed by the member who ran and reviewed it. Each member SHOULD use one consistent Git
@@ -250,68 +270,66 @@ Krav: Softwarearkitektur › Hvad skal afleveres · T2 › Q10 and intro · TD (
 
 ## Mandatory Scope & Deliverables
 
-Every item below is a teacher requirement and a Converge checkpoint. "Team coverage" shows which
-of the team's user stories (TM › User stories) covers it today.
+Every item below is a teacher requirement (`T1` + `T4`) and a Converge checkpoint.
 
-**Interactive Tableau dashboard built on the REST API** (T1 › Systemkrav › Visualisering; Krav:
-Forretningsdesign og Analytics)
+**Analytics & KPIs exposed via the REST API (`Hotel Analytics`), displayed in the Frontend Prototype, and supported in Tableau** (`T1 › Krav: Forretningsdesign og Analytics`; `T4 › Nye krav til applikationen; Pointer`)
 
-| ID | The dashboard shows and calculates | Team coverage |
-|----|------------------------------------|---------------|
-| A1 | Where the guests come from (countries) | Missing (OQ-2) |
+| ID | The API calculates & exposes (and frontend + Tableau display) | Team coverage |
+|----|---------------------------------------------------------------|---------------|
+| A1 | Where the guests come from (countries) | US3 |
 | A2 | Revenue per room type, per season | US2 |
 | A3 | Revenue per country | US2 |
 | A4 | The room types that earn the most | US2 |
 | A5 | The countries that earn the most | US2 |
 | A6 | The hotel's revenue for the year | US2 |
-| A7 | One interesting KPI chosen by the team | Not chosen (OQ-2); US4 is a candidate |
-| B1 | Helene Christine's total bar sales for the year | US3 |
-| B2 | Revenue per drink | US3 |
-| B3 | Percentage split between cocktails and coffee for Helene Christine | US3 |
+| A7 | One interesting KPI chosen by the team (ALOS, ADR, Revenue per Booking & Bar Price-Tier Demand) | US5 |
+| B1 | Helene Christine's total bar sales for the year | US4 |
+| B2 | Revenue per drink | US4 |
+| B3 | Percentage split between cocktails and coffee for Helene Christine | US4 |
 
-**System capabilities** (T1 › Systemkrav › Beregninger; Krav: Softwarearkitektur)
+**System capabilities** (`T1 › Systemkrav › Beregninger; Krav: Softwarearkitektur`; `T4 › Pointer`)
 
 | ID | Requirement | Team coverage |
 |----|-------------|---------------|
-| K1 | Calculate occupancy rate (belægningsgrad) | Missing (OQ-2) |
-| K2 | Calculate revenue (indtjening) | US2 |
-| K3 | Calculate customer satisfaction (kundetilfredshed) | Missing, and no data (OQ-2) |
+| K1 | Calculate occupancy rate (belægningsgrad) in backend API | US3 |
+| K2 | Calculate revenue (indtjening) in backend API | US2 |
+| K3 | Calculate customer satisfaction (kundetilfredshed) in backend API | US3 |
 | F1 | Browser frontend that creates, edits and deletes bookings in the backend | US1 |
+| F2 | Browser frontend prototype displays the calculated hotel and bar analytics read from the REST API (`T4`) | US2–US5 |
+| G1 | Week 1 MySQL + raw-API baseline preserved in Git (`v1.0.0`) for presentation (`T4`) | Release `v1.0.0` |
 
 **Deliverables in the GitHub repository** (T1 › Hvad skal afleveres, in both Systemudvikling and
-Softwarearkitektur)
+Softwarearkitektur; T4 › Pointer)
 
 | ID | Deliverable |
 |----|-------------|
-| D1 | Source code, with commits from every group member |
-| D2 | `README.md` with an architecture diagram of the whole system (see OQ-4) |
+| D1 | Source code, with commits from every group member (plus `v1.0.0` tag/release for Week 1 work) |
+| D2 | `README.md` with an architecture diagram of the whole system |
 | D3 | `CONTRIBUTE.md` (exactly this file name) |
-| D4 | Swagger UI running in a Docker container |
+| D4 | Swagger UI running in a Docker container (with existing headers + `"Hotel Analytics"`) |
 | D5 | The OpenAPI specification of the API |
 | D6 | Spec artefacts: this constitution, plus `spec.md`, `plan.md` and `tasks.md` under `specs/` |
 | D7 | User stories with acceptance criteria |
 | D8 | The result of the final Converge check: what is implemented and what is missing |
 
-**Presentation** (T1 › Præsentation; T2 › intro): Friday 2026-11-06, in the slot for the group's
+**Presentation** (T1 › Præsentation; T2 › intro; T4 › Pointer): Friday 2026-11-06, in the slot for the group's
 number between 12:30 and 15:45. The group presents for 10 minutes, followed by 10 minutes of
-questions and feedback, first from the review group and then from Lasse and Claus. The group MUST
-also take notes on another group's presentation and then question it and give feedback, and MUST
-be ready before entering the room. The T2 questions are the expected basis for the talk and for
-Claus's questions.
+questions and feedback, first from the review group and then from Lasse and Claus. Both the Week 1
+release (`v1.0.0`) and the Week 2 PostgreSQL + API/frontend analytics solution MUST be accessible.
 
 **Technology stack**
 
 | Concern | Decision | Source |
 |---------|----------|--------|
-| Backend | Three-layer architecture with a REST API and JSON | T1 |
-| API contract | OpenAPI (team: 3.0), Swagger UI in a container | T1, TM |
-| Database | MySQL | T1 |
+| Backend | Three-layer architecture with a REST API and JSON | T1, T4 |
+| API contract | OpenAPI 3.0.3, Swagger UI in a container (`Health`, `Reference data`, `Bookings`, `Reviews`, `Bar`, `Hotel Analytics`) | T1, T4, TM |
+| Database | PostgreSQL 17 (`postgres:17-alpine`, migrated from MySQL 8.4 per T4) | T4, TD |
 | Runtime | Docker; the whole system starts with `docker-compose up` | T1 |
-| Dashboard | Tableau, reading data through the REST API | T1, TM |
-| Frontend | Browser UI for bookings, served from a container | T1, TM; see OQ-1 |
-| Backend language | Python (the teacher leaves the language free) | TM, T1 |
-| Web framework | FastAPI or Flask, chosen in Plan | TM |
-| MySQL driver | PyMySQL or mysqlclient, chosen in Plan | TM |
+| Analytics delivery | Calculated in backend API (`Hotel Analytics` endpoints with filters) + displayed in browser frontend prototype + raw endpoints preserved for Tableau | T1, T4 |
+| Frontend | Browser UI for bookings (`F1`) and analytics dashboard (`F2`), served from a container | T1, T4, TM |
+| Backend language | Python 3.13 | TM, T1 |
+| Web framework | FastAPI on Uvicorn | TM |
+| PostgreSQL driver | `psycopg[binary]` 3.2x | TD |
 
 ## Development Workflow & Quality Gates
 
@@ -335,15 +353,15 @@ Tracking. Violations of teacher-bound rules are not allowed.
 
 | Gate | Question |
 |------|----------|
-| I | Is the spec clarified, and do plan and tasks exist before any code? |
+| I | Is the spec clarified, do plan and tasks exist before code, and is the Week 1 milestone preserved in Git (`v1.0.0`)? |
 | II | Does every story use the teacher's format, meet INVEST and have acceptance criteria? |
-| III | Does every component sit in exactly one layer, with calls only going downwards? |
-| IV | Do all clients, Tableau included, use only the REST/JSON API? |
-| V | Is the OpenAPI contract updated, and is the sync mechanism named? |
-| VI | Is all runtime data in MySQL and seeded automatically, with persistence decided? |
-| VII | Are operational business rules defined once in the business layer (with the browser limited to the one display-only price mirror guarded by a drift test), and does the REST API expose the raw datasets without query parameters so Tableau can build the KPIs? |
+| III | Does every component sit in exactly one layer, with calls only going downwards, and does the MySQL → PostgreSQL swap stay confined to the data layer and deployment config? |
+| IV | Do all clients (frontend, direct API consumers, Tableau, hotel booking system) use only the REST/JSON API? |
+| V | Is the OpenAPI contract updated (keeping the 5 existing headers and adding `"Hotel Analytics"`), and is the sync mechanism named? |
+| VI | Is all runtime data stored live in PostgreSQL (no MySQL), with schema/reference data created automatically and persistence decided? |
+| VII | Are all operational rules and KPI formulas (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) defined once in the business layer, exposed via filtered `"Hotel Analytics"` GET endpoints while preserving raw endpoints for Tableau, and displayed in the frontend prototype? |
 | VIII | Does the whole system start from a fresh clone with `docker-compose up`? |
-| IX | Are unit tests for business rules and contract tests for endpoints planned? |
+| IX | Are unit tests for business rules/KPIs and contract tests for all endpoints planned? |
 | X | Are architecture decisions recorded with rationale, including one the AI proposed? |
 
 **Commits and review** (TD; T1 › Krav: Systemudvikling › Workflowet (Implement))
@@ -367,15 +385,13 @@ VIII, IX and X)
 
 ## Governance
 
-- **Precedence** (TM › Planen; TD): teacher requirements (T1, T2) come first, then this
-  constitution, the team plan (TM), specs, plans and tasks, and finally code. When anything
+- **Precedence** (TM › Planen; TD): teacher requirements (`T4` amending `T1`, plus `T2`) come first,
+  then this constitution, the team plan (TM), specs, plans and tasks, and finally code. When anything
   conflicts with a teacher requirement, the teacher requirement wins and the conflict is added to
   *Open Questions*; it is never resolved silently.
 - **Teacher-bound rules** cannot be waived in a plan's Complexity Tracking or weakened by an
   amendment. Team-bound rules can be changed by amendment.
-- **Traceability:** every rule MUST cite its source. Team rules MUST be traceable to a file under
-  `context/team/`; the TD decisions MUST be written there before `/speckit-specify` runs for the
-  first time.
+- **Traceability:** every rule MUST cite its source.
 - **Amendments** (TD): an amendment follows the same flow as code. A member runs
   `/speckit-constitution`, commits the result directly to `main` with the version change and the
   reason in the commit message, and the team reviews it at the next check-in. Closing an Open
@@ -388,70 +404,13 @@ VIII, IX and X)
   sources stay in Danish. Day-to-day developer guidance (setup, tests, commit conventions) belongs
   in `CONTRIBUTE.md`.
 
-**Version**: 1.2.0 | **Ratified**: 2026-10-27 | **Last Amended**: 2026-10-29
+**Version**: 2.0.0 | **Ratified**: 2026-10-27 | **Last Amended**: 2026-11-02
 
 ## Open Questions
 
-For every item below, the teacher requirement is already applied in the principles above. Each
-item still needs a decision by the team, or an answer from Lasse or Claus, and is closed by
-amendment.
+All initial Open Questions (`OQ-1` through `OQ-5`) have been resolved in `spec.md` and `plan.md`:
 
-### Conflicts between teacher and team
-
-**OQ-1: Frontend on GitHub Pages vs. "everything in Docker"**
-
-- Team (TM › Overordnet arkitektur): "WebUI køres via browser (og Github Pages)".
-- Teacher (T1 › Systemkrav › Teknologistak): "Alt skal køre i Docker-containere"; and
-  (T1 › Krav: Softwarearkitektur): "Alt i jeres system skal kunne køres ved hjælp af en enkelt
-  `docker-compose up` kommando".
-- Applied: the frontend is served from a compose container (Principle VIII).
-- To decide: drop GitHub Pages, or keep it only as an extra copy? A Pages copy would also need a
-  reachable backend URL and CORS, because the backend runs in Docker on a laptop.
-
-### Gaps where the team plan does not yet cover a teacher requirement
-
-**OQ-2: KPIs missing from the team's user stories**
-
-- T1 requires guest countries (A1), one self-chosen KPI (A7), occupancy rate (K1) and customer
-  satisfaction (K3). No story in US1–US4 explicitly covers them; US4 could become A7.
-- The T3 CSV files contain no satisfaction data.
-- Applied: all four are in *Mandatory Scope*.
-- To decide: new or extended stories for A1, A7, K1 and K3, and where satisfaction data comes from
-  (e.g. recorded through the API, or generated). Settle in Specify/Clarify, or ask Lasse or Claus.
-
-**OQ-3: The team's user stories do not yet meet Principle II**
-
-- US1–US4 have no acceptance criteria.
-- US2 and US3 each bundle several goals (INVEST "Small"); US3 and US4 overlap (INVEST
-  "Independent").
-- To decide: how to split and refine them in `/speckit-specify`.
-
-**OQ-4: The team's architecture diagram does not show the whole system**
-
-- The TM diagram shows no Docker containers and does not show the hotel's booking system as an
-  API client.
-- T1 requires a diagram of "jeres samlede system" in `README.md`; T2 › Q1 and Q8 ask about the
-  components and containers.
-- To decide: extend the diagram before it goes into `README.md` (D2).
-
-### Interpretation of the teacher text used in this constitution
-
-**OQ-5: Tableau cannot run in Docker**
-
-- T1 says "Alt skal køre i Docker-containere" but also requires a Tableau dashboard, which is a
-  desktop or cloud application.
-- Applied: "everything" means everything the team builds and runs (database, API, Swagger UI,
-  frontend); Tableau is an external client of the containerised API (Principle VIII).
-- To decide: confirm this reading with Lasse or Claus.
-
-### For `/speckit-clarify` (the teacher assigns these questions to Clarify)
-
-- What does "live" mean: which mechanism, and what delay is acceptable? Must bar sales be live as
-  well, or only bookings?
-- How is a season defined? T1 gives low = winter, mid = spring and autumn, high = summer and
-  Christmas, but no month boundaries.
-- Is occupancy measured in rooms or in guests? T1 says 1–4 guests per room, yet about 428 guests
-  at most for 214 rooms, which is 2 per room.
-- Which year is "the year" in A6 and B1? The T3 CSV files contain no dates.
-- Risk for Plan: Tableau's JSON connector reads files, not HTTP endpoints, so prove the route from
-  Tableau to the REST API (e.g. a Web Data Connector) early.
+- **OQ-1 (Frontend in Docker vs. GitHub Pages)**: Resolved — served from the `frontend` nginx container in `docker-compose.yml`.
+- **OQ-2 & OQ-3 (KPIs and INVEST user stories)**: Resolved — refined into `US1`–`US5` in `spec.md` with Given/When/Then acceptance criteria.
+- **OQ-4 (System architecture diagram)**: Resolved — full container and 3-layer diagram included in `plan.md` and `README.md`.
+- **OQ-5 (Tableau outside Docker)**: Resolved — Tableau runs outside Docker as an external client of the raw REST API, while Week 2 (`T4`) additionally provides direct API analytics (`Hotel Analytics`) and a built-in frontend analytics view inside the containerised web UI.

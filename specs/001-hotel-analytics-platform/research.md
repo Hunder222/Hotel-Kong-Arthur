@@ -1,6 +1,6 @@
 # Research: Hotel Kong Arthur Operations & Analytics Platform
 
-**Feature**: `001-hotel-analytics-platform` | **Date**: 2026-10-28 | **Plan**: [plan.md](plan.md)
+**Feature**: `001-hotel-analytics-platform` | **Date**: 2026-10-28 (Updated 2026-11-02 for Week 2 Demands) | **Plan**: [plan.md](plan.md)
 
 Phase 0 output of `/speckit-plan`. Every open point in the plan's Technical Context is settled here
 as **Decision / Rationale / Alternatives considered**. No `NEEDS CLARIFICATION` remains. The
@@ -15,25 +15,17 @@ decision log at the end is the record that Constitution Principle X asks for.
   contains 20 countries, all 8 room types and the seasons `low` 332, `mid` 335 and `high` 333.
   `Days Rented` ranges from 1 to 10. Every `Price` is a whole number of DKK and divisible by
   `Days Rented`.
-- 54 rows contain the family name `M�ller`. The file stores the literal Unicode replacement
-  character (U+FFFD) where `ü` used to be, so the original letter is lost in the file itself.
-  Everything else is ASCII.
+- 54 rows contain the family name `Mller` (with U+FFFD replacement character where `ü` used to be).
 - `drinks_menu_with_sales.csv` is UTF-8 **with a BOM**, uses `;` as delimiter and a decimal comma
   (`72,47`), and has 30 rows: 20 `Cocktail` and 10 `Coffee`.
 - Nightly rates (`Price / Days Rented`) fall in tight bands per room type and season. Every one of
   the 1,000 rows fits the bands chosen in R9.
 
-**Tooling**: one team laptop runs Python 3.9.6, and a `.pyc` committed under `.specify/` was
-compiled by Python 3.15. Local Python versions differ across the team. Docker 29.7 and Compose
-v5.4 are available.
+**Week 2 Assignment Amendments (`context/teacher/Tillægsopgave_uge_2.md`, 2026-11-02)**:
 
-**Tableau** (checked 2026-10-27; see Sources):
-
-- Web Data Connector 3.0 is deprecated and will be removed with the Tableau 26.3 release.
-- Tableau now recommends the **REST API Connector** on Tableau Exchange. It needs Tableau 2023.3+
-  and a JDBC REST driver, uses HTTP GET only, reads JSON (with a JSONPath to the records) or CSV,
-  and is extract-only.
-- The JSON file connector reads local files only.
+1. **Direct API Analytics + Frontend Display**: Hotel Kong Arthur wants to read the data analytics directly from the REST API (not only through Tableau), and the browser frontend prototype must display these calculations read from the REST API. Meanwhile, the existing raw API must continue to work as-is for Tableau.
+2. **Database Replacement**: Hotel Kong Arthur no longer wants MySQL; the team must replace MySQL with another database (team choice: **PostgreSQL**).
+3. **Git Preservation of Week 1 Work**: The completed Week 1 solution (MySQL + parameterless raw-data API) has been released in Git as **`v1.0.0`** so it remains accessible for the Friday presentation.
 
 ---
 
@@ -45,411 +37,186 @@ v5.4 are available.
   `redoc_url=None`, `openapi_url=None`, see R4).
 - **Rationale**: The team plan (TM) chose Python. Pydantic DTOs give the presentation layer
   type-checked JSON input and output without hand-written parsing. Synchronous endpoints match the
-  blocking MySQL driver and are easier to explain than async. Python 3.13 is supported until 2029
-  and every dependency ships wheels for it. Running everything in the image makes the different
-  local Python versions irrelevant.
+  blocking PostgreSQL driver (`psycopg`) and are easier to explain than async.
 - **Alternatives considered**:
   - Flask: needs extra libraries for validation and serialisation.
-  - Django REST Framework: its ORM-centred design blurs the explicit data layer the constitution
-    asks for.
-  - Python 3.14: also fine, but 3.13 has the longest track record with the chosen libraries.
+  - Django REST Framework: its ORM-centred design blurs the explicit data layer the constitution asks for.
 
-## R2. Database and driver
+## R2. Database and driver (Week 2 Migration: MySQL → PostgreSQL, answers Q5)
 
-- **Decision**: **MySQL 8.4 LTS** (`mysql:8.4`), InnoDB, `utf8mb4` throughout. The data layer uses
-  **PyMySQL 1.2 with the `rsa` extra**, hand-written parameterised SQL and no ORM. Each HTTP request
-  (or CLI run) opens one connection with autocommit off. The composition root commits when the
-  request succeeds and rolls back on an error.
-- **Rationale**: MySQL is required (T1). 8.4 is a long-term-support release with abundant
-  documentation; 9.7 (the newer LTS) offers nothing this project needs. MySQL 8.4 authenticates with
-  `caching_sha2_password`, which PyMySQL supports through `cryptography` (the `rsa` extra). PyMySQL
-  is pure Python, so the image needs no compiler. Plain SQL in repositories makes the data layer
-  easy to point to and explain (Q3, Q5). One transaction per request means a booking change is
-  either fully stored or not at all.
+- **Decision**: **PostgreSQL 17** (`postgres:17-alpine`), UTF-8 throughout. The data layer uses
+  **`psycopg[binary]` 3.2x**, hand-written parameterised SQL (`%s` placeholders), `dict_row` row
+  factory, and no ORM. Each HTTP request (or CLI run) opens one connection with `autocommit=False`.
+  The composition root commits when the request succeeds and rolls back on an error.
+- **Rationale**: `Tillægsopgave_uge_2.md` forbids MySQL and requires migrating to a different database.
+  PostgreSQL 17 is the industry-standard open-source relational database with rich `CHECK` constraints,
+  `GENERATED BY DEFAULT AS IDENTITY` primary keys, `RETURNING` clauses (allowing `INSERT ... RETURNING id, created_at, updated_at` and `UPDATE ... RETURNING ...` in a single round-trip), and exact `NUMERIC(10,2)` arithmetic. `psycopg[binary]` ships pre-compiled wheels for Python 3.13 on Linux/Windows/macOS so no C compiler is needed in the Docker image.
+- **Proof of 3-layer isolation (`T2 › Q5`)**: Migrating from MySQL (`v1.0.0`) to PostgreSQL touches
+  **only** `backend/src/hotel_api/data/`, `db/init/*.sql`, `backend/pyproject.toml`, `backend/tests/conftest.py`,
+  and `docker-compose.yml` for all existing operations. The presentation and business layers remain
+  100% untouched by the database swap.
 - **Alternatives considered**:
-  - mysqlclient: faster, but needs `gcc` and `libmysqlclient-dev` in the image.
-  - SQLAlchemy ORM: hides the SQL the team must defend, and is not needed for five tables.
-  - aiomysql: async gives no benefit here.
-  - Connection pooling: unnecessary at this scale; it can be added in the data layer alone.
+  - SQLite: file-based rather than a dedicated client/server database container.
+  - MongoDB: document model would lose relational foreign-key and check constraints (`ON DELETE SET NULL` on `reviews.booking_id`).
+  - SQLAlchemy ORM: hides the SQL the team must defend in Q3 and Q5.
 
 ## R3. Layer boundaries and how they are enforced
 
 - **Decision**: The backend package `hotel_api` has exactly three layer packages:
   `presentation` (REST routers, DTOs, error mapping and the seed CLI adapter), `business` (domain
-  models, rules, services, repository protocols) and `data` (connection handling
-  and repositories).
+  models, operational rules, KPI calculators, services, repository protocols) and `data` (PostgreSQL
+  connection handling and repositories).
   - Two root modules sit outside the layers: `main.py` is the **composition root** that wires the
     layers together, and `config.py` reads settings.
   - The business layer defines the repository interfaces (`business/ports.py`, Python `Protocol`s)
     that the data layer implements.
-  - `presentation/api/dependencies.py` declares service providers typed with business services.
-    `main.py` binds them to request-scoped factories that build repositories and services.
-  - An architecture test parses every module's imports and fails when:
+  - An architecture test (`backend/tests/architecture/test_layers.py`) parses every module's imports
+    and fails when:
     - `presentation` imports `data`;
-    - `business` imports `presentation`, `data`, `fastapi` or `pymysql`;
+    - `business` imports `presentation`, `data`, `fastapi`, `psycopg` or `pymysql`;
     - `data` imports `presentation` or `business.services`.
-- **Rationale**: Calls run presentation → business → data. Imports from `data` to
-  `business.domain`/`business.ports` exist only so the data layer can map rows to domain models
-  (Principle III gives the data layer that job). Pointing to `main.py` answers "where are the layers
-  connected?" (Q3). Swapping MySQL touches only `data/` plus the compose file. Swapping the
-  frontend for the hotel's booking system touches nothing in the backend (Q5).
-- **Alternatives considered**:
-  - Services importing repositories directly: this couples business to MySQL and breaks Q5.
-  - import-linter: works, but adds a tool to learn. A 30-line pytest is easier to explain.
+- **Rationale**: Calls run `presentation → business → data`. Pointing to `main.py` answers "where are the layers connected?" (Q3), and the Week 2 MySQL → PostgreSQL migration demonstrates Q5 live.
 
 ## R4. API contract: OpenAPI 3.0.3 design-first, and how contract and code stay in sync
 
-- **Decision**: [contracts/openapi.yaml](contracts/openapi.yaml) (**OpenAPI 3.0.3**) is the single
-  authoritative contract. It stays in the spec folder; nothing copies it.
+- **Decision**: [contracts/openapi.yaml](contracts/openapi.yaml) (**OpenAPI 3.0.3**, `info.version: 1.1.0`) is the single authoritative contract (20 operations across 15 paths).
   - The Swagger UI container mounts it read-only. The test container mounts it too.
-  - FastAPI's own generated contract (OpenAPI 3.1) is switched off, so only one contract can be seen.
+  - FastAPI's own generated contract (OpenAPI 3.1) is switched off.
   - The sync mechanism has three automated parts:
     1. `openapi-spec-validator` checks that the file is valid OpenAPI 3.0.3.
-    2. A **route-parity test** checks that the (method, path) pairs registered in the FastAPI app
-       exactly equal those in the contract (HEAD/OPTIONS are ignored).
+    2. A **route-parity test** checks that the `(method, path)` pairs registered in the FastAPI app
+       exactly equal the 20 operations in the contract (HEAD/OPTIONS are ignored).
     3. **Contract tests** call every operation through FastAPI's `TestClient` and validate status
-       code, content type, documented headers and body with **openapi-core 0.23**:
-       `OpenAPI.from_file_path(...).validate_response(...)`, fed by `openapi_core.testing.MockRequest`
-       and `MockResponse`. Every response schema uses `additionalProperties: false`, so an
-       undocumented field fails the test.
-- **Rationale**: The team chose 3.0 (constitution V). FastAPI generates 3.1 and cannot emit 3.0, so
-  3.0.3 can only be authoritative design-first. Validating real responses catches drift in both
-  directions, which answers Q7. One file avoids drift between copies.
-- **Alternatives considered**:
-  - Code-first, exporting FastAPI's 3.1 output plus a diff test: rejected, because it contradicts
-    the team's 3.0 choice and the generated schemas are less precise (Problem Details, nullable
-    fields).
-  - Schemathesis property-based testing: powerful, but its random inputs make results noisier for
-    a two-week project. It can be added later.
-  - A copy of the contract inside `backend/`: rejected, because two files drift.
+       code, content type, documented headers and body with **openapi-core 0.23**. Every response
+       schema uses `additionalProperties: false`.
 
-## R5. REST resource design, status codes and error format
+## R5. REST resource design, Swagger UI headers (tags), and filter attributes
 
-- **Decision (corrected 2026-10-29)**: All endpoints sit under `/api/v1`. Domain resources are
-  `room-types`, `bookings`, `reviews` and `bar/drink-sales`, plus `health` (11 operations total).
-  - Pre-aggregated KPI endpoints (`/api/v1/kpis/hotel/*` and `/api/v1/kpis/bar/*`) and all query
-    parameters (`?year=`, `?season=`, `?room_type=`, `?country=`, `?category=`) were removed on
-    2026-10-29. Instead, the API serves the full, unfiltered raw operational and reference
-    collections (`GET /api/v1/bookings`, `GET /api/v1/room-types`, `GET /api/v1/reviews`,
-    `GET /api/v1/bar/drink-sales`) with **no query parameters**, and the team builds dashboards
-    and computes KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) manually in Tableau.
-  - Collections return `{"items": [...]}`.
-  - Methods: `GET` reads. `POST` creates and returns `201` with a `Location` header. `PUT` replaces
-    a booking and returns `200`. `DELETE` returns `204`.
-  - Error status codes:
-    - `400`: malformed JSON, or an invalid path parameter.
-    - `404`: unknown id in the path.
-    - `422`: well-formed body that breaks a field or business rule.
-    - `503`: database unavailable.
-  - Errors are **RFC 9457 Problem Details** (`application/problem+json`) with an `errors` list of
-    `{field, message}`. The frontend uses it to show the message next to the field (US1 scenario 4).
-  - Resources carry per-record derived fields: a booking's `season` and `year`, and a review's
-    `season` and `year`. `bar/drink-sales` returns the raw sales fields (`id`, `year`,
-    `drink_name`, `category`, `unit_price_dkk`, `units_sold`).
-- **Rationale**: Resources mirror the domain (Principle IV). Returning flat, complete raw tables
-  with no query parameters lets Tableau ingest each dataset once via `$.items[*]` and perform
-  all filtering, grouping, ranking and KPI calculations inside the workbook. The `items` envelope
-  leaves room for metadata later without breaking clients. The 400/422 split follows HTTP
-  semantics and is easy to defend on a concrete endpoint (Q6).
-- **Alternatives considered**:
-  - Pre-aggregated `/api/v1/kpis/*` endpoints and query parameters: originally built, then removed
-    on 2026-10-29 because the team wants a basic REST connection to raw data so KPIs and
-    dashboards are authored manually in Tableau.
-  - Bare JSON arrays: cannot be extended without a breaking change.
-  - FastAPI's default `{"detail": ...}` errors: not a standard, and they do not name fields
-    consistently.
-  - `PATCH`: the constitution names `PUT`, and the form always sends the whole booking.
+- **Decision (Week 2 update, 2026-11-02)**: All endpoints sit under `/api/v1` (20 operations across 15 paths).
+  - **Existing 5 Swagger UI headers (tags) and 11 operations preserved as-is**:
+    - `Health`: `GET /api/v1/health`
+    - `Reference data`: `GET /api/v1/room-types`
+    - `Bookings`: `GET /api/v1/bookings` (no query parameters), `POST /api/v1/bookings`, `GET/PUT/DELETE /api/v1/bookings/{booking_id}`
+    - `Reviews`: `GET /api/v1/reviews` (no query parameters), `POST /api/v1/reviews`, `GET /api/v1/reviews/{review_id}`
+    - `Bar`: `GET /api/v1/bar/drink-sales` (no query parameters, raw fields `id`, `year`, `drink_name`, `category`, `unit_price_dkk`, `units_sold`)
+  - **New 6th Swagger UI header (tag): `Hotel Analytics` (9 `GET` endpoints with filter attributes)**:
+    - `GET /api/v1/kpis/hotel/summary` (filters: `year`, `season`, `room_type`, `country`) — `A6`, `K1`, `K2`, `K3`, `A7`
+    - `GET /api/v1/kpis/hotel/by-room-type` (filters: `year`, `season`, `room_type`, `country`) — `A4`, `K1`, `K2`, `K3`, `A7`
+    - `GET /api/v1/kpis/hotel/by-season` (filters: `year`, `season`, `room_type`, `country`) — `K1`, `K2`, `K3`, `A7`
+    - `GET /api/v1/kpis/hotel/by-room-type-and-season` (filters: `year`, `season`, `room_type`, `country`) — `A2`, `K1`, `K2`, `A7`
+    - `GET /api/v1/kpis/hotel/by-country` (filters: `year`, `season`, `room_type`, `country`) — `A1`, `A3`, `A5`, `K2`
+    - `GET /api/v1/kpis/bar/summary` (filters: `year`, `category`, `price_tier`) — `B1`
+    - `GET /api/v1/kpis/bar/by-drink` (filters: `year`, `category`, `price_tier`) — `B2`, `A7`/`US4`
+    - `GET /api/v1/kpis/bar/by-category` (filters: `year`, `category`, `price_tier`) — `B3`
+    - `GET /api/v1/kpis/bar/by-price-tier` (filters: `year`, `category`, `price_tier`) — `A7`/`US4`
+  - **Filter semantics (`FR-021`)**:
+    - `year`: calendar year (`2000`–`2100`) or `'all'` (default when omitted).
+    - `season`: `low`, `mid`, or `high`.
+    - `room_type`: one of the 8 room type names.
+    - `country`: guest country string (`1`–`100` chars after trimming).
+    - `category`: `Cocktail` or `Coffee`.
+    - `price_tier`: `budget`, `standard`, or `premium`.
+    - Invalid filter values return `400 Bad Request` (`application/problem+json`) with `errors[].field` naming the parameter.
+- **Rationale**: Keeping the 5 existing headers and 11 raw/CRUD operations unchanged guarantees 100% backward compatibility with `v1.0.0` and Tableau, while grouping all 9 analytical `GET` endpoints (with filter attributes) under **`Hotel Analytics`** satisfies the Week 2 demand (`T4`) cleanly.
 
-## R6. Business rules vs Tableau KPI calculations (answers Q4)
+## R6. Authoritative KPI calculations in the business layer (answers Q4)
 
-- **Decision (corrected 2026-10-29)**: Operational business rules (month-to-season mapping,
-  seasonal nightly rate bands, standard price calculation, multi-field booking and review
-  validation, and deterministic seed data transformation) are implemented **once**, as pure
-  functions in `business/rules/`. The backend attaches derived `season` and `year` fields to each
-  booking and review record returned by the API. Analytical KPI aggregations (`A1`–`A7`, `B1`–`B3`,
-  `K1`–`K3`) are computed manually by the team in **Tableau** from the four parameterless raw REST
-  endpoints (`bookings`, `room-types`, `reviews`, `bar/drink-sales`), following the authoritative
-  formulas documented in [data-model.md](data-model.md) §7.
-- **Rationale**: Operational rules stay unit-testable without a database and independent of the
-  database product (Q5), ensuring every write client (`F1` web UI or the hotel's booking system)
-  is governed by the exact same validation and pricing rules, while Tableau receives clean,
-  complete raw datasets (including derived `season` and `year` per stay/review and `room_count` per
-  room type) to build interactive dashboards manually.
+- **Decision (Week 2 update, 2026-11-02)**: Both operational rules (`business/rules/`) and analytical KPI calculations (`business/kpis/hotel.py` and `business/kpis/bar.py`) live **once** as pure functions in the backend business layer (`business/`), orchestrated by `KpiService` (`business/services/kpi_service.py`).
+- **Rationale**:
+  - `Tillægsopgave_uge_2.md` requires the REST API to expose the KPI calculations directly so clients and the frontend prototype can read them without Tableau.
+  - Keeping KPI calculations as pure Python functions in `business/kpis/` makes them unit-testable without a database and completely independent of PostgreSQL vs. MySQL (`T2 › Q4, Q5`).
 - **Cost of moving logic** (what Q4 asks):
-  - **Moving operational rules to MySQL** (triggers/stored procedures): testing would require a
-    database, and replacing MySQL would mean rewriting season and pricing validation.
-  - **Computing analytical KPIs in Tableau** (chosen on 2026-10-29): keeps the REST API simple
-    (11 parameterless operations over 5 core resources) and lets the team design custom visual
-    analyses, rankings, price tiers and filters directly in Tableau without needing a new backend
-    endpoint for every chart grain.
-- **Alternatives considered**: pre-aggregating KPIs in Python (`business/kpis/*`), which was
-  replaced on 2026-10-29 per team direction.
+  - **In Tableau only (Week 1 `v1.0.0`)**: Every non-Tableau client (such as the browser frontend prototype or mobile/reporting integrations) would have to re-implement the KPI formulas, leading to duplicated business logic.
+  - **In SQL / Database views**: Testing KPI edge cases (empty years, leap-year season days, largest-remainder 100.00% share rounding, competition ranking) would require a running database, and migrating from MySQL to PostgreSQL in Week 2 would have required rewriting every KPI query.
+  - **In the Backend Business Layer (`business/kpis/`, Week 2)**: Computed once, unit-tested in milliseconds without a database, unaffected by the MySQL → PostgreSQL swap, and available to any HTTP client (Swagger UI, frontend prototype, or external BI).
 
 ## R7. What "live" means in the running system (answers Q9)
 
-- **Decision**: "Live" follows the Clarify answer: on-demand pull.
-  - Every write is committed before its 2xx response.
-  - Every `GET` endpoint reads the current committed rows from MySQL on every request.
+- **Decision**: On-demand pull against live PostgreSQL rows.
+  - Every write is committed in PostgreSQL before its `2xx` response.
+  - Every raw `GET` and every `Hotel Analytics` `GET` endpoint reads the current committed rows from PostgreSQL on every request and computes KPIs on the fly.
   - Every API response carries `Cache-Control: no-store`.
-  - The frontend reloads the list after each create, edit or delete.
-  - Tableau re-pulls the raw data when the CFO refreshes the extract (R14). The dashboard shows the
-    database state at that moment, well inside the 5-second limit (SC-004).
-- **Rationale**: This is the simplest mechanism that meets FR-005 and SC-004, and it is the only
-  one Tableau's connector supports (GET plus extract refresh).
-- **Alternatives considered**:
-  - WebSockets or Server-Sent Events: Tableau cannot consume them.
-  - Frontend polling: not needed for a single receptionist.
-  - Database triggers maintaining KPI tables: a second definition plus staleness risk.
+  - The frontend reloads both the booking list and the **Hotel Analytics** dashboard after each booking create, edit, or delete.
 
 ## R8. Seasons, calendar and attribution
 
 - **Decision**: `business/rules/seasons.py` maps months to seasons: `low` = Jan, Feb, Nov;
   `mid` = Mar, Apr, May, Sep, Oct; `high` = Jun, Jul, Aug, Dec.
-  - For 2026 the calendar gives 89 days in `low`, 153 in `mid`, and 123 in `high` (365 total),
-    which Tableau uses with `room_count` from `GET /api/v1/room-types` (214 total rooms) to compute
-    occupancy (`K1`).
-  - A booking (and its revenue and nights) belongs entirely to the season and year of its
-    `check_in_date`, even when the stay crosses into another season or year. A review belongs to
-    the season and year of its `stay_date`.
-  - Season and year are not stored in MySQL. They are derived in the business layer when a domain
-    object is built and included in every `Booking` and `Review` JSON object, so the date is the
-    only source of truth and Tableau never has to re-implement the month-to-season rule.
-- **Rationale**: Clarify fixed the month mapping. Deriving instead of storing means no stored
-  value can disagree with the date.
-- **Alternatives considered**:
-  - Storing season in MySQL: risks inconsistency if `check_in_date` changes.
-  - Splitting stays across seasons night by night: more precise, but the spec attributes by
-    check-in date.
+  - `season_days(year)` derives exact day counts from the calendar (`89` / `153` / `123` = `365` in 2026; `90` / `153` / `123` = `366` in leap years).
+  - For `year=all` (or omitted `year`), the available room-nights span every calendar year from `min(booking.year)` to `max(booking.year)` (`0` when there are no bookings in the database).
+  - When a `season` or `room_type` filter is applied on `HotelSummary`, `available_room_nights` scales to the filtered season's days and the filtered room type's `room_count`.
 
-## R9. Seasonal pricing rule (FR-003 "consistent with the room type's seasonal pricing rules")
+## R9. Seasonal pricing rule (FR-003)
 
-- **Decision**: Every room type has three nightly rate bands, one per season, stored as reference
-  data in `room_type_rates` (values in [data-model.md](data-model.md)). Each band has a minimum,
-  a maximum and a **standard rate** (the midpoint).
-  - When `price_dkk` is omitted or `null`, the business layer sets
-    `price = standard rate × days_rented`.
-  - When `price_dkk` is given, it must be positive with at most 2 decimals, and
-    `price_dkk / days_rented` must lie inside the band for that room type and the derived season.
-    Otherwise the API returns `422` with a message that names the allowed range.
-  - The bands come from the sample data, rounded outward to whole 100 DKK. They start at T1's
-    "ca." low-season prices; for the suites they top out at T1's figures.
-- **Rationale**: This makes "consistent with the pricing rules" testable, keeps all 1,000
-  historical prices valid (checked), and lets the receptionist save without typing a price
-  (US1 scenario 2: changing `Days Rented` recalculates the price when the field is left empty).
-- **Alternatives considered**:
-  - Accepting any positive price: leaves FR-003's "consistent with..." untested.
-  - T1's ranges as the only band: 1,000 sample rows exceed them in high season.
-  - A strict single price per season: the sample shows real prices vary within a band.
+- **Decision**: Unchanged from Week 1. Every room type has three nightly rate bands (`low`, `mid`, `high`) in `room_type_rates` with `min_nightly_dkk`, `max_nightly_dkk`, and `standard_nightly_dkk` (midpoint). Omitted price uses `standard_nightly_dkk × days_rented`; manual `price_dkk` or `price_per_night_dkk` (mutually exclusive, FR-019) must fall within the seasonal band.
 
-## R10. Numbers: money and rounding
+## R10. Numbers, shares and competition ranking
 
 - **Decision**:
-  - Money is `Decimal` in the business layer, `DECIMAL(10,2)` in MySQL and a **JSON number** in
-    responses (never a string), rounded half-up to 2 decimals (`business/rules/numbers.py`).
-  - Raw counts (`days_rented`, `room_count`, `max_guests`, `rating`, `units_sold`, `year`) are
-    JSON integers.
-  - In Tableau, the team formats calculated KPI averages, occupancy rates and percentage shares
-    to 2 decimal places (within the ±0.01 DKK / ±0.01 percentage-point tolerance of SC-003).
-- **Rationale**: Exact monetary storage and validation in the backend, and native numeric JSON types
-  that Tableau reads directly as measures without string-to-float conversion.
-- **Alternatives considered**:
-  - Floats in the business layer: rounding drift on drink prices such as 72.47.
-  - Pydantic's default `Decimal`-as-string JSON: Tableau would read the values as text.
+  - Money and percentages use `Decimal` rounded half-up to 2 decimals (`business/rules/numbers.py`), serialized as JSON numbers.
+  - Percentage shares across a breakdown use **largest-remainder rounding** (`largest_remainder_shares`) so the shares of an unfiltered breakdown sum to `100.00%` (or `0.0` when the total is `0`).
+  - Rankings (`revenue_rank`, `units_rank`) use standard **"1224" competition ranking** (`business/rules/ranking.py`), with ties broken alphabetically by name.
 
 ## R11. Containers, start-up order and schema creation (answers Q8)
 
-- **Decision**: One `docker-compose.yml` at the repository root. `docker compose up` (or
-  `docker-compose up`) starts four services:
+- **Decision**: One `docker-compose.yml` at the repository root. `docker compose up` starts four services:
 
   | Service | Image | Host port | Starts when |
   |---------|-------|-----------|-------------|
-  | `db` | `mysql:8.4` | none (not published) | immediately; healthy once the schema and reference data are queryable over TCP |
+  | `db` | `postgres:17-alpine` | none (not published) | immediately; healthy once the schema and reference data are queryable over TCP (`127.0.0.1:5432`) |
   | `api` | built from `backend/` (target `runtime`) | 8000 | `db` is healthy; healthy when `GET /api/v1/health` returns 200 |
   | `frontend` | built from `frontend/` (`nginx:1.30-alpine`) | 8080 | `api` is healthy |
   | `swagger-ui` | `swaggerapi/swagger-ui:v5.33.3` | 8081 | immediately (static contract) |
 
-  - Two more services sit in compose **profiles**, so `up` never starts them: `seed` (profile
-    `tools`, R13) and `tests` (profile `test`, R16).
-  - The schema and the reference data (8 room types, 214 rooms, 24 rate bands) are created by SQL
-    scripts in `db/init/`, which MySQL runs on first start with an empty volume. A third script
-    creates the `hotel_test` database for the test suite.
-  - The `db` healthcheck runs `SELECT COUNT(*) FROM room_types` over **TCP** (`-h 127.0.0.1`).
-    During initialisation MySQL only listens on its socket, so the check cannot pass before the
-    init scripts have finished.
-  - Containers reach each other by service name: `api` connects to `db:3306`, and nginx proxies
-    `/api/` to `http://api:8000`.
-  - Configuration ships as development defaults in the compose file (database name, user,
-    password, CORS origins, `TZ=Europe/Copenhagen`). None of them is a real secret.
-- **Rationale**: Principle VIII asks for explicit start-up order and lookup by service name. Not
-  publishing MySQL's port enforces "clients only through the API" physically (Principle IV).
-- **Alternatives considered**:
-  - The API creating its own tables at start-up: mixes DDL with serving, and has races when
-    scaled.
-  - A migration tool (Alembic or yoyo): worth it for a long-lived product, but over-sized for two
-    weeks. Instead, schema changes are made by `docker compose down -v` plus `up` (documented in
-    `CONTRIBUTE.md`).
+  - Two tool services sit in compose **profiles**: `seed` (profile `tools`) and `tests` (profile `test`).
+  - PostgreSQL runs `/docker-entrypoint-initdb.d/*.sql` (`01_schema.sql`, `02_reference_data.sql`, `03_test_database.sql`) on first start with an empty `postgres-data` volume.
+  - The `db` healthcheck queries `SELECT COUNT(*) FROM room_types` over TCP (`-h 127.0.0.1`) so `api` only starts after init scripts complete.
 
 ## R12. Data persistence when containers stop (Principle VI, Q8)
 
-- **Decision**: MySQL data lives in the **named volume `mysql-data`**.
+- **Decision**: PostgreSQL data lives in the **named volume `postgres-data`**.
   - `docker compose stop`, `down`, restarts and reboots keep all bookings, reviews and bar sales.
-  - `docker compose down -v` deletes the volume. The next `up` recreates the schema and reference
-    data, and `seed` reloads the sample data.
-  - `README.md` documents this behaviour.
-- **Rationale**: Bookings are live operational data. Losing them on `down` would surprise the
-  receptionist and make the demo fragile.
-- **Alternatives considered**:
-  - No volume or tmpfs: data is lost on every `down`.
-  - A bind mount to `./data`: file-permission problems across macOS, Windows and Linux, plus the
-    risk of committing database files.
+  - `docker compose down -v` deletes the volume. The next `up` recreates the schema and reference data, and `seed` reloads the sample data.
 
-## R13. Loading the sample data (`seed`)
+## R13. Loading the sample data (`seed`) into PostgreSQL
 
-- **Decision**: `docker compose run --rm seed` runs
-  `python -m hotel_api.presentation.cli.seed` in the API image, with `context/teacher/` mounted
-  read-only. The CLI adapter (presentation layer) parses the CSV files and calls
-  `SampleDataService.replace_with_sample_data(...)` in the business layer, which writes through the
-  repositories. The run is **one transaction**:
-  1. Delete all reviews, bookings and bar drink sales (the reference data stays).
-  2. Insert the 1,000 bookings with **explicit IDs 1 to 1000**, equal to the CSV row order.
-     - The check-in date is deterministic: the *k*-th row of a season gets the *k*-th date
-       (cycling) of that season's dates in 2026.
-     - Each row passes the same booking rules as the API (all 1,000 do).
-  3. Insert 500 synthetic reviews, one for each odd booking ID. The rating is drawn by
-     `random.Random(2026)` with weights 5% / 10% / 20% / 35% / 30% for ratings 1 to 5.
-  4. Insert the 30 drink sales for year 2026.
+- **Decision**: `docker compose run --rm seed` runs `python -m hotel_api.presentation.cli.seed` in one PostgreSQL transaction:
+  1. Delete all `reviews`, `bookings` and `bar_drink_sales`.
+  2. Insert the 1,000 bookings with explicit IDs `1` to `1000` and synchronise the PostgreSQL identity sequence (`SELECT setval(pg_get_serial_sequence('bookings', 'id'), COALESCE(MAX(id), 1), MAX(id) IS NOT NULL) FROM bookings`) so subsequent `POST /api/v1/bookings` calls receive ID `1001`, `1002`, etc.
+  3. Insert 500 synthetic reviews (one per odd booking ID, `random.Random(2026)`) and synchronise the `reviews` identity sequence.
+  4. Insert the 30 drink sales for year 2026 with explicit IDs `1` to `30` and synchronise the `bar_drink_sales` identity sequence.
 
-  Text and number repairs:
-  - The decimal comma becomes a decimal point, and the BOM is ignored.
-  - `M�ller` is repaired to `Müller` through a one-entry, documented repair map.
-  - Any other U+FFFD stops the seed with an error instead of storing broken text.
+## R14. Dual analytics delivery: Direct REST API (`Hotel Analytics`) + Tableau compatibility
 
-  Every run ends in the same state, so the command is idempotent. User-created bookings are removed
-  (documented).
-- **Rationale**:
-  - Clarify Q5 asks for an explicit, idempotent reset/replace command.
-  - The single transaction means a failed seed leaves the old data intact.
-  - Booking IDs that equal CSV rows make the data traceable.
-  - The repair satisfies the spec's edge case on international characters.
-  - Seeding through the business layer reuses the season and pricing rules instead of copying
-    them.
-  - The seed is a backend entry point, not an external client, so Principle IV still holds. It
-    cannot go through REST anyway, because bar sales have no write endpoint (out of scope).
-- **Alternatives considered**:
-  - SQL `LOAD DATA` in `db/init`: runs automatically, which contradicts Clarify Q5. It would also
-    duplicate the season rule in SQL.
-  - Posting the CSV through the REST API: impossible for bar sales.
-  - Random dates: not reproducible.
-  - Keeping `M�ller`: breaks the spec's edge case on international characters.
+- **Decision**:
+  - **Direct API & Frontend consumers (`T4`)** call the 9 `GET /api/v1/kpis/*` endpoints under **`Hotel Analytics`** with optional filter parameters (`year`, `season`, `room_type`, `country`, `category`, `price_tier`).
+  - **Tableau Desktop (`T1`)** can still connect to the 4 parameterless raw `GET` endpoints (`bookings`, `room-types`, `reviews`, `bar/drink-sales`) or to the `Hotel Analytics` endpoints.
 
-## R14. How Tableau gets current data (team-owned, outside this repository)
+## R15. Browser frontend: Bookings (`F1`) + Hotel Analytics Dashboard (`F2`)
 
-- **Decision (corrected 2026-10-29)**: Per FR-017, this repository delivers only the REST API and its
-  contract, with no Tableau files and no connector code. The team builds the dashboard and calculates
-  all KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) by hand in Tableau from the four parameterless raw
-  `GET` collection endpoints:
-  - `GET /api/v1/bookings` (JSONPath `$.items[*]`)
-  - `GET /api/v1/room-types` (JSONPath `$.items[*]`)
-  - `GET /api/v1/reviews` (JSONPath `$.items[*]`)
-  - `GET /api/v1/bar/drink-sales` (JSONPath `$.items[*]`)
-  - The CFO refreshes the extract (Data → Refresh All Extracts) to pull current data.
-  - The connector offers Basic, Bearer or OAuth authentication. The API ignores `Authorization`,
-    so any dummy credentials work if the connector insists on one.
-
-  The API makes this route easy:
-  - flat rows with no query parameters required;
-  - `season` and `year` included on every booking and review row;
-  - JSON numbers;
-  - ISO dates;
-  - stable field names fixed by the contract;
-  - no pagination (the largest table is about 1,000 rows);
-  - no authentication;
-  - `Cache-Control: no-store`.
-
-  **Risk**: the team should run the connector once against `GET /api/v1/bookings` as
-  early as possible (quickstart §8).
-- **Rationale**: Principle VI requires the plan to describe the route. WDC 3.0, which the
-  constitution's Clarify list suggested, is deprecated and excluded by FR-017. Exposing raw
-  collections without query parameters gives the team full flexibility to build every chart and
-  KPI manually in Tableau.
-- **Alternatives considered**:
-  - Pre-aggregated `/api/v1/kpis/*` endpoints: removed on 2026-10-29 per team direction so KPIs
-    are built manually in Tableau from raw data.
-  - Web Data Connector 3.0: deprecated, removed in Tableau 26.3, and code that FR-017 keeps out of
-    the repository.
-  - JSON file connector with downloaded files: not live.
-  - An OData v4 service: Tableau supports it, but it would add a second API style and an XML
-    metadata document for one client.
-  - Tableau connecting to MySQL directly: violates Principle IV, and the port is not published.
-
-## R15. Browser frontend (F1)
-
-- **Decision**: One static page (`index.html`, ES-module JavaScript, CSS) with no build step,
-  served by `nginx:1.30-alpine` in the `frontend` container.
-  - nginx also proxies `/api/` to the API, so the page calls `/api/v1/...` on its own origin and
-    needs no CORS.
-  - The page lists bookings and provides a create/edit form and a delete-with-confirmation action.
-  - The room-type list and its rate bands come from `GET /api/v1/room-types`.
-  - Season and price come back from the API. JavaScript implements **no** business rule: it never
-    maps months to seasons and never calculates prices.
-  - Validation messages from Problem Details appear next to the fields.
-  - When room type, check-in date or nights change, the price field is cleared, so the API
-    recalculates the price unless the user types one. (Amended below: a fixed price per night
-    survives a change of nights.)
-  - **Amended 2026-10-29 (FR-018, FR-019, T114, T115)**: the price preview and the two price fields
-    need the season and the standard price before anything is saved. `frontend/public/price-preview.js`
-    therefore mirrors the month → season table and the standard-price arithmetic, **for display only**.
-    The API still derives the season, prices the stay and validates every field on save, and
-    `backend/tests/architecture/test_frontend_price_mirror.py` fails if the table drifts from
-    `business/rules/seasons.py`. A change of room type or check-in date clears a typed price, a change
-    of nights clears a typed total but keeps a fixed price per night.
-- **Rationale**: The smallest thing that satisfies F1 inside Docker (OQ-1 resolved toward the
-  compose container).
-- **Alternatives considered**:
-  - React or Vite: a build toolchain for one form.
-  - GitHub Pages: violates Principle VIII (OQ-1), and would need a public backend URL and CORS.
-  - Server-rendered templates in the API: would mix UI into the presentation layer of a
-    JSON-only API.
+- **Decision**: Extend the single-page frontend (`frontend/public/`) with an interactive **Hotel Analytics** section (`FR-022`) alongside the Receptionist Booking Management section (`F1`, `FR-018`–`FR-020`):
+  - **Filter bar**: lets the user filter hotel analytics by `year` (`all` or `2026`), `season`, `room_type`, and `country`, and filter bar analytics by `year`, `category`, and `price_tier`.
+  - **Hotel KPI summary cards**: Total Revenue (`A6`/`K2`), Occupancy Rate & Available Room-Nights (`K1`), Customer Satisfaction & Satisfied Share (`K3`), ALOS, ADR, and Average Revenue per Booking (`A7`).
+  - **Hotel KPI breakdown tables**: By Room Type (`A4`, `K1`, `K3`, `A7`), By Season (`K1`, `K2`, `K3`, `A7`), By Room Type × Season (`A2`), and By Country (`A1`, `A3`, `A5`).
+  - **Cocktail Bar KPI summary & breakdown tables**: Helene Christine's Total Bar Sales (`B1`), Cocktail vs. Coffee Category Split (`B3`), Demand by Price Tier (`A7`/`US4`), and Revenue & Rank per Drink (`B2`).
+  - **Live refresh**: creating, editing, or deleting a booking automatically refreshes both the booking list and the Hotel Analytics views.
+  - **Zero KPI math in JavaScript**: all KPI numbers displayed in the frontend come directly from `/api/v1/kpis/*` responses.
 
 ## R16. Test strategy and how tests run (Principle IX)
 
-- **Decision**: pytest 9 with four suites:
+- **Decision**: pytest 9 with four suites against `hotel_test` in PostgreSQL:
+  - `tests/unit`: all operational rules (`seasons`, `pricing`, `booking_validation`, `review_validation`, `numbers`, `ranking`, `price_tiers`), all KPI calculators (`hotel.py`, `bar.py`, including filters and `year=all`), and all services (`booking_service`, `review_service`, `kpi_service`, `sample_data_service`).
+  - `tests/contract`: all **20 operations** validated against `openapi.yaml` with `openapi-core`, route parity (20 operations), and spec validity.
+  - `tests/integration`: PostgreSQL repositories (`test_repositories.py`), booking CRUD (`test_booking_crud.py`), seed idempotency (`test_seed.py`), and golden KPI tests (`test_golden_revenue.py`, `test_golden_occupancy_satisfaction.py`, `test_golden_bar.py`, `test_golden_a7.py`, `test_all_time_kpis.py`).
+  - `tests/architecture`: layer import rules (`test_layers.py`), frontend price-preview mirror (`test_frontend_price_mirror.py`), and no Tableau files (`test_no_tableau_files.py`).
 
-  | Suite | Purpose | Needs MySQL |
-  |-------|---------|-------------|
-  | `tests/unit` | every business rule and service in `business/` (seasons, pricing bands and standard price, booking and review validation, rounding, booking/review services, seed transformation) | no |
-  | `tests/contract` | every operation in the 11-operation contract, success and error statuses, validated with openapi-core; route parity; contract file validity | yes (`hotel_test`) |
-  | `tests/integration` | repositories against MySQL; booking CRUD lifecycle; seed idempotency (run twice, same counts and totals) | yes (`hotel_test`) |
-  | `tests/architecture` | the import rules from R3, frontend price-preview mirror parity (`test_frontend_price_mirror.py`), and a scan proving the repository contains no Tableau files (`.twb`, `.twbx`, `.tbm`, `.tds`, `.tdsx`, `.hyper`; FR-017) | no |
+## R17. Validation limits
 
-  - Tests run in Docker: `docker compose run --rm tests`. This uses the `test` image target, mounts
-    the repository at `/repo` (backend sources, contract, `db/init`, sample CSVs and the whole tree
-    for the FR-017 scan), and reaches the `db` service.
-  - Fixtures rebuild the `hotel_test` schema from `db/init/` once per session and empty the
-    operational tables before each test, so dev data in `hotel` is never touched.
-  - Unit and architecture tests also run on any local Python ≥ 3.13.
-  - `CONTRIBUTE.md` documents both ways.
-- **Rationale**: Tests behave the same on every laptop. Contract tests hit real SQL, so they prove
-  the whole stack against the contract (Q7).
-- **Alternatives considered**:
-  - SQLite for tests: a different SQL dialect gives false confidence.
-  - Testcontainers: needs the Docker socket inside a container.
-  - In-memory fake repositories for contract tests: duplicate repository behaviour and skip the
-    SQL.
+- **Decision**: Unchanged (`days_rented` 1–365, dates/years 2000–2100, text 1–100 chars trimmed, prices > 0 with at most 2 decimals, ratings 1–5).
 
-## R17. Validation limits the spec does not state (flagged for the team)
+## R18. Git preservation of Week 1 work (`Tillægsopgave_uge_2.md`)
 
-- **Decision**:
-  - `days_rented` ≤ 365.
-  - `check_in_date` and `stay_date` lie between 2000 and 2100.
-  - Name and country are trimmed, non-empty and at most 100 characters.
-  - `price_dkk` and `price_per_night_dkk` have at most 2 decimals.
-  - `rating` is a whole number from 1 to 5.
-- **Rationale**: These bounds keep values inside the database column types, so an extreme value
-  becomes a clear `422` instead of a `500`, and keep stays meaningful (one booking cannot cover more
-  than a reporting year).
-- **Alternatives considered**: no upper bounds, which lets values such as 70,000 nights reach the
-  database and fail with errors the user cannot understand.
+- **Decision**: Commit `018396b` (the completed Week 1 MySQL + raw-API release) is tagged/released as `v1.0.0` in Git prior to Week 2 implementation (`FR-023`). During the presentation on Friday, the team can inspect or check out `v1.0.0` to show the Week 1 state and `main` (or `v2.0.0`) to show the PostgreSQL + `Hotel Analytics` Week 2 state.
 
 ---
 
@@ -458,16 +225,14 @@ v5.4 are available.
 | # | Decision | Proposed by | Team status |
 |---|----------|-------------|-------------|
 | 1 | Python + FastAPI, synchronous endpoints (R1) | Team plan (TM), framework picked by AI | Kept |
-| 2 | Operational rules in the business layer; KPIs calculated manually in Tableau from raw REST endpoints (R5, R6) | AI originally proposed pre-aggregated `/api/v1/kpis/*` endpoints with query parameters | **Changed by the team** on 2026-10-29: removed `/api/v1/kpis/*` and all query parameters; API serves raw collections (`bookings`, `room-types`, `reviews`, `bar/drink-sales`) for manual KPI creation in Tableau |
-| 3 | Design-first OpenAPI 3.0.3, FastAPI docs off, three-part sync check (R4) | AI (this plan) | Kept (11 parameterless operations) |
-| 4 | Named volume `mysql-data`; `down -v` resets (R12) | AI (this plan) | Kept |
-| 5 | Tableau via the REST API only; no Tableau files or connector code in the repository (R14, FR-017) | **AI proposed a Web Data Connector** (constitution, Clarify list) | **Changed by the team** on 2026-10-27: REST API only, dashboard built manually |
-| 6 | Sample data by explicit `seed` command, not on `up` (R13) | AI asked in Clarify | Decided by the team (Clarify Q5) |
-| 7 | Pricing bands plus standard rate (R9) | AI (this plan) | Kept |
-| 8 | Repair M�ller → Müller while seeding (R13) | AI (this plan) | Kept |
-
-Row 5 is the decision Principle X asks for: one the AI proposed and the team changed. The team
-should fill in "Kept" or "Changed" for the pending rows during the plan review.
+| 2 | Week 1 → Week 2 KPI evolution: pre-aggregated KPIs built in Phase 4–9, removed for `v1.0.0` raw-Tableau release, and restored/expanded with filter attributes under `"Hotel Analytics"` + frontend view in Week 2 (`T4`, R5, R6) | Team & `Tillægsopgave_uge_2.md` | **Evolved across v1.0.0 → Week 2**: raw endpoints kept as-is for Tableau while adding 9 filtered `"Hotel Analytics"` GET endpoints and frontend analytics display |
+| 3 | Database migration from MySQL 8.4 (`PyMySQL`) in `v1.0.0` to **PostgreSQL 17** (`psycopg[binary]`) in Week 2 (`T4`, R2) | Teacher (`T4` forbids MySQL), PostgreSQL chosen by team | **Changed in Week 2**: proves 3-layer replaceability (Q5) by confining DB changes to `data/`, `db/init/`, and compose |
+| 4 | Design-first OpenAPI 3.0.3, FastAPI docs off, three-part sync check (R4) | AI (this plan) | Kept (20 operations across 6 tags) |
+| 5 | Named volume `postgres-data`; `down -v` resets (R12) | AI (this plan) | Kept |
+| 6 | Tableau via the REST API only; no Tableau files or connector code in the repository (R14, FR-017) | **AI proposed a Web Data Connector** (constitution, Clarify list) | **Changed by the team** on 2026-10-27: REST API only |
+| 7 | Sample data by explicit `seed` command, not on `up` (R13) | AI asked in Clarify | Decided by the team (Clarify Q5) |
+| 8 | Pricing bands plus standard rate and dual price input (R9, FR-019) | AI & team (`TODOS.md`) | Kept |
+| 9 | Repair `Mller` → `Müller` while seeding (R13) | AI (this plan) | Kept |
 
 ## Biggest weakness if this went to production
 
@@ -476,19 +241,7 @@ change or delete bookings, and nothing records who did it. The spec puts this ou
 prototype; production would need at least an identity provider, roles (Receptionist, CFO, booking
 system), TLS and an audit log.
 
-Two runner-up weaknesses are worth naming in Q10:
+Two runner-up weaknesses worth naming in Q10:
 
 - **No room-level availability check**: overbooking beyond 214 rooms is possible.
-- **Last-write-wins on concurrent edits**: there is no ETag or version check.
-
-## Sources
-
-- Tableau, *Web Data Connector 3.0* repository (deprecation notice):
-  <https://github.com/tableau/wdc3>
-- Tableau Exchange, *REST API Connector*: <https://exchange.tableau.com/products/1111>
-- Tableau Help, *Web Data Connector*: <https://help.tableau.com/current/api/webdataconnector/en-us>
-- Tableau Help, *OData* connector: <https://help.tableau.com/current/pro/desktop/en-us/examples_odata.htm>
-- PyPI metadata (versions as of 2026-10-27): fastapi 0.162.0, pydantic 2.14.1, uvicorn 0.54.0,
-  PyMySQL 1.2.3, openapi-core 0.23.1, openapi-spec-validator 0.9.0, pytest 9.2.0, httpx 0.28.1.
-- Docker Hub tags (2026-10-27): `mysql:8.4`, `python:3.13-slim`, `nginx:1.30-alpine`,
-  `swaggerapi/swagger-ui:v5.33.3`.
+- **In-memory KPI aggregation per request**: `KpiService` loads the matching bookings/reviews from PostgreSQL and aggregates in Python (`business/kpis/`), which is fast at 1,000–10,000 rows (<100 ms) and keeps business logic out of SQL, but at millions of rows would need pagination, caching, or read-model projections.
