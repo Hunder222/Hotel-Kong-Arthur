@@ -635,16 +635,16 @@
       <div class="brand-badge">KA</div>
       <div>
         <h1>Hotel Kong Arthur · Architecture Floorplan</h1>
-        <p>Interactive 3-Layer Backend, REST Contract, Web Reception UI &amp; MySQL 8.4 Dependency Map</p>
+        <p>Interactive 3-Layer Backend, REST Contract (20 Operations), Bookings &amp; Analytics Web UI &amp; PostgreSQL 17 Dependency Map</p>
       </div>
     </div>
 
     <div class="toolbar-stats">
       <span class="stat-pill"><strong>5</strong> Architectural Tiers</span>
-      <span class="stat-pill"><strong id="stat-nodes">16</strong> Components</span>
-      <span class="stat-pill"><strong id="stat-edges">37</strong> Dependency Edges</span>
-      <span class="stat-pill"><strong>11</strong> OpenAPI Operations</span>
-      <button class="chip" id="btn-rules-modal" type="button" title="Inspect test_layers.py &amp; FR-017 architectural constraints">
+      <span class="stat-pill"><strong id="stat-nodes">25</strong> Components</span>
+      <span class="stat-pill"><strong id="stat-edges">56</strong> Dependency Edges</span>
+      <span class="stat-pill"><strong>20</strong> OpenAPI Operations</span>
+      <button class="chip" id="btn-rules-modal" type="button" title="Inspect tests/architecture/ &amp; FR-017 architectural constraints">
         🛡️ Layer Rules &amp; Guardrails
       </button>
       <button class="chip" id="btn-orientation" type="button" aria-pressed="false" title="Toggle between Vertical Floorplan and Horizontal Flow">
@@ -670,7 +670,7 @@
         <span class="layer-dot" style="background: var(--layer-domain)"></span>2b. Domain, KPIs &amp; Rules
       </button>
       <button class="chip" data-layer="data" aria-pressed="false" type="button">
-        <span class="layer-dot" style="background: var(--layer-data)"></span>3. Data Access &amp; MySQL
+        <span class="layer-dot" style="background: var(--layer-data)"></span>3. Data Access &amp; PostgreSQL
       </button>
     </div>
 
@@ -684,7 +684,6 @@
       <button class="chip" data-journey="us3" aria-pressed="false" type="button">US3 · Occupancy &amp; Reviews (K1/K3)</button>
       <button class="chip" data-journey="us4" aria-pressed="false" type="button">US4 · Lobby Bar &amp; Tiers (B1–B3)</button>
       <button class="chip" data-journey="us5" aria-pressed="false" type="button">US5 · Stay KPIs (A7: ALOS/ADR)</button>
-      <button class="chip" data-journey="seed" aria-pressed="false" type="button">CLI · CSV Sample Seed (R13)</button>
     </div>
 
     <div class="divider"></div>
@@ -744,7 +743,8 @@
       <button class="close-btn" id="btn-close-dialog" type="button" aria-label="Close modal">✕</button>
     </div>
     <p style="margin: 0 0 0.75rem; font-size: 0.85rem; color: var(--text-muted);">
-      Verified automatically on every test run by <code>backend/tests/architecture/test_layers.py</code> and
+      Verified automatically on every test run by <code>backend/tests/architecture/test_layers.py</code>,
+      <code>backend/tests/architecture/test_frontend_price_mirror.py</code>, and
       <code>backend/tests/architecture/test_no_tableau_files.py</code>:
     </p>
     <table class="matrix-table">
@@ -759,33 +759,33 @@
       <tbody>
         <tr>
           <td><strong>Frontend Web UI</strong><br/><code>frontend/public/*</code></td>
-          <td><span class="ok-badge">✓</span> Same-origin <code>/api/v1/*</code></td>
-          <td><span class="forbid-badge">✗</span> Business formulas, direct DB</td>
-          <td>Contains zero pricing, season, or validation logic (Research R15).</td>
+          <td><span class="ok-badge">✓</span> Same-origin <code>/api/v1/*</code>, display-only <code>price-preview.js</code></td>
+          <td><span class="forbid-badge">✗</span> Authoritative business/KPI formulas, duplicated season arrays, direct DB</td>
+          <td>API is sole authority for pricing, validation &amp; KPIs; <code>test_frontend_price_mirror.py</code> enforces season parity &amp; semantic tabs (<code>role="tablist"</code>).</td>
         </tr>
         <tr>
           <td><strong>1. Presentation Layer</strong><br/><code>hotel_api.presentation.*</code></td>
           <td><span class="ok-badge">✓</span> <code>hotel_api.business.*</code>, FastAPI, Pydantic</td>
-          <td><span class="forbid-badge">✗</span> <code>hotel_api.data.*</code>, PyMySQL</td>
-          <td>Routers depend on Service stubs in <code>dependencies.py</code>; <code>main.py</code> binds them per request.</td>
+          <td><span class="forbid-badge">✗</span> <code>hotel_api.data.*</code>, <code>psycopg</code></td>
+          <td>Routers depend on 6 Service stubs &amp; filter providers in <code>dependencies.py</code>; <code>main.py</code> binds them per request.</td>
         </tr>
         <tr>
           <td><strong>2. Business Layer</strong><br/><code>hotel_api.business.*</code></td>
           <td><span class="ok-badge">✓</span> Pure Python stdlib, <code>hotel_api.business.*</code></td>
-          <td><span class="forbid-badge">✗</span> <code>presentation</code>, <code>data</code>, <code>fastapi</code>, <code>starlette</code>, <code>pymysql</code></td>
-          <td>Single source of truth for KPIs, seasons, pricing, ranking, and validation (Constitution VII).</td>
+          <td><span class="forbid-badge">✗</span> <code>presentation</code>, <code>data</code>, <code>fastapi</code>, <code>starlette</code>, <code>psycopg</code>, <code>pymysql</code></td>
+          <td>Single source of truth for Hotel &amp; Bar KPIs, seasons, pricing, price tiers, ranking, and validation (Constitution VII).</td>
         </tr>
         <tr>
           <td><strong>3. Data Layer</strong><br/><code>hotel_api.data.*</code></td>
-          <td><span class="ok-badge">✓</span> <code>business.domain.models</code>, <code>business.ports</code>, <code>business.rules.seasons</code>, PyMySQL</td>
+          <td><span class="ok-badge">✓</span> <code>business.domain.models</code>, <code>business.ports</code>, <code>business.rules.seasons</code>, <code>psycopg</code></td>
           <td><span class="forbid-badge">✗</span> <code>hotel_api.presentation.*</code>, <code>hotel_api.business.services.*</code></td>
-          <td>Parameterised SQL over one transactional connection per request; maps driver errors to <code>StorageUnavailable</code>.</td>
+          <td>Parameterised SQL over one transactional PostgreSQL 17 connection per request; maps driver errors to <code>StorageUnavailable</code>.</td>
         </tr>
         <tr>
           <td><strong>Tableau Handover</strong><br/><code>FR-017</code></td>
           <td><span class="ok-badge">✓</span> External HTTP GET JSON via REST API Connector</td>
-          <td><span class="forbid-badge">✗</span> <code>.twb</code>, <code>.twbx</code>, <code>.tbm</code>, <code>.tds</code>, <code>.hyper</code>, WDC JS</td>
-          <td>Dashboard is built manually by the team against the REST API; repo stores zero Tableau files.</td>
+          <td><span class="forbid-badge">✗</span> <code>.twb</code>, <code>.twbx</code>, <code>.tbm</code>, <code>.tds</code>, <code>.tdsx</code>, <code>.hyper</code>, WDC JS</td>
+          <td>Dashboard is built manually by the team against the preserved raw REST endpoints; repo stores zero Tableau files.</td>
         </tr>
       </tbody>
     </table>
@@ -799,8 +799,8 @@
       {
         id: "client",
         index: 0,
-        name: "Tier 0 · Clients, External Consumers & Data Inputs",
-        subtitle: "Reception Browser SPA, Nginx Proxy, Tableau CFO Dashboard, Swagger UI & Teacher CSVs",
+        name: "Tier 0 · Clients & External Consumers",
+        subtitle: "Bookings & Analytics Browser SPA (F1/F2), Nginx Proxy, Tableau CFO Dashboard & Swagger UI",
         color: "#f59e0b",
         bg: "rgba(245, 158, 11, 0.07)"
       },
@@ -808,7 +808,7 @@
         id: "presentation",
         index: 1,
         name: "Tier 1 · Presentation Layer & Composition Root (hotel_api.presentation)",
-        subtitle: "FastAPI Routers, Pydantic DTO Schemas, RFC 9457 Problem Details, Seed CLI & main.py Wiring",
+        subtitle: "FastAPI Routers (CRUD + Hotel Analytics KPIs), Pydantic DTO Schemas, RFC 9457 Problem Details & main.py Wiring",
         color: "#38bdf8",
         bg: "rgba(56, 189, 248, 0.07)"
       },
@@ -816,7 +816,7 @@
         id: "services",
         index: 2,
         name: "Tier 2a · Business Layer — Application Services (hotel_api.business.services)",
-        subtitle: "Use-Case Orchestrators coordinating Pure Rules/KPIs with Repository Protocol Ports",
+        subtitle: "Use-Case Orchestrators coordinating Pure KPIs & Rules with Repository Protocol Ports",
         color: "#a855f7",
         bg: "rgba(168, 85, 247, 0.07)"
       },
@@ -824,15 +824,15 @@
         id: "domain",
         index: 3,
         name: "Tier 2b · Business Layer — Pure KPIs, Rules, Models & Ports (hotel_api.business.*)",
-        subtitle: "Zero-I/O KPI Calculators, Validation & Pricing Rules, Domain Dataclasses & Repository Protocols",
+        subtitle: "Zero-I/O Hotel & Bar KPI Calculators, Validation, Pricing, Price Tiers, Ranking & Repository Protocols",
         color: "#ec4899",
         bg: "rgba(236, 72, 153, 0.07)"
       },
       {
         id: "data",
         index: 4,
-        name: "Tier 3 · Data Access Layer & Persistence (hotel_api.data + MySQL 8.4)",
-        subtitle: "PyMySQL Transactional Connection Scope, Parameterised SQL Repositories & MySQL 8.4 Tables",
+        name: "Tier 3 · Data Access Layer & Persistence (hotel_api.data + PostgreSQL 17)",
+        subtitle: "psycopg 3.2 Transactional Connection Scope, Parameterised SQL Repositories & PostgreSQL 17 Tables",
         color: "#10b981",
         bg: "rgba(16, 185, 129, 0.07)"
       }
@@ -844,21 +844,23 @@
         id: "frontend-ui",
         layer: "client",
         slot: 0,
-        title: "Reception Booking Web UI",
-        subtitle: "frontend/public/{index.html,app.js}",
-        badge: "Browser SPA · F1",
-        journeys: ["us1"],
-        summary: "Static browser application used by hotel receptionists on port 8080 to list, create, edit, and delete guest room bookings. Intentionally contains zero business rules, pricing formulas, or season mappings—it renders rate hints and field-level validation errors directly from the REST API.",
+        title: "Web UI: Bookings & Hotel Analytics",
+        subtitle: "frontend/public/{index.html,app.js,price-preview.js}",
+        badge: "Browser SPA · F1 & F2",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "Two-tab browser application (`#bookings` and `#analytics/{hotel|bar}`) on port 8080. Receptionists manage room bookings (`F1`) with dual total/nightly price inputs (`FR-018`/`FR-019`) and a display-only price preview (`price-preview.js`, guarded by `test_frontend_price_mirror.py`). The Hotel Analytics tab (`F2`, `FR-022`) displays an Executive Revenue Overview (Room Bookings + Bar Sales + Combined Total Revenue) and interactive sub-views for Room Booking Analytics and Bar Sales Analytics with filter controls and sortable tables. All pricing, validation, and KPI calculations happen on the backend API.",
         files: [
-          { path: "frontend/public/index.html", role: "Booking form & table markup" },
-          { path: "frontend/public/app.js", role: "UI state, rendering & event wiring" },
-          { path: "frontend/public/styles.css", role: "Responsive reception stylesheet" }
+          { path: "frontend/public/index.html", role: "Semantic tabs (role='tablist'), booking form & analytics tables" },
+          { path: "frontend/public/app.js", role: "Tab navigation, booking CRUD, analytics rendering & table sorting" },
+          { path: "frontend/public/price-preview.js", role: "Display-only season & standard price preview mirror (FR-018/FR-019)" },
+          { path: "frontend/public/styles.css", role: "Responsive reception & analytics dashboard stylesheet" }
         ],
         exports: [
-          { sig: "init() / reload()", desc: "Loads room types and newest bookings on startup" },
-          { sig: "onSubmit(event)", desc: "Dispatches createBooking() or replaceBooking() and maps 400/422 errors to fields" },
-          { sig: "startEdit(booking) / removeBooking(booking)", desc: "Switches form into edit mode or confirms deletion" },
-          { sig: "renderRoomTypes() / showRateHint()", desc: "Populates room select and displays seasonal min–max rate bands" }
+          { sig: "setPrimaryView() / setAnalyticsSubView() / handleHashChange()", desc: "Switches between Bookings (#bookings) and Analytics (#analytics/hotel | #analytics/bar)" },
+          { sig: "loadAnalytics() / renderHotelAnalytics() / renderBarAnalytics() / renderTopRevenueSummary()", desc: "Fetches all 9 KPI endpoints in parallel and renders executive revenue summary & tables" },
+          { sig: "onSubmit(event) / startEdit(booking) / removeBooking(booking) / refreshPrice()", desc: "Booking CRUD workflow, live price preview & RFC 9457 field error placement" },
+          { sig: "standardPreview() / totalFromNightly() / nightlyFromTotal()", desc: "Display-only price preview helpers in price-preview.js" },
+          { sig: "initTableSorting() / sortTable()", desc: "Accessible client-side column sorting for bookings and KPI tables" }
         ]
       },
       {
@@ -868,20 +870,18 @@
         title: "Browser API Client & Nginx Proxy",
         subtitle: "frontend/public/api.js + nginx.conf",
         badge: "ES Module + Nginx :8080",
-        journeys: ["us1"],
-        summary: "Thin fetch wrapper module (`api.js`) paired with an Nginx 1.30 reverse proxy (`nginx.conf`). The browser talks to its own origin on port 8080; Nginx forwards `/api/*` requests to `http://api:8000` using Docker's internal DNS resolver.",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "Thin fetch wrapper module (`api.js`) paired with an Nginx 1.30 reverse proxy (`nginx.conf`). The browser talks to its own origin on port 8080; Nginx forwards `/api/*` requests to `http://api:8000` using Docker's internal DNS resolver. Provides both Bookings CRUD methods and query-string builders for the `/api/v1/kpis/hotel/*` and `/api/v1/kpis/bar/*` endpoints.",
         files: [
-          { path: "frontend/public/api.js", role: "Fetch wrappers & ApiError class" },
-          { path: "frontend/nginx.conf", role: "Static serving + /api/ reverse proxy" },
+          { path: "frontend/public/api.js", role: "Fetch wrappers, queryString() builder & ApiError class" },
+          { path: "frontend/nginx.conf", role: "Static serving + /api/ reverse proxy to api:8000" },
           { path: "frontend/Dockerfile", role: "nginx:1.30-alpine container image" }
         ],
         exports: [
           { sig: "class ApiError(status, problem)", desc: "Wraps RFC 9457 Problem Details and exposes .fieldErrors" },
-          { sig: "listRoomTypes()", desc: "GET /api/v1/room-types -> items[]" },
-          { sig: "listBookings()", desc: "GET /api/v1/bookings -> items[]" },
-          { sig: "createBooking(booking)", desc: "POST /api/v1/bookings" },
-          { sig: "replaceBooking(id, booking)", desc: "PUT /api/v1/bookings/{id}" },
-          { sig: "deleteBooking(id)", desc: "DELETE /api/v1/bookings/{id}" }
+          { sig: "listRoomTypes() / listBookings() / createBooking() / replaceBooking() / deleteBooking()", desc: "GET /room-types and full CRUD over /api/v1/bookings" },
+          { sig: "getHotelSummary(filters) / getHotelKpis(kind, filters)", desc: "GET /api/v1/kpis/hotel/{summary,by-room-type,by-season,by-room-type-and-season,by-country}" },
+          { sig: "getBarSummary(filters) / getBarKpis(kind, filters)", desc: "GET /api/v1/kpis/bar/{summary,by-drink,by-category,by-price-tier}" }
         ]
       },
       {
@@ -890,9 +890,9 @@
         slot: 2,
         title: "Tableau Desktop CFO Dashboard",
         subtitle: "External Consumer (REST API Connector)",
-        badge: "Analytics · A1–A7, B1–B3, K1–K3",
+        badge: "Raw Extracts · FR-017",
         journeys: ["us2", "us3", "us4", "us5"],
-        summary: "External analytics client used by the Hotel CFO. Connects to the 4 parameterless raw GET collection endpoints (`/api/v1/bookings`, `/api/v1/room-types`, `/api/v1/reviews`, `/api/v1/bar/drink-sales`) via Tableau's REST API Connector (JSONPath `$.items[*]`). The team manually builds dashboards and calculates all KPIs (`A1`–`A7`, `B1`–`B3`, `K1`–`K3`) inside Tableau. Per FR-017 (enforced by `test_no_tableau_files.py`), the repository stores no `.twb`/`.twbx` files.",
+        summary: "External analytics client used by the Hotel CFO. Connects to the 4 preserved parameterless raw GET collection endpoints (`/api/v1/bookings`, `/api/v1/room-types`, `/api/v1/reviews`, `/api/v1/bar/drink-sales`) via Tableau's REST API Connector (JSONPath `$.items[*]`), maintaining 100% backward compatibility with `v1.0.0`. Per FR-017 (enforced by `test_no_tableau_files.py`), the repository stores no `.twb`/`.twbx` files or connector code.",
         files: [
           { path: "README.md", role: "Tableau REST API Connector handover guide" },
           { path: "backend/tests/architecture/test_no_tableau_files.py", role: "AST/filesystem guardrail enforcing FR-017" }
@@ -908,35 +908,18 @@
         slot: 3,
         title: "OpenAPI 3.0.3 Contract & Swagger UI",
         subtitle: "contracts/openapi.yaml (:8081)",
-        badge: "11 Operations · R4",
+        badge: "20 Operations · 6 Tags · R4",
         journeys: ["us1", "us2", "us3", "us4", "us5"],
-        summary: "The single authoritative API specification (`openapi.yaml`) mounted read-only into the `swagger-ui` Docker container on port 8081 and validated against every live route response by `backend/tests/contract/`.",
+        summary: "The single authoritative API specification (`openapi.yaml`) mounted read-only into the `swagger-ui` Docker container on port 8081 and validated against every live route and response by `backend/tests/contract/`. Defines 20 operations across 16 paths under 6 tags (`Health`, `Reference data`, `Bookings`, `Reviews`, `Bar`, and `Hotel Analytics`).",
         files: [
-          { path: "specs/001-hotel-analytics-platform/contracts/openapi.yaml", role: "Single authoritative OpenAPI 3.0.3 contract" },
-          { path: "backend/tests/contract/test_contract_validity.py", role: "Verifies 11-operation route parity & schema conformance" },
+          { path: "specs/001-hotel-analytics-platform/contracts/openapi.yaml", role: "Single authoritative OpenAPI 3.0.3 contract (20 operations)" },
+          { path: "backend/tests/contract/test_contract_validity.py", role: "Verifies 20-operation route parity & OpenAPI 3.0.3 schema conformance" },
           { path: "docker-compose.yml", role: "Mounts openapi.yaml into swaggerapi/swagger-ui:v5.33.3" }
         ],
         exports: [
-          { sig: "11 OperationIds (no query parameters)", desc: "getHealth, listRoomTypes, Bookings CRUD (5), Reviews (3), listDrinkSales (1)" },
-          { sig: "Schemas: Problem, Booking, RoomType, Review, DrinkSale", desc: "Strict DTO contracts with additionalProperties: false" }
-        ]
-      },
-      {
-        id: "csv-sample-files",
-        layer: "client",
-        slot: 4,
-        title: "Teacher Sample CSV Datasets",
-        subtitle: "context/teacher/*.csv",
-        badge: "1,000 Bookings · 30 Drinks",
-        journeys: ["seed"],
-        summary: "Raw CSV datasets provided for the course assignment. Read only on-demand by the `seed` CLI profile—never at runtime by the web API. Includes 1,000 international room bookings (with 54 `M\\ufffdller` rows repaired during seed) and 30 lobby bar drinks.",
-        files: [
-          { path: "context/teacher/international_names_with_rooms_1000.csv", role: "1,000 sample bookings (comma-delimited)" },
-          { path: "context/teacher/drinks_menu_with_sales.csv", role: "30 bar drink sales (semicolon-delimited, decimal comma)" }
-        ],
-        exports: [
-          { sig: "international_names_with_rooms_1000.csv", desc: "Columns: First Name, Family Name, Country, Room Type, Days Rented, Season, Price" },
-          { sig: "drinks_menu_with_sales.csv", desc: "Columns: Drink Name, Category, Price (DKK), Units Sold" }
+          { sig: "11 Core OperationIds (Raw & CRUD)", desc: "getHealth, listRoomTypes, Bookings CRUD (5), Reviews (3), listDrinkSales (1)" },
+          { sig: "9 Hotel Analytics OperationIds", desc: "getHotelSummary, listHotelKpisBy{RoomType,Season,RoomTypeAndSeason,Country}, getBarSummary, listBarKpisBy{Drink,Category,PriceTier}" },
+          { sig: "Schemas: Problem, Booking, RoomType, Review, DrinkSale, Hotel*Kpi, Bar*Kpi", desc: "Strict DTO contracts with additionalProperties: false" }
         ]
       },
 
@@ -948,38 +931,38 @@
         title: "Composition Root & Settings",
         subtitle: "hotel_api/main.py + config.py",
         badge: "FastAPI App · R3",
-        journeys: ["us1", "us2", "us3", "us4", "us5", "seed"],
-        summary: "The only module in the backend that imports all three layers (`presentation`, `business`, `data`). Builds the FastAPI app, attaches CORS and `NoStoreMiddleware` (`Cache-Control: no-store`), registers RFC 9457 error handlers, and binds each presentation dependency stub to a request-scoped transactional connection.",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "The only module in the backend that imports all three layers (`presentation`, `business`, `data`). Builds the FastAPI app, attaches CORS and `NoStoreMiddleware` (`Cache-Control: no-store`), registers RFC 9457 error handlers, mounts all 7 routers, and binds all 6 presentation dependency stubs to a request-scoped transactional PostgreSQL connection.",
         files: [
-          { path: "backend/src/hotel_api/main.py", role: "FastAPI factory, NoStoreMiddleware & DI wiring" },
-          { path: "backend/src/hotel_api/config.py", role: "Frozen Settings dataclass from env vars" },
+          { path: "backend/src/hotel_api/main.py", role: "FastAPI factory, NoStoreMiddleware & request-scoped DI wiring" },
+          { path: "backend/src/hotel_api/config.py", role: "Frozen Settings dataclass from env vars (PostgreSQL 5432)" },
           { path: "backend/Dockerfile", role: "Python 3.13 multi-stage runtime & test image" },
-          { path: "docker-compose.yml", role: "Orchestrates db, api, frontend, swagger-ui, seed, tests" }
+          { path: "docker-compose.yml", role: "Orchestrates db (postgres:17-alpine), api, frontend, swagger-ui & tests" }
         ],
         exports: [
-          { sig: "create_app(settings: Settings | None) -> FastAPI", desc: "Builds FastAPI app and wires dependency_overrides" },
-          { sig: "sample_data_service_scope(settings) -> Iterator[SampleDataService]", desc: "Transactional context manager for CLI seeding" },
+          { sig: "create_app(settings: Settings | None) -> FastAPI", desc: "Builds FastAPI app, mounts 7 routers and wires 6 dependency_overrides" },
           { sig: "class NoStoreMiddleware", desc: "Enforces Cache-Control: no-store on all HTTP responses" },
-          { sig: "Settings.from_env() / get_settings()", desc: "Loads DB_HOST, DB_PORT, DB_NAME, CORS_ORIGINS, TZ" }
+          { sig: "Settings.from_env() / get_settings()", desc: "Loads DB_HOST/POSTGRES_HOST, DB_PORT (5432), DB_NAME, CORS_ORIGINS, TZ" }
         ]
       },
       {
         id: "api-deps-errors",
         layer: "presentation",
         slot: 1,
-        title: "DI Stubs, RFC 9457 Errors & Shared DTOs",
+        title: "DI Stubs, Filter Parsers & RFC 9457 Errors",
         subtitle: "presentation/api/{dependencies,errors}.py",
-        badge: "Problem+JSON · Europe/Copenhagen",
+        badge: "6 DI Stubs · Problem+JSON",
         journeys: ["us1", "us2", "us3", "us4", "us5"],
-        summary: "Provides the dependency injection provider stubs (`get_booking_service`, `get_review_service`, `get_bar_service`, etc.) so routers never import `data/`, and translates `ValidationFailed` (422), `NotFound` (404), `StorageUnavailable` (503), and malformed requests (400) into RFC 9457 `application/problem+json`.",
+        summary: "Provides the 6 dependency injection provider stubs (`get_booking_service`, `get_kpi_service`, etc.) so routers never import `data/`, parses and validates query filter parameters (`hotel_filters`, `bar_filters`, `report_year`) for the `Hotel Analytics` endpoints, and translates `ValidationFailed` (422), `NotFound` (404), `StorageUnavailable` (503), and malformed requests/queries (400) into RFC 9457 `application/problem+json`.",
         files: [
-          { path: "backend/src/hotel_api/presentation/api/dependencies.py", role: "5 service provider stubs" },
+          { path: "backend/src/hotel_api/presentation/api/dependencies.py", role: "6 service provider stubs + hotel_filters & bar_filters query parsers" },
           { path: "backend/src/hotel_api/presentation/api/errors.py", role: "Exception handlers -> RFC 9457 Problem JSON" },
-          { path: "backend/src/hotel_api/presentation/api/schemas/common.py", role: "AmountDkk float serializer & with_zone()" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/common.py", role: "AmountDkk float serializer & with_zone() (Europe/Copenhagen)" },
           { path: "backend/src/hotel_api/presentation/api/schemas/problem.py", role: "Problem & FieldError Pydantic schemas" }
         ],
         exports: [
-          { sig: "get_booking_service / get_review_service / get_bar_service / ...", desc: "5 service DI stubs overridden by main.py" },
+          { sig: "get_booking_service / get_kpi_service / get_review_service / get_bar_service / ...", desc: "6 service DI stubs overridden by main.py" },
+          { sig: "hotel_filters() / bar_filters() / report_year()", desc: "Validates year (2000..2100 or 'all'), season, room_type, country, category, price_tier" },
           { sig: "register_error_handlers(app: FastAPI)", desc: "Maps domain & FastAPI errors to RFC 9457 Problem responses" },
           { sig: "AmountDkk / with_zone()", desc: "Serializes Decimal as JSON number & attaches Europe/Copenhagen tz" }
         ]
@@ -990,7 +973,7 @@
         slot: 2,
         title: "Bookings & Room Types Routers + DTOs",
         subtitle: "routers/{bookings,room_types}.py",
-        badge: "6 Endpoints · F1, A1–A7, K1, K2",
+        badge: "6 Endpoints · F1",
         journeys: ["us1", "us2", "us3", "us5"],
         summary: "Handles `/api/v1/room-types` (`GET`) and `/api/v1/bookings` (`GET`, `POST`, `GET /{id}`, `PUT /{id}`, `DELETE /{id}`) with no query parameters. `BookingInput` intentionally accepts `Any` field values with `extra='forbid'` so all value validation runs uniformly in the business layer and returns all broken rules at once.",
         files: [
@@ -1006,9 +989,29 @@
         ]
       },
       {
-        id: "router-reviews",
+        id: "router-kpis",
         layer: "presentation",
         slot: 3,
+        title: "Hotel & Bar Analytics Routers + DTOs",
+        subtitle: "routers/{kpis_hotel,kpis_bar}.py",
+        badge: "9 Endpoints · Hotel Analytics",
+        journeys: ["us2", "us3", "us4", "us5"],
+        summary: "Exposes the 9 `Hotel Analytics` endpoints (`/api/v1/kpis/hotel/*` and `/api/v1/kpis/bar/*`). Accepts optional query filters via `Depends(hotel_filters)` (`year`, `season`, `room_type`, `country`) and `Depends(bar_filters)` (`year`, `category`, `price_tier`), delegates calculations to `KpiService`, and serializes responses into strict Pydantic DTOs.",
+        files: [
+          { path: "backend/src/hotel_api/presentation/api/routers/kpis_hotel.py", role: "5 Hotel KPI endpoints (summary, by-room-type, by-season, by-room-type-and-season, by-country)" },
+          { path: "backend/src/hotel_api/presentation/api/routers/kpis_bar.py", role: "4 Bar KPI endpoints (summary, by-drink, by-category, by-price-tier)" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/kpis_hotel.py", role: "HotelSummary, RoomTypeKpi, SeasonKpi, RoomTypeSeasonKpi, CountryKpi DTOs" },
+          { path: "backend/src/hotel_api/presentation/api/schemas/bar.py", role: "BarSummary, RankedDrinkSale, BarCategoryKpi, BarPriceTierKpi DTOs" }
+        ],
+        exports: [
+          { sig: "get_hotel_summary() / list_by_room_type() / list_by_season() / list_by_room_type_and_season() / list_by_country()", desc: "Hotel Analytics route handlers (A1–A7, K1–K3)" },
+          { sig: "get_bar_summary() / list_by_drink() / list_by_category() / list_by_price_tier()", desc: "Cocktail Bar Analytics route handlers (B1–B3, A7)" }
+        ]
+      },
+      {
+        id: "router-reviews",
+        layer: "presentation",
+        slot: 4,
         title: "Guest Reviews Router & DTOs",
         subtitle: "routers/reviews.py + schemas/reviews.py",
         badge: "3 Endpoints · K3",
@@ -1027,12 +1030,12 @@
       {
         id: "router-bar",
         layer: "presentation",
-        slot: 4,
+        slot: 5,
         title: "Lobby Bar Drink Sales Router + DTOs",
         subtitle: "routers/bar.py + schemas/bar.py",
-        badge: "1 Endpoint · B1–B3, A7",
+        badge: "1 Endpoint · Raw Bar Sales",
         journeys: ["us4", "us5"],
-        summary: "Read-only parameterless endpoint `/api/v1/bar/drink-sales` returning raw drink sales (`id`, `year`, `drink_name`, `category`, `unit_price_dkk`, `units_sold`) for Helene Christine's lobby bar so Tableau can compute B1–B3 and price-tier demand.",
+        summary: "Read-only parameterless endpoint `/api/v1/bar/drink-sales` returning raw drink sales (`id`, `year`, `drink_name`, `category`, `unit_price_dkk`, `units_sold`) for Helene Christine's lobby bar so Tableau Desktop can extract raw rows via `$.items[*]`.",
         files: [
           { path: "backend/src/hotel_api/presentation/api/routers/bar.py", role: "GET /api/v1/bar/drink-sales" },
           { path: "backend/src/hotel_api/presentation/api/schemas/bar.py", role: "DrinkSale & DrinkSaleList DTOs" }
@@ -1042,23 +1045,20 @@
         ]
       },
       {
-        id: "router-health-seed",
+        id: "router-health",
         layer: "presentation",
-        slot: 5,
-        title: "Health Router & Sample Seed CLI",
-        subtitle: "routers/health.py + cli/seed.py",
-        badge: "Health + CLI Seeder",
-        journeys: ["seed"],
-        summary: "Includes `GET /api/v1/health` for container healthchecks and `python -m hotel_api.presentation.cli.seed` for parsing the teacher CSVs, repairing `M\\ufffdller` -> `Müller`, and delegating atomic database replacement to `SampleDataService`.",
+        slot: 6,
+        title: "Health Probe Router & DTO",
+        subtitle: "routers/health.py + schemas/health.py",
+        badge: "1 Endpoint · Liveness & DB",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "Exposes `GET /api/v1/health` for container healthchecks and monitoring. Verifies PostgreSQL reachability through `HealthService` before returning `Health(status='ok', database='ok')`.",
         files: [
           { path: "backend/src/hotel_api/presentation/api/routers/health.py", role: "GET /api/v1/health" },
-          { path: "backend/src/hotel_api/presentation/api/schemas/health.py", role: "Health(status='ok', database='ok') DTO" },
-          { path: "backend/src/hotel_api/presentation/cli/seed.py", role: "CSV parser, U+FFFD repair & CLI entry point" }
+          { path: "backend/src/hotel_api/presentation/api/schemas/health.py", role: "Health(status='ok', database='ok') DTO" }
         ],
         exports: [
-          { sig: "get_health()", desc: "GET /api/v1/health liveness & DB reachability probe" },
-          { sig: "run_seed() / main()", desc: "Parses CSVs and runs SampleDataService in one transaction" },
-          { sig: "parse_bookings_csv() / parse_drinks_csv() / repair_text()", desc: "Applies REPAIR_MAP {'M\\ufffdller': 'Müller'} and rejects unknown U+FFFD" }
+          { sig: "get_health()", desc: "GET /api/v1/health liveness & PostgreSQL reachability probe" }
         ]
       },
 
@@ -1082,9 +1082,26 @@
         ]
       },
       {
-        id: "service-review",
+        id: "service-kpi",
         layer: "services",
         slot: 1,
+        title: "KpiService (Hotel & Bar Analytics)",
+        subtitle: "business/services/kpi_service.py",
+        badge: "9 KPI Use Cases · A1–A7, B1–B3, K1–K3",
+        journeys: ["us2", "us3", "us4", "us5"],
+        summary: "Orchestrates all 9 `Hotel Analytics` KPI use cases. Loads records through `BookingRepository`, `ReviewRepository`, `RoomTypeRepository`, and `BarSalesRepository`, constructs filtered `_HotelScope` and `_BarScope` views (resolving `years_in_scope` and country-scoped review IDs), and delegates pure math to `business/kpis/hotel.py` and `business/kpis/bar.py`.",
+        files: [
+          { path: "backend/src/hotel_api/business/services/kpi_service.py", role: "Scope assembly & orchestration for all 9 Hotel and Bar KPI endpoints" }
+        ],
+        exports: [
+          { sig: "KpiService.summary(filters) / by_room_type / by_season / by_room_type_and_season / by_country", desc: "Computes Hotel KPIs over filtered bookings, reviews, room types & calendar years" },
+          { sig: "KpiService.bar_summary(filters) / bar_by_drink / bar_by_category / bar_by_price_tier", desc: "Computes Bar KPIs over filtered drink sales, categories & price tiers" }
+        ]
+      },
+      {
+        id: "service-review",
+        layer: "services",
+        slot: 2,
         title: "ReviewService (Satisfaction)",
         subtitle: "business/services/review_service.py",
         badge: "Guest Reviews · K3",
@@ -1102,7 +1119,7 @@
       {
         id: "service-bar",
         layer: "services",
-        slot: 2,
+        slot: 3,
         title: "BarService (Lobby Bar Sales)",
         subtitle: "business/services/bar_service.py",
         badge: "Raw Bar Sales · B1–B3",
@@ -1116,34 +1133,66 @@
         ]
       },
       {
-        id: "service-sample-health",
+        id: "service-health",
         layer: "services",
-        slot: 3,
-        title: "SampleDataService & HealthService",
-        subtitle: "business/services/{sample_data,health}_service.py",
-        badge: "Atomic Seed + Ping",
-        journeys: ["seed"],
-        summary: "`SampleDataService` deterministically assigns 2026 check-in dates (`k mod N` per season), validates all 1,000 bookings and 30 drinks, generates 500 synthetic reviews (`random.Random(2026)` on odd booking IDs), and atomically replaces operational tables. `HealthService` checks DB reachability.",
+        slot: 4,
+        title: "HealthService (DB Liveness)",
+        subtitle: "business/services/health_service.py",
+        badge: "Database Ping",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "Checks whether the application can reach PostgreSQL by delegating a lightweight ping to `HealthRepository`.",
         files: [
-          { path: "backend/src/hotel_api/business/services/sample_data_service.py", role: "Deterministic date assignment, synthetic reviews & atomic reset" },
           { path: "backend/src/hotel_api/business/services/health_service.py", role: "Database reachability check" }
         ],
         exports: [
-          { sig: "SampleDataService.replace_with_sample_data(...)", desc: "Validates & replaces reviews, bookings, and bar_drink_sales" },
-          { sig: "build_sample_bookings / build_sample_reviews / build_sample_drinks", desc: "Pure builders for deterministic 2026 seed records" },
-          { sig: "HealthService.check()", desc: "Delegates ping() to HealthRepository" }
+          { sig: "HealthService.check() -> None", desc: "Delegates ping() to HealthRepository; raises StorageUnavailable on failure" }
         ]
       },
 
-      // ---------------- TIER 2b: PURE DOMAIN, RULES & PORTS ----------------
+      // ---------------- TIER 2b: PURE DOMAIN, KPIS, RULES & PORTS ----------------
+      {
+        id: "kpis-hotel",
+        layer: "domain",
+        slot: 0,
+        title: "Hotel KPI Calculators",
+        subtitle: "business/kpis/hotel.py",
+        badge: "Pure KPIs · A1–A7, K1–K3",
+        journeys: ["us2", "us3", "us5"],
+        summary: "Pure, zero-I/O calculator functions for hotel analytics (`A1`–`A7`, `K1`–`K3`). Filters bookings and reviews in memory (`filter_bookings`, `filter_reviews`), computes available room-nights (`rooms × season days` across years in scope), occupancy rate (`K1`), total revenue (`A6`/`K2`), ALOS/ADR/revenue-per-booking (`A7`), satisfaction mean and `>= 4` share (`K3`), largest-remainder shares, and competition rankings (`1224`).",
+        files: [
+          { path: "backend/src/hotel_api/business/kpis/hotel.py", role: "Pure hotel KPI calculators & scope filters" }
+        ],
+        exports: [
+          { sig: "hotel_summary() / room_type_kpis() / season_kpis() / room_type_season_kpis() / country_kpis()", desc: "Pure breakdown & summary calculators for /api/v1/kpis/hotel/*" },
+          { sig: "stay_metrics() / satisfaction_metrics() / occupancy_rate_pct() / available_room_nights()", desc: "Core KPI building blocks (ALOS, ADR, Rev/Booking, K1 capacity, K3 satisfaction)" },
+          { sig: "filter_bookings() / filter_reviews() / years_in_scope()", desc: "In-memory scope filtering for year, season, room_type, and country" }
+        ]
+      },
+      {
+        id: "kpis-bar",
+        layer: "domain",
+        slot: 1,
+        title: "Lobby Bar KPI Calculators",
+        subtitle: "business/kpis/bar.py",
+        badge: "Pure KPIs · B1–B3, A7",
+        journeys: ["us4", "us5"],
+        summary: "Pure, zero-I/O calculator functions for Helene Christine's lobby bar (`B1`–`B3`, `A7`). Filters drink sales by `year`, `category`, and `price_tier`, computes total bar revenue and distinct menu drinks (`B1`), per-drink competition ranks by revenue and unit volume (`B2`), Cocktail vs. Coffee percentage splits (`B3`), and budget/standard/premium price-tier demand distributions (`FR-016`).",
+        files: [
+          { path: "backend/src/hotel_api/business/kpis/bar.py", role: "Pure cocktail bar KPI calculators & filters" }
+        ],
+        exports: [
+          { sig: "bar_summary() / ranked_drink_sales() / category_kpis() / price_tier_kpis()", desc: "Pure breakdown & summary calculators for /api/v1/kpis/bar/*" },
+          { sig: "filter_drink_sales() / total_revenue()", desc: "Filters drink sales by year, category, and price_tier and sums revenue" }
+        ]
+      },
       {
         id: "rules-validation-pricing",
         layer: "domain",
-        slot: 0,
+        slot: 2,
         title: "Validation & Seasonal Pricing Rules",
         subtitle: "business/rules/{booking_validation,review_validation,pricing,_parsing}.py",
         badge: "Multi-Field Validation · R9",
-        journeys: ["us1", "us3", "seed"],
+        journeys: ["us1", "us3"],
         summary: "Validates raw client dictionaries, collecting every broken field rule at once rather than failing on the first error. Enforces seasonal nightly price bands (`min_nightly_dkk <= price / nights <= max_nightly_dkk`), standard price calculation, `price_per_night_dkk` XOR `price_dkk` (FR-019), and `booking_id` XOR `(room_type, stay_date)` on reviews.",
         files: [
           { path: "backend/src/hotel_api/business/rules/booking_validation.py", role: "validate_booking() multi-error validator" },
@@ -1161,117 +1210,122 @@
       {
         id: "rules-core",
         layer: "domain",
-        slot: 1,
-        title: "Seasons & Decimal Rounding Rules",
-        subtitle: "business/rules/{seasons,numbers}.py",
-        badge: "Season Mapping · ROUND_HALF_UP",
-        journeys: ["us1", "us2", "us3", "us4", "us5", "seed"],
-        summary: "Foundational domain rules: maps months to seasons (`low`: Jan/Feb/Nov, `mid`: Mar/Apr/May/Sep/Oct, `high`: Jun/Jul/Aug/Dec) and rounds monetary `Decimal` amounts half-up to 2 decimal places.",
+        slot: 3,
+        title: "Seasons, Price Tiers, Ranking & Rounding",
+        subtitle: "business/rules/{seasons,numbers,ranking,price_tiers}.py",
+        badge: "Pure Domain Rules · R8, R10",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "Foundational pure rules shared across validation and KPI engines: maps dates/months to seasons (`low`, `mid`, `high`) and counts calendar days per season (`days_in_season`, leap-year aware); classifies bar drinks into `budget` (`< 70 DKK`), `standard` (`70–109.99 DKK`), and `premium` (`>= 110 DKK`) tiers; computes `\"1224\"` competition ranks with alphabetical tie-breaking; and performs `ROUND_HALF_UP` decimal rounding, safe division, and largest-remainder percentage shares summing to `100.00%`.",
         files: [
-          { path: "backend/src/hotel_api/business/rules/seasons.py", role: "Month-to-season mapping (season_of, season_of_month)" },
-          { path: "backend/src/hotel_api/business/rules/numbers.py", role: "round_half_up() to 2 decimal places" }
+          { path: "backend/src/hotel_api/business/rules/seasons.py", role: "Month-to-season mapping & calendar day counts (days_in_season, days_in_year)" },
+          { path: "backend/src/hotel_api/business/rules/numbers.py", role: "round_half_up(), safe_ratio() & largest_remainder_shares()" },
+          { path: "backend/src/hotel_api/business/rules/ranking.py", role: "competition_ranks() ('1224' ranking with alphabetical tie-breaker)" },
+          { path: "backend/src/hotel_api/business/rules/price_tiers.py", role: "classify_price_tier() & price_tier_bounds() (budget/standard/premium)" }
         ],
         exports: [
-          { sig: "season_of(day) / season_of_month(month)", desc: "Maps dates/months to Season.LOW, Season.MID, or Season.HIGH" },
-          { sig: "round_half_up(value: Decimal) -> Decimal", desc: "Rounds Decimal values half-up to 0.01" }
+          { sig: "season_of(day) / days_in_season(year, season) / days_in_year(year)", desc: "Maps dates to Season.LOW/MID/HIGH and counts calendar days per season" },
+          { sig: "round_half_up() / safe_ratio() / largest_remainder_shares()", desc: "Exact 2-decimal rounding, zero-safe ratios & 100.00% share allocation" },
+          { sig: "competition_ranks(items, key, tie_key)", desc: "Standard '1224' competition ranking ordered descending with tie_key order" },
+          { sig: "classify_price_tier(unit_price_dkk) / price_tier_bounds(tier)", desc: "Classifies drinks into budget (<70), standard (70..109.99), or premium (>=110)" }
         ]
       },
       {
         id: "domain-models-ports",
         layer: "domain",
-        slot: 2,
+        slot: 4,
         title: "Domain Models, Ports & Business Errors",
         subtitle: "business/{domain/models,ports,errors}.py",
         badge: "Dataclasses & Protocols",
-        journeys: ["us1", "us2", "us3", "us4", "us5", "seed"],
-        summary: "Defines immutable domain dataclasses (`Booking`, `RoomType`, `GuestReview`, `BarDrinkSale`), the 5 `Protocol` repository interfaces (`ports.py`) implemented by the data layer, and HTTP-agnostic domain exceptions (`ValidationFailed`, `NotFound`, `StorageUnavailable`).",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "Defines immutable domain dataclasses (entities `Booking`, `RoomType`, `GuestReview`, `BarDrinkSale`; filter scopes `HotelFilters`, `BarFilters`; and KPI result models `HotelSummary`, `RoomTypeKpi`, `SeasonKpi`, `RoomTypeSeasonKpi`, `CountryKpi`, `BarSummary`, `RankedDrinkSale`, `BarCategoryKpi`, `BarPriceTierKpi`), the 5 `Protocol` repository interfaces (`ports.py`) implemented by the data layer, and HTTP-agnostic domain exceptions (`ValidationFailed`, `NotFound`, `StorageUnavailable`).",
         files: [
-          { path: "backend/src/hotel_api/business/domain/models.py", role: "Frozen domain entities & enums (Season, DrinkCategory)" },
+          { path: "backend/src/hotel_api/business/domain/models.py", role: "Frozen domain entities, filter scopes, KPI models & enums" },
           { path: "backend/src/hotel_api/business/ports.py", role: "5 Repository Protocol interfaces (Dependency Inversion)" },
           { path: "backend/src/hotel_api/business/errors.py", role: "BusinessError, ValidationFailed, NotFound, StorageUnavailable" }
         ],
         exports: [
-          { sig: "Booking / RoomType / GuestReview / BarDrinkSale", desc: "Core domain entities with derived .season and .year on Booking and GuestReview" },
-          { sig: "RoomTypeRepository / BookingRepository / ReviewRepository / BarSalesRepository / HealthRepository", desc: "Structural Protocol ports decoupling business from MySQL" },
+          { sig: "Booking / RoomType / GuestReview / BarDrinkSale", desc: "Core domain entities with derived .season, .year, .revenue_dkk, and .price_tier" },
+          { sig: "HotelFilters / BarFilters / HotelSummary / RoomTypeKpi / SeasonKpi / CountryKpi / Bar*Kpi", desc: "Filter scopes and immutable KPI value objects" },
+          { sig: "RoomTypeRepository / BookingRepository / ReviewRepository / BarSalesRepository / HealthRepository", desc: "Structural Protocol ports decoupling business logic from PostgreSQL" },
           { sig: "ValidationFailed / NotFound / StorageUnavailable / FieldError", desc: "Domain exceptions mapped to HTTP 422/404/503 by presentation" }
         ]
       },
 
-      // ---------------- TIER 3: DATA ACCESS & MYSQL ----------------
+      // ---------------- TIER 3: DATA ACCESS & POSTGRESQL ----------------
       {
         id: "repo-bookings-rooms",
         layer: "data",
         slot: 0,
-        title: "MySQL Booking & RoomType Repositories",
+        title: "PostgreSQL Booking & RoomType Repos",
         subtitle: "data/repositories/{bookings,room_types}.py",
         badge: "SQL · bookings + room_types",
-        journeys: ["us1", "us2", "us3", "us5", "seed"],
-        summary: "Implements `BookingRepository` and `RoomTypeRepository` using parameterised SQL over PyMySQL `DictCursor`. Resolves `room_type` names via `JOIN room_types`, filters bookings by `check_in_date` year and `MONTH(check_in_date)` season, and supports bulk seeding.",
+        journeys: ["us1", "us2", "us3", "us5"],
+        summary: "Implements `BookingRepository` (`PostgresBookingRepository`) and `RoomTypeRepository` (`PostgresRoomTypeRepository`) using parameterised SQL over `psycopg` `dict_row` cursors. Resolves `room_type` names via `JOIN room_types` and uses `INSERT ... RETURNING` / `UPDATE ... RETURNING` for atomic booking mutations.",
         files: [
-          { path: "backend/src/hotel_api/data/repositories/bookings.py", role: "MySqlBookingRepository CRUD & bulk seed SQL" },
-          { path: "backend/src/hotel_api/data/repositories/room_types.py", role: "MySqlRoomTypeRepository canonical T1 room & rate queries" },
-          { path: "backend/src/hotel_api/data/repositories/__init__.py", role: "Re-exports all 5 MySQL repository classes" }
+          { path: "backend/src/hotel_api/data/repositories/bookings.py", role: "PostgresBookingRepository CRUD SQL" },
+          { path: "backend/src/hotel_api/data/repositories/room_types.py", role: "PostgresRoomTypeRepository canonical T1 room & rate queries" },
+          { path: "backend/src/hotel_api/data/repositories/__init__.py", role: "Re-exports all 5 PostgreSQL repository classes" }
         ],
         exports: [
-          { sig: "MySqlBookingRepository (BookingRepo)", desc: "list, get, add, replace, delete, delete_all, insert_many" },
-          { sig: "MySqlRoomTypeRepository (RoomTypeRepo)", desc: "list_all() ordered by id ASC with rates low/mid/high, get_by_name()" }
+          { sig: "PostgresBookingRepository (BookingRepo)", desc: "list(), get(id), add(booking), replace(id, booking), delete(id)" },
+          { sig: "PostgresRoomTypeRepository (RoomTypeRepo)", desc: "list_all() ordered by id ASC with rates low/mid/high, get_by_name(name)" }
         ]
       },
       {
         id: "repo-reviews-bar",
         layer: "data",
         slot: 1,
-        title: "MySQL Review & BarSales Repositories",
+        title: "PostgreSQL Review & BarSales Repos",
         subtitle: "data/repositories/{reviews,bar_sales}.py",
         badge: "SQL · reviews + bar_drink_sales",
-        journeys: ["us3", "us4", "seed"],
-        summary: "Implements `ReviewRepository` (`reviews` joined with `room_types`, filtered by `stay_date` year/season) and `BarSalesRepository` (`bar_drink_sales` filtered by `sales_year` and optional `category`), plus `delete_all()` and `insert_many()` for atomic seeding.",
+        journeys: ["us3", "us4", "us5"],
+        summary: "Implements `ReviewRepository` (`PostgresReviewRepository`, joining `reviews` with `room_types` and inserting with `RETURNING id, created_at`) and `BarSalesRepository` (`PostgresBarSalesRepository`, querying `bar_drink_sales` ordered by `id ASC`).",
         files: [
-          { path: "backend/src/hotel_api/data/repositories/reviews.py", role: "MySqlReviewRepository queries & inserts" },
-          { path: "backend/src/hotel_api/data/repositories/bar_sales.py", role: "MySqlBarSalesRepository queries & bulk seed" }
+          { path: "backend/src/hotel_api/data/repositories/reviews.py", role: "PostgresReviewRepository queries & INSERT ... RETURNING" },
+          { path: "backend/src/hotel_api/data/repositories/bar_sales.py", role: "PostgresBarSalesRepository read queries" }
         ],
         exports: [
-          { sig: "MySqlReviewRepository (ReviewRepo)", desc: "list, get, add, delete_all, insert_many" },
-          { sig: "MySqlBarSalesRepository (BarSalesRepo)", desc: "list(sales_year, category), delete_all, insert_many" }
+          { sig: "PostgresReviewRepository (ReviewRepo)", desc: "list(), get(review_id), add(review)" },
+          { sig: "PostgresBarSalesRepository (BarSalesRepo)", desc: "list() ordered by id ASC" }
         ]
       },
       {
         id: "data-conn-health",
         layer: "data",
         slot: 2,
-        title: "PyMySQL Connection Scope & HealthRepo",
+        title: "psycopg Connection Scope & HealthRepo",
         subtitle: "data/connection.py + repositories/health.py",
-        badge: "Transactional · utf8mb4",
-        journeys: ["us1", "us2", "us3", "us4", "us5", "seed"],
-        summary: "Manages request-scoped and CLI-scoped PyMySQL connections (`autocommit=False`, `utf8mb4`, `DictCursor`). `connection_scope()` commits on success and rolls back on any exception, translating `pymysql.MySQLError` and `OSError` into `StorageUnavailable` (HTTP 503).",
+        badge: "Transactional · psycopg 3.2",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "Manages request-scoped PostgreSQL connections via `psycopg` 3.2 (`autocommit=False`, `client_encoding='UTF8'`, `row_factory=dict_row`). `connection_scope()` commits on success and rolls back on any exception, translating `psycopg.OperationalError`, `psycopg.InterfaceError`, and `OSError` into `StorageUnavailable` (HTTP 503).",
         files: [
           { path: "backend/src/hotel_api/data/connection.py", role: "open_connection(), db_cursor() & connection_scope()" },
-          { path: "backend/src/hotel_api/data/repositories/health.py", role: "MySqlHealthRepository executing SELECT 1" }
+          { path: "backend/src/hotel_api/data/repositories/health.py", role: "PostgresHealthRepository executing SELECT 1" }
         ],
         exports: [
-          { sig: "connection_scope(settings) -> Iterator[Connection]", desc: "One transaction per HTTP request or CLI seed run" },
-          { sig: "db_cursor(conn) -> Iterator[DictCursor]", desc: "Wraps cursor execution and translates MySQLError -> StorageUnavailable" },
-          { sig: "MySqlHealthRepository.ping()", desc: "Executes SELECT 1 to verify DB readiness" }
+          { sig: "connection_scope(settings) -> Iterator[Connection]", desc: "One transaction per HTTP request (commit on success, rollback on error)" },
+          { sig: "db_cursor(conn) -> Iterator[Cursor]", desc: "Wraps cursor execution and translates unreachable driver errors -> StorageUnavailable" },
+          { sig: "PostgresHealthRepository.ping()", desc: "Executes SELECT 1 to verify PostgreSQL readiness" }
         ]
       },
       {
-        id: "mysql-database",
+        id: "postgres-database",
         layer: "data",
         slot: 3,
-        title: "MySQL 8.4 Database & Schema Init",
+        title: "PostgreSQL 17 Database & Schema Init",
         subtitle: "db/init/{01_schema,02_reference_data,03_test_database}.sql",
         badge: "5 Tables · 214 Rooms · No Host Port",
-        journeys: ["us1", "us2", "us3", "us4", "us5", "seed"],
-        summary: "MySQL 8.4 container (`utf8mb4_0900_ai_ci`, `TZ=Europe/Copenhagen`, persistent volume `mysql-data`) with no host port exposed (Constitution IV). Initialized with 5 relational tables, 8 canonical room types totaling 214 rooms, 24 seasonal nightly rate bands, and the isolated `hotel_test` database.",
+        journeys: ["us1", "us2", "us3", "us4", "us5"],
+        summary: "PostgreSQL 17 container (`postgres:17-alpine`, `UTF8`, `TZ=Europe/Copenhagen`, persistent volume `postgres-data`) with no host port exposed (Constitution IV). Initialized with 5 relational tables (`GENERATED BY DEFAULT AS IDENTITY` primary keys, `TIMESTAMPTZ` timestamps, `CHECK` constraints), 8 canonical room types totaling 214 rooms, 24 seasonal nightly rate bands, and the isolated `hotel_test` database.",
         files: [
-          { path: "db/init/01_schema.sql", role: "DDL for room_types, room_type_rates, bookings, reviews, bar_drink_sales" },
-          { path: "db/init/02_reference_data.sql", role: "Seeds 8 room types (214 rooms) & 24 seasonal price bands" },
-          { path: "db/init/03_test_database.sql", role: "Creates hotel_test database for pytest suite" }
+          { path: "db/init/01_schema.sql", role: "PostgreSQL 17 DDL for room_types, room_type_rates, bookings, reviews, bar_drink_sales" },
+          { path: "db/init/02_reference_data.sql", role: "Static reference data: 8 room types (214 rooms) & 24 seasonal price bands" },
+          { path: "db/init/03_test_database.sql", role: "Creates isolated hotel_test database for pytest suite" }
         ],
         exports: [
-          { sig: "Tables: room_types (8), room_type_rates (24)", desc: "Static reference tables protected by foreign keys" },
-          { sig: "Tables: bookings, reviews, bar_drink_sales", desc: "Operational tables queried & mutated via repositories" },
-          { sig: "Database: hotel & hotel_test", desc: "Production/dev schema and isolated test schema" }
+          { sig: "Tables: room_types (8), room_type_rates (24)", desc: "Static reference tables protected by foreign keys and CHECK constraints" },
+          { sig: "Tables: bookings, reviews, bar_drink_sales", desc: "Operational tables queried & mutated via Postgres*Repository classes" },
+          { sig: "Databases: hotel & hotel_test", desc: "Operational schema and isolated test schema on db:5432" }
         ]
       }
     ];
@@ -1283,60 +1337,72 @@
       // Client -> Presentation
       { source: "frontend-ui", target: "frontend-api-proxy", type: "http", label: "imports api.js" },
       { source: "frontend-api-proxy", target: "router-bookings-rooms", type: "http", label: "GET /room-types, CRUD /bookings" },
+      { source: "frontend-api-proxy", target: "router-kpis", type: "http", label: "GET /kpis/hotel/* & /kpis/bar/*" },
       { source: "tableau-client", target: "router-bookings-rooms", type: "http", label: "GET /bookings & /room-types" },
-      { source: "tableau-client", target: "router-bar", type: "http", label: "GET /bar/drink-sales" },
       { source: "tableau-client", target: "router-reviews", type: "http", label: "GET /reviews" },
-      { source: "openapi-swagger", target: "router-bookings-rooms", type: "wire", label: "contract validates routes" },
-      { source: "openapi-swagger", target: "router-reviews", type: "wire", label: "contract validates reviews" },
-      { source: "openapi-swagger", target: "router-bar", type: "wire", label: "contract validates bar" },
-      { source: "csv-sample-files", target: "router-health-seed", type: "http", label: "read by cli/seed.py" },
+      { source: "tableau-client", target: "router-bar", type: "http", label: "GET /bar/drink-sales" },
+      { source: "openapi-swagger", target: "router-bookings-rooms", type: "wire", label: "contract validates 6 routes" },
+      { source: "openapi-swagger", target: "router-kpis", type: "wire", label: "contract validates 9 KPI routes" },
+      { source: "openapi-swagger", target: "router-reviews", type: "wire", label: "contract validates 3 review routes" },
+      { source: "openapi-swagger", target: "router-bar", type: "wire", label: "contract validates /bar/drink-sales" },
+      { source: "openapi-swagger", target: "router-health", type: "wire", label: "contract validates /health" },
 
       // Composition Root wiring
-      { source: "composition-root", target: "api-deps-errors", type: "wire", label: "overrides DI stubs + error handlers" },
-      { source: "composition-root", target: "router-bookings-rooms", type: "wire", label: "includes routers" },
-      { source: "composition-root", target: "router-reviews", type: "wire", label: "includes router" },
-      { source: "composition-root", target: "router-bar", type: "wire", label: "includes router" },
-      { source: "composition-root", target: "router-health-seed", type: "wire", label: "includes health + seed scope" },
+      { source: "composition-root", target: "api-deps-errors", type: "wire", label: "overrides 6 DI stubs + error handlers" },
+      { source: "composition-root", target: "router-bookings-rooms", type: "wire", label: "includes bookings & room_types routers" },
+      { source: "composition-root", target: "router-kpis", type: "wire", label: "includes kpis_hotel & kpis_bar routers" },
+      { source: "composition-root", target: "router-reviews", type: "wire", label: "includes reviews router" },
+      { source: "composition-root", target: "router-bar", type: "wire", label: "includes bar router" },
+      { source: "composition-root", target: "router-health", type: "wire", label: "includes health router" },
       { source: "composition-root", target: "data-conn-health", type: "wire", label: "opens connection_scope per request" },
 
       // Presentation Routers -> DI & Business Services
       { source: "router-bookings-rooms", target: "api-deps-errors", type: "service", label: "Depends(get_booking/room_type_service)" },
+      { source: "router-kpis", target: "api-deps-errors", type: "service", label: "Depends(get_kpi_service, hotel/bar_filters)" },
       { source: "router-reviews", target: "api-deps-errors", type: "service", label: "Depends(get_review_service)" },
       { source: "router-bar", target: "api-deps-errors", type: "service", label: "Depends(get_bar_service)" },
+      { source: "router-health", target: "api-deps-errors", type: "service", label: "Depends(get_health_service)" },
       { source: "router-bookings-rooms", target: "service-booking-room", type: "service", label: "calls BookingService & RoomTypeService" },
+      { source: "router-kpis", target: "service-kpi", type: "service", label: "calls KpiService (9 KPI methods)" },
       { source: "router-reviews", target: "service-review", type: "service", label: "calls ReviewService" },
       { source: "router-bar", target: "service-bar", type: "service", label: "calls BarService" },
-      { source: "router-health-seed", target: "service-sample-health", type: "service", label: "calls SampleDataService & HealthService" },
+      { source: "router-health", target: "service-health", type: "service", label: "calls HealthService.check()" },
 
-      // Business Services -> Rules & Domain Models/Ports
+      // Business Services -> Pure KPIs, Rules & Domain Models/Ports
       { source: "service-booking-room", target: "rules-validation-pricing", type: "service", label: "validate_booking + standard_price" },
       { source: "service-booking-room", target: "domain-models-ports", type: "service", label: "BookingRepository & RoomTypeRepository ports" },
+      { source: "service-kpi", target: "kpis-hotel", type: "service", label: "hotel_summary & 4 breakdown calculators" },
+      { source: "service-kpi", target: "kpis-bar", type: "service", label: "bar_summary & 3 breakdown calculators" },
+      { source: "service-kpi", target: "rules-core", type: "service", label: "SEASON_ORDER & PRICE_TIER_ORDER" },
+      { source: "service-kpi", target: "domain-models-ports", type: "service", label: "Booking, Review, RoomType & BarSales ports" },
       { source: "service-review", target: "rules-validation-pricing", type: "service", label: "validate_review()" },
       { source: "service-review", target: "domain-models-ports", type: "service", label: "Review, Booking & RoomType ports" },
       { source: "service-bar", target: "domain-models-ports", type: "service", label: "BarSalesRepository port" },
-      { source: "service-sample-health", target: "rules-validation-pricing", type: "service", label: "validates & prices 1,000 seed rows" },
-      { source: "service-sample-health", target: "rules-core", type: "service", label: "season_of() for 2026 dates" },
-      { source: "service-sample-health", target: "domain-models-ports", type: "service", label: "all 5 repository ports" },
+      { source: "service-health", target: "domain-models-ports", type: "service", label: "HealthRepository port" },
 
-      // Intra-Business Layer (Validation -> Core Rules & Domain Models)
+      // Intra-Business Layer (KPIs & Validation -> Core Rules & Domain Models)
+      { source: "kpis-hotel", target: "rules-core", type: "service", label: "days_in_season, safe_ratio, competition_ranks" },
+      { source: "kpis-hotel", target: "domain-models-ports", type: "service", label: "HotelSummary, RoomTypeKpi, SeasonKpi, CountryKpi" },
+      { source: "kpis-bar", target: "rules-core", type: "service", label: "price_tier_bounds, competition_ranks, shares" },
+      { source: "kpis-bar", target: "domain-models-ports", type: "service", label: "BarSummary, RankedDrinkSale, BarCategoryKpi, BarPriceTierKpi" },
       { source: "rules-validation-pricing", target: "rules-core", type: "service", label: "season_of() & round_half_up()" },
       { source: "rules-validation-pricing", target: "domain-models-ports", type: "service", label: "NewBooking, NewReview, FieldError" },
 
       // Services / Ports -> Data Layer Repositories
       { source: "service-booking-room", target: "repo-bookings-rooms", type: "data", label: "bound via main.py DI" },
+      { source: "service-kpi", target: "repo-bookings-rooms", type: "data", label: "loads bookings & room_types" },
+      { source: "service-kpi", target: "repo-reviews-bar", type: "data", label: "loads reviews & bar_drink_sales" },
       { source: "service-review", target: "repo-reviews-bar", type: "data", label: "reads/writes reviews" },
       { source: "service-review", target: "repo-bookings-rooms", type: "data", label: "resolves booking_id & room_types" },
       { source: "service-bar", target: "repo-reviews-bar", type: "data", label: "reads bar_drink_sales" },
-      { source: "service-sample-health", target: "repo-bookings-rooms", type: "data", label: "delete_all + insert_many" },
-      { source: "service-sample-health", target: "repo-reviews-bar", type: "data", label: "delete_all + insert_many" },
-      { source: "service-sample-health", target: "data-conn-health", type: "data", label: "HealthRepo.ping()" },
+      { source: "service-health", target: "data-conn-health", type: "data", label: "PostgresHealthRepository.ping()" },
 
-      // Data Layer Repositories -> Connection & MySQL
+      // Data Layer Repositories -> Connection & PostgreSQL
       { source: "repo-bookings-rooms", target: "data-conn-health", type: "data", label: "uses db_cursor(conn)" },
       { source: "repo-reviews-bar", target: "data-conn-health", type: "data", label: "uses db_cursor(conn)" },
-      { source: "repo-bookings-rooms", target: "mysql-database", type: "data", label: "SQL on bookings, room_types, room_type_rates" },
-      { source: "repo-reviews-bar", target: "mysql-database", type: "data", label: "SQL on reviews, bar_drink_sales" },
-      { source: "data-conn-health", target: "mysql-database", type: "data", label: "PyMySQL TCP db:3306 (SELECT 1 / tx)" }
+      { source: "repo-bookings-rooms", target: "postgres-database", type: "data", label: "SQL on bookings, room_types, room_type_rates" },
+      { source: "repo-reviews-bar", target: "postgres-database", type: "data", label: "SQL on reviews, bar_drink_sales" },
+      { source: "data-conn-health", target: "postgres-database", type: "data", label: "psycopg TCP db:5432 (SELECT 1 / tx)" }
     ];
 
     // ============================================================================
@@ -1371,7 +1437,7 @@
       const NODE_H = 74;
 
       if (isVert) {
-        const BAND_W = 1780;
+        const BAND_W = 1840;
         const BAND_H = 148;
         const BAND_GAP = 54;
         const START_X = 60;
@@ -1730,8 +1796,7 @@
       us2: "US2 · Hotel Revenue (A1–A6)",
       us3: "US3 · Occupancy & Reviews (K1/K3)",
       us4: "US4 · Lobby Bar & Price Tiers (B1–B3)",
-      us5: "US5 · Stay KPIs (A7: ALOS/ADR)",
-      seed: "CLI · Idempotent CSV Seed (R13)"
+      us5: "US5 · Stay KPIs (A7: ALOS/ADR)"
     };
 
     function selectNode(nodeId) {
@@ -2051,6 +2116,8 @@
     window.addEventListener("resize", fitToScreen);
 
     // Initial boot
+    document.getElementById("stat-nodes").textContent = String(NODES.length);
+    document.getElementById("stat-edges").textContent = String(EDGES.length);
     renderGraph();
     selectNode("composition-root");
     requestAnimationFrame(fitToScreen);
